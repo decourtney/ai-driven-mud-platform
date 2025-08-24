@@ -1,0 +1,36 @@
+# Python cache and build
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+lora_env/
+venv/
+.env/
+
+# Model files and outputs
+offload/
+lora_output/
+ai_models/
+*.bin
+*.safetensors
+*.pt
+
+# Hugging Face cache
+~/.cache/huggingface/
+huggingface/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+
