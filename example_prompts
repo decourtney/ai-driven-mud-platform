@@ -1,5 +1,6 @@
 { "actor": "Thorin",  "action": "sword strike",  "target": "goblin",  "action_type": "attack",  "weapon": "enchanted sword",  "subject": null,  "details": "aimed at the creature's weak spot" }
 { "actor": "Gandalf",  "action": "fireball spell",  "target": "group of orcs",  "action_type": "spell",  "weapon": null,  "subject": "elemental fire magic",  "details": "channeled through his staff with ancient incantations" }
+{ "actor": "player", "action": "lock picking", "target": "wooden chest", "action_type": "interact", "weapon": null, "subject": null, "details": "player doesn't have the required lockpick set" }
 
 success: true, damage_type: "critical"
 success: false, damage_type: "miss"

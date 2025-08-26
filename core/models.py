@@ -8,6 +8,14 @@ from typing import Optional
 from enum import Enum
 
 
+
+class GameCondition(Enum):
+    CONTINUE = "continue"
+    PLAYER_WIN = "player_win"
+    PLAYER_DEFEAT = "player_defeat"
+    GAME_OVER = "game_over"
+    
+
 class ActionType(str, Enum):
     ATTACK = "attack"
     SPELL = "spell"

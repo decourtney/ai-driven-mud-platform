@@ -154,26 +154,54 @@ class CodeLlamaParser(ActionParser):
     
     def _create_prompt(self, user_input: str) -> str:
         """Create a well-structured prompt for CodeLlama"""
-        system_prompt = """You are a text action parser.  
-        Given user input, return a JSON object with these keys:   
-        
-        - Fields: "actor", "action", "target", "action_type", "weapon", "subject", "details"
-        - actor: who/what is performing the action.
-        - action: verb or verb phrase describing what the actor is doing.
-        - target: who/what is affected by the action.
-        - action_type: one of ["attack", "spell", "skill_check", "social", "movement", "interact"] — pick the best match 
-        - weapon: item used for attack or spellcasting.
-        - subject: the specific topic, claim, or object of focus — this may be a **full phrase or sentence**.
-        - details: only include the specific clauses, phrases, or statements that add important nuance not already covered by other fields. Keep it short (one or two sentences max). Do not repeat the full user input unless every part is important.
-        - Output ONLY valid JSON. 
+        system_prompt = """
+            You are a D&D text action parser.
+            Given user input, return a JSON object with these keys:
 
-        Examples:
-        Input: "Tell the merchant about the quest to find the ancient ruins"
-        Output: {"actor": "player", "action": "telling", "target": "merchant", "action_type": "social", "weapon": null, "subject": "quest", "details": "find the ancient ruins"}
-        
-        Input: "I attack the dragon with my sword"
-        Output: {"actor": "player", "action": "sword strike", "target": "dragon", "action_type": "attack", "weapon": "sword", "subject": null, "details": null}
-        """
+            - Fields: "actor", "action", "target", "action_type", "weapon", "subject", "details".
+            - actor: who/what is performing the action.
+            - action: verb or short phrase describing what the actor is doing.
+            - target: who/what is affected by the action.
+            - action_type: one of ["attack", "spell", "skill_check", "social", "interact", "movement"]:
+                - "attack": physical or weapon-based attack.
+                - "spell": casting magic.
+                - "skill_check": actions that require a skill to perform - sneaking, perception, disarming.
+                - "social": persuading, negotiating, influencing, intimidating, or talking to characters.
+                - "interact": manipulating, opening, closing, or using any object, device, container, or entrance 
+                (including doors, gates, chests, levers, locks, switches). 
+                Always use "interact" for these actions, even if the object could be passed through.
+                - "movement": actively traveling from one location to another, including going through entrances.
+                Only use "movement" when the action is clearly about changing position or location, 
+                not just opening something.
+            - weapon: item used for attack or spellcasting.
+            - subject: the specific topic, claim, or object of focus — this may be a full phrase or sentence.
+            - details: include only clauses that add nuance not covered by other fields. Keep it one sentence max.
+            - Output ONLY valid JSON.
+
+            Examples:
+
+            Input: "I try to pick the lock on the chest"
+            Output: {
+            "actor": "player",
+            "action": "pick the lock",
+            "target": "chest",
+            "action_type": "skill_check",
+            "weapon": null,
+            "subject": null,
+            "details": null
+            }
+
+            Input: "I swing my sword at the goblin"
+            Output: {
+            "actor": "player",
+            "action": "swing my sword",
+            "target": "goblin",
+            "action_type": "attack",
+            "weapon": "sword",
+            "subject": null,
+            "details": null
+            }
+            """
 
         return f"""{system_prompt}
 

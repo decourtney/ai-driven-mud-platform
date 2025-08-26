@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
 """
-Main entry point for the D&D Narrator system.
-Provides unified CLI interface for all components.
+Main entry point for the D&D Streaming Game Engine.
+Supports both server mode for Next.js frontend and CLI testing modes.
 """
 
 import argparse
 import sys
 import threading
+import uuid
 from typing import Optional
 
 from api.server import create_server
 from cli.test_parser import ParserTester
-from core.models import ProcessUserInputRequest
+from core.models import ProcessUserInputRequest, CharacterState
+from core.game_engine import GameEngine, GameCondition
+from core.model_manager import ModelManager
 
 
 def run_server_mode(args):
-    """Run the FastAPI server"""
-    print("[+] Starting D&D Narrator Server...")
+    """Run the FastAPI server optimized for Next.js frontend"""
+    print("[+] Starting D&D Streaming Game Server for Next.js...")
     
     server = create_server(
         parser_model_path=args.parser_model,
@@ -29,15 +32,16 @@ def run_server_mode(args):
     results = server.load_all_models()
     if results["models_manager"]:
         print("[+] Models loaded successfully!")
+        print(f"[+] Ready for Next.js frontend connections on http://{args.host}:{args.port}")
     else:
         print("[-] Warning: Failed to load models")
         print("[-] Models will auto-load on first request")
     
-    # Add CLI thread if requested
+    # Add CLI thread if requested (for debugging)
     if args.with_cli:
         def cli_loop():
-            print("\n[+] CLI mode active alongside server")
-            print("Commands: '/reload' - reload models, '/status' - check status, '/quit' - shutdown server")
+            print("\n[+] Server CLI mode active")
+            print("Commands: '/sessions' - list sessions, '/reload' - reload models, '/status' - check status, '/quit' - shutdown")
             
             while True:
                 try:
@@ -50,26 +54,25 @@ def run_server_mode(args):
                         results = server.load_all_models()
                         print(f"Reload results: {results}")
                     elif cmd.lower() == '/status':
-                        status = server.game_engine.is_ready()
-                        memory = server.model_manager.get_memory_usage()
-                        print(f"Component status: {status}")
-                        print(f"GPU memory: {memory}")
+                        status = {
+                            "models_loaded": server.model_manager.are_models_loaded(),
+                            "active_sessions": len(server.active_sessions),
+                            "parser_ready": server.model_manager.is_parser_ready(),
+                            "narrator_ready": server.model_manager.is_narrator_ready()
+                        }
+                        print(f"Status: {status}")
+                        if server.model_manager.are_models_loaded():
+                            memory = server.model_manager.get_memory_usage()
+                            print(f"GPU memory: {memory}")
+                    elif cmd.lower() == '/sessions':
+                        print(f"Active sessions: {len(server.active_sessions)}")
+                        for session_id, session in server.active_sessions.items():
+                            print(f"  - {session_id}: {session.player_name} ({session.game_condition.value})")
                     elif cmd.lower() == '/unload':
                         server.model_manager.unload_all_models()
                         print("Models unloaded")
-                    elif cmd and not cmd.startswith('/'):
-                        # Process as natural language action
-                        try:
-                            request = ProcessUserInputRequest(user_input=cmd)
-                            result = server.game_engine.execute_game_turn(request)
-                            print(f"Action: {result.parsed_action.action}")
-                            print(f"Roll: {result.dice_roll}, Hit: {result.hit}")
-                            print(f"Narration: {result.narration}")
-                        except Exception as e:
-                            print(f"Error: {e}")
                     else:
-                        print("Available commands: /reload, /status, /unload, /quit")
-                        print("Or enter natural language to test the system")
+                        print("Available commands: /sessions, /reload, /status, /unload, /quit")
                         
                 except KeyboardInterrupt:
                     print("\nShutting down server...")
@@ -82,8 +85,148 @@ def run_server_mode(args):
     server.run(host=args.host, port=args.port)
 
 
+def run_streaming_game_mode(args):
+    """Run the streaming game engine in CLI mode for testing"""
+    print("[+] Starting Streaming Game Engine CLI Mode...")
+    
+    # Initialize components
+    model_manager = ModelManager()
+    
+    print("[+] Loading models...")
+    if not model_manager.load_all_models():
+        print("[-] Failed to load models. Exiting.")
+        return
+    
+    print("[+] Models loaded successfully!")
+    
+    # Create game engine
+    engine = GameEngine(model_manager)
+    
+    # Set up game state
+    player_name = args.player_name or "Hero"
+    print(f"[+] Creating game for player: {player_name}")
+    
+    player = CharacterState(
+        name=player_name,
+        max_hp=20,
+        current_hp=20,
+        equipped_weapon="sword"
+    )
+    
+    npcs = [
+        CharacterState(name="Goblin", max_hp=8, current_hp=8, equipped_weapon="club"),
+        CharacterState(name="Orc", max_hp=15, current_hp=15, equipped_weapon="axe")
+    ]
+    
+    scene_state = {
+        "name": "Test Dungeon",
+        "description": "A dark stone chamber with flickering torches",
+        "rules": {},
+        "difficulty_modifier": 0
+    }
+    
+    engine.initialize_game_state(player, npcs, scene_state)
+    
+    print(f"[+] Game initialized! Type 'help' for commands or describe your actions.")
+    print("="*60)
+    
+    # Display initial scene
+    scene = engine.get_current_scene()
+    print(f"\n🎭 SCENE: {scene}\n")
+    
+    # Game loop
+    while True:
+        try:
+            user_input = input(f"{player_name}> ").strip()
+            
+            if not user_input:
+                continue
+                
+            # Special commands
+            if user_input.lower() in ['quit', 'exit']:
+                break
+            elif user_input.lower() == 'help':
+                print("\nCommands:")
+                print("  help - Show this help")
+                print("  status - Show character status")
+                print("  scene - Show current scene")
+                print("  quit/exit - Exit game")
+                print("\nOr describe any action you want to take!")
+                continue
+            elif user_input.lower() == 'status':
+                state = engine.game_state
+                print(f"\n📊 STATUS:")
+                print(f"Player: {state.player.name} ({state.player.current_hp}/{state.player.max_hp} HP)")
+                for npc in state.npcs:
+                    status = "alive" if npc.is_alive() else "defeated"
+                    print(f"  {npc.name}: {npc.current_hp}/{npc.max_hp} HP ({status})")
+                print(f"Turn: {state.turn_counter}\n")
+                continue
+            elif user_input.lower() == 'scene':
+                scene = engine.get_current_scene()
+                print(f"\n🎭 SCENE: {scene}\n")
+                continue
+            
+            print(f"\n⚡ Processing action: '{user_input}'")
+            
+            # Process player action immediately
+            print("🎲 Rolling dice and generating result...")
+            player_narration, condition, should_continue = engine.process_player_input_immediate(user_input)
+            
+            print(f"📖 {player_narration}")
+            
+            # Check game condition
+            if condition != GameCondition.CONTINUE:
+                print(f"\n🎮 GAME OVER: {condition.value}")
+                break
+                
+            if not should_continue:
+                print("❌ Action failed. Try again.")
+                continue
+            
+            # Process NPCs
+            print("\n⏳ NPCs are taking their turns...")
+            living_npcs = engine.get_living_npcs()
+            
+            if living_npcs:
+                for npc in living_npcs:
+                    print(f"  🤖 {npc.name} is deciding...")
+                    
+                    npc_narration, success = engine.process_single_npc_action(npc)
+                    if npc_narration:
+                        print(f"  📖 {npc_narration}")
+                    
+                    # Check condition after each NPC
+                    current_condition = engine.check_game_condition()
+                    if current_condition != GameCondition.CONTINUE:
+                        print(f"\n🎮 GAME OVER: {current_condition.value}")
+                        return
+            else:
+                print("  (No living NPCs to act)")
+            
+            # Update scene
+            print("\n🔄 Updating scene...")
+            scene_description, final_condition = engine.get_updated_scene_after_actions()
+            
+            print(f"\n🎭 UPDATED SCENE: {scene_description}")
+            
+            # Final condition check
+            if final_condition != GameCondition.CONTINUE:
+                print(f"\n🎮 GAME OVER: {final_condition.value}")
+                break
+            
+            print("\n" + "="*60)
+            
+        except KeyboardInterrupt:
+            print("\n\nGame interrupted. Goodbye!")
+            break
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            print("Try again or type 'help' for commands.")
+
+
 def run_test_parser_mode(args):
-    """Run parser testing mode"""
+    """Run parser testing mode (unchanged from original)"""
     print("[+] Starting Parser Testing Mode...")
     
     tester = ParserTester()
@@ -108,146 +251,78 @@ def run_test_parser_mode(args):
         tester.interactive_mode()
 
 
-def run_test_narrator_mode(args):
-    """Run narrator testing mode"""
-    print("[+] Starting Narrator Testing Mode...")
+def run_quick_test_mode(args):
+    """Quick test mode with new streaming engine"""
+    print(f"[+] Quick streaming test: '{args.text}'")
     
-    # Import here to avoid loading heavy models unless needed
-    from narrators.pygmalion_narrator import PygmalionNarrator
-    from core.models import ParsedAction, ActionType
+    # Initialize minimal components
+    model_manager = ModelManager()
     
-    narrator = PygmalionNarrator(
-        model_name=args.narrator_model,
-        adapter_path=args.narrator_adapter
-    )
-    
-    if not narrator.load_model():
-        print("[-] Failed to load narrator model")
+    print("[+] Loading models...")
+    if not model_manager.load_all_models():
+        print("[-] Failed to load models")
         return
     
-    print("[+] Narrator loaded successfully")
+    # Create engine and minimal game state
+    engine = GameEngine(model_manager)
     
-    # Test cases
-    test_actions = [
-        ParsedAction(
-            actor="Thorin",
-            action="sword strike", 
-            target="goblin",
-            action_type=ActionType.ATTACK,
-            weapon="sword"
-        ),
-        ParsedAction(
-            actor="Gandalf",
-            action="fireball spell",
-            target="orc",
-            action_type=ActionType.SPELL
-        ),
-        ParsedAction(
-            actor="Legolas", 
-            action="stealth attempt",
-            target="guard",
-            action_type=ActionType.SKILL_CHECK
-        )
-    ]
+    player = CharacterState(name="TestPlayer", max_hp=20, current_hp=20, equipped_weapon="sword")
+    npcs = [CharacterState(name="TestGoblin", max_hp=5, current_hp=5, equipped_weapon="club")]
+    scene = {"name": "Test Scene", "description": "A simple test chamber", "rules": {}}
     
-    if args.interactive:
-        print("\nInteractive narrator testing (type 'quit' to exit):")
-        while True:
-            try:
-                action_text = input("\nDescribe action: ").strip()
-                if action_text.lower() in ['quit', 'exit']:
-                    break
-                
-                # Simple parsing for demo
-                action = ParsedAction(
-                    actor="player",
-                    action=action_text,
-                    target="target",
-                    action_type=ActionType.ATTACK
-                )
-                
-                dice_roll = int(input("Dice roll (1-20): ") or "10")
-                hit = dice_roll >= 10
-                damage_type = "critical" if dice_roll >= 18 else "wound" if hit else "miss"
-                
-                narration = narrator.generate_narration(action, hit, damage_type)
-                print(f"Narration: {narration}")
-                
-            except KeyboardInterrupt:
-                break
-            except Exception as e:
-                print(f"Error: {e}")
-    else:
-        # Run test cases
-        for i, action in enumerate(test_actions, 1):
-            print(f"\n--- Test Case {i} ---")
-            print(f"Action: {action.actor} performs {action.action} against {action.target}")
+    engine.initialize_game_state(player, npcs, scene)
+    
+    # Process the test action
+    print(f"[+] Processing action: {args.text}")
+    
+    try:
+        player_narration, condition, should_continue = engine.process_player_input_immediate(args.text)
+        print(f"Player result: {player_narration}")
+        print(f"Game condition: {condition.value}")
+        print(f"Should continue: {should_continue}")
+        
+        if should_continue and condition == GameCondition.CONTINUE:
+            # Test one NPC action
+            print("\n[+] Testing NPC response...")
+            living_npcs = engine.get_living_npcs()
+            if living_npcs:
+                npc_narration, success = engine.process_single_npc_action(living_npcs[0])
+                print(f"NPC result: {npc_narration}")
             
-            for roll in [5, 12, 18, 20]:  # Different roll outcomes
-                hit = roll >= 12
-                damage_type = "critical" if roll >= 18 else "wound" if hit else "miss"
-                
-                narration = narrator.generate_narration(action, hit, damage_type)
-                print(f"Roll {roll}: {narration}")
-
-
-def run_quick_test_mode(args):
-    """Quick test mode using minimal components"""
-    print(f"[+] Quick test: '{args.text}'")
-    
-    if args.fallback_only:
-        from parsers.fallback_parser import FallbackParser
-        parser = FallbackParser()
-        parser.load_model()
-        result = parser.parse_action(args.text)
-        print(f"Parsed with fallback: {result}")
-    else:
-        # Try to use full system with ModelManager
-        from core.model_manager import ModelManager
-        from core.game_engine import GameEngine
-        from core.models import ProcessUserInputRequest
-        
-        # Use ModelManager for efficient model handling
-        model_manager = ModelManager()
-        
-        # Load models
-        print("[+] Loading models...")
-        if not model_manager.load_all_models():
-            print("[-] Failed to load models, trying fallback parser only...")
-            from parsers.fallback_parser import FallbackParser
-            parser = FallbackParser()
-            parser.load_model()
-            result = parser.parse_action(args.text)
-            print(f"Parsed with fallback: {result}")
-            return
-        
-        engine = GameEngine(model_manager)
-        request = ProcessUserInputRequest(user_input=args.text)
-        
-        result = engine.execute_game_turn(request)
-        
-        print(f"Parsed Action: {result.parsed_action.action}")
-        print(f"Roll: {result.dice_roll}, Hit: {result.hit}")
-        print(f"Narration: {result.narration}")
+    except Exception as e:
+        print(f"Error: {e}")
 
 
 def main():
     """Main CLI entry point with subcommands"""
     parser = argparse.ArgumentParser(
-        description="D&D Narrator System - AI-powered action parsing and narration",
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        description="D&D Streaming Game Engine - AI-powered real-time gameplay",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python main.py server --host 0.0.0.0 --port 8000  # Start server for Next.js
+  python main.py game --player-name "Aragorn"       # CLI game mode
+  python main.py quick "attack the goblin"          # Quick test
+        """
     )
     
     subparsers = parser.add_subparsers(dest='mode', help='Operation mode')
     
-    # Server mode
-    server_parser = subparsers.add_parser('server', help='Run FastAPI server')
+    # Server mode (for Next.js frontend)
+    server_parser = subparsers.add_parser('server', help='Run FastAPI server for Next.js frontend')
     server_parser.add_argument('--host', default='0.0.0.0', help='Server host')
     server_parser.add_argument('--port', type=int, default=8000, help='Server port')
     server_parser.add_argument('--parser-model', help='Path to CodeLlama parser model')
     server_parser.add_argument('--narrator-model', help='Path to narrator base model')
     server_parser.add_argument('--narrator-adapter', help='Path to narrator LoRA adapter')
-    server_parser.add_argument('--with-cli', action='store_true', help='Run CLI alongside server')
+    server_parser.add_argument('--with-cli', action='store_true', help='Run CLI alongside server for debugging')
+    
+    # Streaming game mode (CLI testing)
+    game_parser = subparsers.add_parser('game', help='Run streaming game in CLI mode')
+    game_parser.add_argument('--player-name', default='Hero', help='Player character name')
+    game_parser.add_argument('--parser-model', help='Path to CodeLlama parser model')
+    game_parser.add_argument('--narrator-model', help='Path to narrator base model')
+    game_parser.add_argument('--narrator-adapter', help='Path to narrator LoRA adapter')
     
     # Parser testing mode  
     parser_parser = subparsers.add_parser('test-parser', help='Test action parsers')
@@ -258,12 +333,6 @@ def main():
     parser_parser.add_argument('--compare', action='store_true', help='Compare parsers')
     parser_parser.add_argument('text', nargs='?', help='Text to parse')
     
-    # Narrator testing mode
-    narrator_parser = subparsers.add_parser('test-narrator', help='Test narration generation')
-    narrator_parser.add_argument('--narrator-model', help='Path to narrator base model')
-    narrator_parser.add_argument('--narrator-adapter', help='Path to narrator LoRA adapter')
-    narrator_parser.add_argument('--interactive', action='store_true', help='Interactive testing mode')
-    
     # Quick test mode
     quick_parser = subparsers.add_parser('quick', help='Quick test with minimal setup')
     quick_parser.add_argument('text', help='Action to test')
@@ -271,9 +340,9 @@ def main():
     
     args = parser.parse_args()
     
-    # Handle no subcommand (default to interactive server with CLI)
+    # Handle no subcommand (default to server mode for Next.js)
     if not args.mode:
-        print("No mode specified. Starting server with CLI...")
+        print("No mode specified. Starting server for Next.js frontend...")
         args.mode = 'server'
         args.with_cli = True
         args.host = '0.0.0.0'
@@ -286,10 +355,10 @@ def main():
     try:
         if args.mode == 'server':
             run_server_mode(args)
+        elif args.mode == 'game':
+            run_streaming_game_mode(args)
         elif args.mode == 'test-parser':
             run_test_parser_mode(args)
-        elif args.mode == 'test-narrator':
-            run_test_narrator_mode(args)
         elif args.mode == 'quick':
             run_quick_test_mode(args)
         else:

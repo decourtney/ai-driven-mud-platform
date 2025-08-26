@@ -185,7 +185,7 @@ class GGUFMistralNarrator(ActionNarrator):
                     scenario = f"{actor} performs {action_desc} with expert technique."
                 else:
                     scenario = f"{actor} successfully completes {action_desc}."
-            elif action.action_type == ActionType.SPELL:
+            elif action.action_type == ActionType.SPELL: # Will have to determine if spell type is an attack or not
                 if damage_type == "kill":
                     scenario = f"{actor} unleashes devastating {action_desc} magic that proves fatal to {target}."
                 elif damage_type == "critical":
@@ -230,7 +230,7 @@ class GGUFMistralNarrator(ActionNarrator):
         full_scenario = scenario + subject_context + details_context
         
         # Balanced prompt with contextual information
-        return f"""<s>[INST] You are a skilled D&D dungeon master. 
+        return f"""[INST] You are a skilled D&D dungeon master. 
             Write exactly one vivid sentence describing this scene. 
             Focus on sensory details and dynamic action. 
             No game mechanics or generic terms like "player" or "character".
@@ -238,7 +238,7 @@ class GGUFMistralNarrator(ActionNarrator):
             Do not use names not given.
             Speak in the third person.
 
-            Scene: {scenario}
+            Scene: {full_scenario}
 
             One sentence description: [/INST]"""
 
