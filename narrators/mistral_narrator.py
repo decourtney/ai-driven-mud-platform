@@ -1,9 +1,10 @@
 import torch
-from typing import Optional
+from typing import Optional, Dict, Any, List
 import gc
 import re
 import os
 from pathlib import Path
+from core.character_state import CharacterState
 
 try:
     from llama_cpp import Llama
@@ -39,6 +40,7 @@ class GGUFMistralNarrator(ActionNarrator):
         if not self.cuda_available:
             print("[!] CUDA not available, using CPU only")
             self.n_gpu_layers = 0
+
 
     def load_model(self) -> bool:
         """Load the GGUF model with llama-cpp-python"""
@@ -105,6 +107,7 @@ class GGUFMistralNarrator(ActionNarrator):
             self._is_loaded = False
             return False
 
+
     def unload_model(self) -> bool:
         """Unload the model to free resources"""
         try:
@@ -121,21 +124,24 @@ class GGUFMistralNarrator(ActionNarrator):
             print(f"[-] Error unloading GGUF Mistral: {e}")
             return False
 
+
     def is_loaded(self) -> bool:
         return self._is_loaded and self.model is not None
 
-    def generate_narration(self, action: ParsedAction, hit: bool, damage_type: str = "wound") -> str:
+
+    def generate_input_narration(self, action: ParsedAction, hit: bool, damage_type: str = "wound") -> str:
         if not self.is_loaded():
             print("[-] Narrator model not loaded")
             return f"{action.actor} performs {action.action}."
+        
         try:
-            user_message = self._create_user_message(action, hit, damage_type)
+            input_prompt = self._create_input_prompt(action, hit, damage_type)
             
             # Debug the prompt if needed
             if self.verbose:
-                print(f"[DEBUG] Prompt: {user_message}")
+                print(f"[DEBUG] Input Prompt: {input_prompt}")
             
-            raw_text = self._generate_text(user_message)
+            raw_text = self._generate_text(input_prompt, max_tokens=64, temperature=0.4)
             
             # Check if generation failed
             if len(raw_text.strip()) < 5:
@@ -154,8 +160,49 @@ class GGUFMistralNarrator(ActionNarrator):
             import traceback
             print(f"[-] Full traceback: {traceback.format_exc()}")
             return f"{action.actor} performs {action.action}."
+        
+        
+    def generate_scene_narration(self, scene: Dict[str, Any], player: CharacterState, npcs: List[CharacterState]):
+        """Generate a scene description using the narrator model"""
+        if not self.is_loaded():
+            print("[-] Narrator model not loaded")
+            return f"You find yourself in {scene.get('name', 'an unknown location')}."
+        
+        try:
+            # Character information - get from CharacterState
+            player_condition = player.get_character_condition()
+            npcs_info = self._get_npcs_info(npcs)
+            
+            # Create the prompt for scene description
+            scene_prompt = self._create_scene_prompt(
+                scene,
+                player_condition, 
+                npcs_info, 
+            )
+            
+            if self.verbose:
+                print(f"[DEBUG] Scene prompt: {scene_prompt}")
+            
+            # Generate the scene description
+            raw_text = self._generate_text(scene_prompt, max_tokens=128, temperature=0.6)
+            
+            # Clean and format the description
+            cleaned_description = self._clean_scene_description(raw_text, scene['name'], player.name)
+            
+            if self.verbose:
+                print(f"[DEBUG] Raw scene: '{raw_text}'")
+                print(f"[DEBUG] Cleaned scene: '{cleaned_description}'")
+            
+            return cleaned_description
+            
+        except Exception as e:
+            print(f"[-] Scene description generation failed: {e}")
+            import traceback
+            print(f"[-] Full traceback: {traceback.format_exc()}")
+            return f"You find yourself in {scene['name']}."
 
-    def _create_user_message(self, action: ParsedAction, hit: bool, damage_type: str) -> str:
+
+    def _create_input_prompt(self, action: ParsedAction, hit: bool, damage_type: str) -> str:
         # Build the scenario description
         actor = action.actor
         target = action.target or "the target"
@@ -241,6 +288,31 @@ class GGUFMistralNarrator(ActionNarrator):
             Scene: {full_scenario}
 
             One sentence description: [/INST]"""
+    
+            
+    def _create_scene_prompt(self, scene, player_condition, npcs_info):
+        """Create the prompt for scene description generation"""
+        
+        
+        # Build context
+        context = f"""Location: {scene['name']}
+            Location description: {scene['description']}
+            Player: {player_condition['name']} is {player_condition['health_status']} and {player_condition['weapon']}
+            NPCs: {npcs_info}
+            """
+        
+        # Create the full prompt
+        return f"""[INST] You are a skilled D&D dungeon master describing a scene.
+            Write exactly 2-3 vivid sentences describing this scene.
+            Focus on sensory details, atmosphere, and the immediate situation.
+            Include the player's condition and any npcs present.
+            Use the player's actual name, not "player" or "character".
+            Speak in second person ("You see...", "You stand...").
+
+            Context: {context}
+
+            Scene description: [/INST]"""
+
 
     def _generate_text(self, user_content: str, max_tokens: int = 64, temperature: float = 0.4) -> str:
         try:
@@ -270,6 +342,7 @@ class GGUFMistralNarrator(ActionNarrator):
             print(f"[-] Full traceback: {traceback.format_exc()}")
             return "The action occurs."
 
+
     def _clean_narration(self, text: str, actor_name: Optional[str] = None, target_name: Optional[str] = None) -> str:
         # Enhanced cleaning logic
         text = text.strip()
@@ -285,6 +358,10 @@ class GGUFMistralNarrator(ActionNarrator):
             text = re.sub(pattern, '', text, flags=re.IGNORECASE | re.DOTALL)
         text = text.strip()
 
+        # ------------------------------
+        # This will likely need to change for scene narration or 
+        # might need a separate cleaner function
+        # ------------------------------
         # Get the first good sentence
         sentences = re.split(r'[.!?]+', text)
         descriptive_sentence = ""
@@ -304,6 +381,9 @@ class GGUFMistralNarrator(ActionNarrator):
             descriptive_sentence = "The action occurs as described."
         text = descriptive_sentence
 
+        # ------------------------------
+        # This will likely need to go away because actor will not always be player
+        # ------------------------------
         # Enhanced name replacement - more aggressive pattern matching
         if actor_name and target_name:
             replacements = {
@@ -341,3 +421,92 @@ class GGUFMistralNarrator(ActionNarrator):
             return f"{actor_name or 'The actor'} performs the action."
             
         return text
+    
+    # ------------------------------
+    # Scene narration cleaner - temporary for now
+    # ------------------------------
+    def _clean_scene_description(self, text, scene_name, player_name):
+        """Clean and format the generated scene description"""
+        import re
+        
+        text = text.strip()
+        
+        # Remove common AI artifacts and instruction remnants
+        artifacts_to_remove = [
+            r'^(Here\'s|Here is|I\'ll describe|Let me describe|Certainly|Of course).*?:',
+            r'^(The scene unfolds|Description).*?:',
+            r'System:', r'User:', r'Assistant:', r'\[INST\]', r'\[\/INST\]',
+            r'\*[^*]*\*', r'\{[^}]*\}', r'\[[^\]]*\]',
+        ]
+        for pattern in artifacts_to_remove:
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE | re.DOTALL)
+        text = text.strip()
+        
+        # Get the meaningful sentences
+        sentences = re.split(r'[.!?]+', text)
+        good_sentences = []
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if len(sentence) > 10:
+                # Skip meta-commentary sentences
+                skip_patterns = [
+                    r'^(here|this describes|as a dm)',
+                    r'^(i will|i\'ll|let me|as requested)',
+                    r'^(certainly|of course|indeed)',
+                    r'^(the description|this scene)',
+                ]
+                if not any(re.match(p, sentence, re.IGNORECASE) for p in skip_patterns):
+                    good_sentences.append(sentence)
+            
+            # Stop after getting 2-3 good sentences
+            if len(good_sentences) >= 3:
+                break
+        
+        if not good_sentences:
+            return f"You find yourself in {scene_name}."
+        
+        # Rejoin the sentences
+        text = '. '.join(good_sentences)
+        
+        # Replace generic terms with proper names
+        replacements = {
+            r'\bplayer\b': player_name,
+            r'\bcharacter\b': player_name,
+            r'\bhero\b': player_name,
+            r'\badventurer\b': player_name,
+            r'\bprotagonist\b': player_name,
+            r'\bthe player\b': player_name,
+            r'\bthe character\b': player_name,
+            r'\bthe hero\b': player_name,
+        }
+        for pattern, replacement in replacements.items():
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+        
+        # Clean up whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        # Ensure it starts with second person if it doesn't already
+        if text and not re.match(r'^(You|Your)', text):
+            # Try to convert third person to second person
+            text = re.sub(r'^' + re.escape(player_name), 'You', text)
+            if not re.match(r'^(You|Your)', text):
+                text = f"You find yourself here. {text}"
+        
+        # Ensure proper ending punctuation
+        if text and text[-1] not in '.!?':
+            text += '.'
+        
+        # Capitalize first letter
+        if text and text[0].islower():
+            text = text[0].upper() + text[1:]
+        
+        # Length check
+        if len(text) < 10:
+            return f"You find yourself in {scene_name}."
+        
+        return text
+    
+
+    def _get_npcs_info(self, npcs: list[CharacterState]) -> List[Dict[str, Any]]:
+        return [npc.get_character_condition() for npc in npcs]

@@ -4,10 +4,12 @@ from enum import Enum
 from .interfaces import ActionParser, ActionNarrator, DiceRoller
 from .models import (
     ParsedAction, ActionResult, GameContext, ActionType, 
-    DamageType, ProcessUserInputRequest, GameState, CharacterState, GameCondition
+    DamageType, ProcessUserInputRequest, GameCondition
 )
 from .model_manager import ModelManager
 from .dice import StandardDiceRoller
+from .character_state import CharacterState
+from .game_state import GameState
 
 
 class ValidationResult:
@@ -76,7 +78,7 @@ class GameEngine:
             raise RuntimeError("Narrator not loaded")
         
         # Use the narrator to generate scene description based on current game state
-        scene_description = self.model_manager.generate_scene_description(
+        scene_description = self.model_manager.generate_scene_narration(
             self.game_state.scene,
             self.game_state.player,
             self.game_state.npcs
@@ -194,7 +196,7 @@ class GameEngine:
                         return f"{error_narration}\n\nTry again.", GameCondition.CONTINUE
                 
                 # Execute valid action
-                result = self.process_player_action(user_input)
+                result = self.process_player_action(user_input) # need to pass parsed_action
                 self.update_game_state([result])
                 
                 # Check game condition after player action
@@ -214,11 +216,11 @@ class GameEngine:
         if not self.model_manager.is_narrator_ready():
             raise RuntimeError("Narrator not loaded")
 
-        parsed_action = self.model_manager.parse_action(user_input)
+        parsed_action = self.model_manager.parse_action(user_input) # this has already been parsed in execute_player_turn, consider passing it instead
         difficulty = self.get_default_difficulty(parsed_action.action_type, self.game_state)
         dice_roll = self.dice_roller.roll_d20()
         hit, damage_type_str = self.dice_roller.determine_hit(dice_roll, difficulty, parsed_action.action_type.value)
-        narration = self.model_manager.generate_narration(parsed_action, hit, damage_type_str)
+        narration = self.model_manager.generate_input_narration(parsed_action, hit, damage_type_str)
         
         return ActionResult(
             parsed_action=parsed_action,
@@ -318,7 +320,7 @@ class GameEngine:
         difficulty = self.get_default_difficulty(parsed_action.action_type, self.game_state)
         dice_roll = self.dice_roller.roll_d20()
         hit, damage_type_str = self.dice_roller.determine_hit(dice_roll, difficulty, parsed_action.action_type.value)
-        narration = self.model_manager.generate_narration(parsed_action, hit, damage_type_str)
+        narration = self.model_manager.generate_input_narration(parsed_action, hit, damage_type_str)
         
         return ActionResult(
             parsed_action=parsed_action,
@@ -361,57 +363,7 @@ class GameEngine:
     # ----------------------------
     # Streaming Game Loop Components
     # ----------------------------
-    def process_player_input_immediate(self, user_input: str) -> Tuple[str, GameCondition, bool]:
-        """
-        Process player input and return immediate narration.
-        Returns (player_narration, game_condition, should_continue_to_npc_turn)
-        """
-        try:
-            # Parse and validate with immediate feedback
-            invalid_attempts = 0
-            
-            while invalid_attempts < self.max_invalid_attempts:
-                try:
-                    # Parse player input
-                    parsed_action = self.model_manager.parse_action(user_input)
-                    
-                    # Validate action
-                    validation = self.validate_action(parsed_action)
-                    if not validation.is_valid:
-                        invalid_attempts += 1
-                        error_narration = self.model_manager.generate_invalid_action_narration(
-                            validation.reason, 
-                            validation.suggested_action
-                        )
-                        
-                        if invalid_attempts >= self.max_invalid_attempts:
-                            return f"{error_narration}\n\nToo many invalid attempts. Turn skipped.", GameCondition.CONTINUE, True
-                        else:
-                            # Return immediately for new input
-                            return f"{error_narration}\n\nTry again.", GameCondition.CONTINUE, False
-                    
-                    # Execute valid action and get immediate narration
-                    result = self.process_player_action(user_input)
-                    
-                    # Apply player action results immediately
-                    self.update_game_state([result])
-                    
-                    # Check game condition after player action
-                    condition = self.check_game_condition()
-                    
-                    # Return player narration immediately
-                    should_continue = condition == GameCondition.CONTINUE
-                    return result.narration, condition, should_continue
-                    
-                except Exception as e:
-                    return f"An error occurred: {str(e)}", GameCondition.GAME_OVER, False
-
-            return "Unable to process action after multiple attempts.", GameCondition.CONTINUE, True
-            
-        except Exception as e:
-            return f"A critical error occurred: {str(e)}", GameCondition.GAME_OVER, False
-
-    def process_single_npc_action(self, npc: CharacterState) -> Tuple[Optional[str], bool]:
+    def execute_single_npc_action(self, npc: CharacterState) -> Tuple[Optional[str], bool]:
         """
         Process a single NPC's action and return narration immediately.
         Returns (npc_narration, action_successful)

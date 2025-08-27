@@ -87,7 +87,7 @@ class MockNarrator(ActionNarrator):
         """Check if narrator is ready"""
         return self._is_loaded
     
-    def generate_narration(self, action: ParsedAction, dice_roll: int, 
+    def generate_input_narration(self, action: ParsedAction, dice_roll: int, 
                           hit: bool, damage_type: str = "wound") -> str:
         """Generate simple template-based narration"""
         if not self.is_loaded():

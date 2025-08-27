@@ -15,11 +15,8 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from core.game_engine import GameEngine, GameCondition
-from core.models import (
-    HealthResponse, CharacterState, GameState,
-    ProcessUserInputRequest
-)
 from core.model_manager import ModelManager
+from core.character_state import CharacterState
 
 
 # API Models for Next.js integration

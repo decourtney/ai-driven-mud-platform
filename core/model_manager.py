@@ -3,7 +3,6 @@ from typing import Optional
 from core.interfaces import ActionParser, ActionNarrator
 from core.models import ParsedAction
 from parsers.codellama_parser import CodeLlamaParser
-from narrators.pygmalion_narrator import PygmalionNarrator
 from narrators.mistral_narrator import GGUFMistralNarrator
 
 
@@ -63,12 +62,19 @@ class ModelManager:
                 raise RuntimeError("Failed to load models")
         return self.parser.parse_action(user_input)
     
-    def generate_narration(self, parsed_action, hit: bool, damage_type: str) -> str:
+    def generate_input_narration(self, parsed_action, hit: bool, damage_type: str) -> str:
         """Generate narration response - no loading/unloading needed"""
         if not self.is_narrator_ready():
             if not self.load_all_models():
                 raise RuntimeError("Failed to load models")
-        return self.narrator.generate_narration(parsed_action, hit, damage_type)
+        return self.narrator.generate_input_narration(parsed_action, hit, damage_type)
+    
+    def generate_scene_narration(self, scene_state, player, npcs) -> str:
+        """Generate scene description - no loading/unloading needed"""
+        if not self.is_narrator_ready():
+            if not self.load_all_models():
+                raise RuntimeError("Failed to load models")
+        return self.narrator.generate_scene_narration(scene_state, player, npcs)
     
     def get_memory_usage(self) -> dict:
         """Get current GPU memory usage"""

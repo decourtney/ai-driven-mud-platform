@@ -125,7 +125,7 @@ class PygmalionNarrator(ActionNarrator):
         """Check if narrator is ready to use"""
         return self._is_loaded and self.model is not None
     
-    def generate_narration(self, action: ParsedAction, 
+    def generate_input_narration(self, action: ParsedAction, 
                           hit: bool, damage_type: str = "wound") -> str:
         """Generate narrative description of an action"""
         if not self.is_loaded():

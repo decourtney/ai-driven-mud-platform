@@ -75,7 +75,7 @@ class GameEngine:
         if not self.model_manager.is_narrator_ready():
             raise RuntimeError("Narrator not loaded")
         
-        return self.model_manager.generate_narration(
+        return self.model_manager.generate_input_narration(
             parsed_action, hit, damage_type
         )
     

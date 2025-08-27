@@ -44,7 +44,7 @@ class ActionNarrator(ABC):
         pass
     
     @abstractmethod
-    def generate_narration(self, action: ParsedAction, dice_roll: int, 
+    def generate_input_narration(self, action: ParsedAction, dice_roll: int, 
                           hit: bool, damage_type: str = "wound") -> str:
         """Generate narrative description of an action"""
         pass

@@ -12,9 +12,9 @@ from typing import Optional
 
 from api.server import create_server
 from cli.test_parser import ParserTester
-from core.models import ProcessUserInputRequest, CharacterState
 from core.game_engine import GameEngine, GameCondition
 from core.model_manager import ModelManager
+from core.character_state import CharacterState
 
 
 def run_server_mode(args):
@@ -114,8 +114,8 @@ def run_streaming_game_mode(args):
     )
     
     npcs = [
-        CharacterState(name="Goblin", max_hp=8, current_hp=8, equipped_weapon="club"),
-        CharacterState(name="Orc", max_hp=15, current_hp=15, equipped_weapon="axe")
+        CharacterState(name="vampire", max_hp=8, current_hp=8, equipped_weapon="Sharp Fangs"),
+        # CharacterState(name="Orc", max_hp=15, current_hp=15, equipped_weapon="axe")
     ]
     
     scene_state = {
@@ -171,7 +171,7 @@ def run_streaming_game_mode(args):
             
             # Process player action immediately
             print("🎲 Rolling dice and generating result...")
-            player_narration, condition, should_continue = engine.process_player_input_immediate(user_input)
+            player_narration, condition = engine.execute_player_turn(user_input)
             
             print(f"📖 {player_narration}")
             
@@ -299,10 +299,10 @@ def main():
         description="D&D Streaming Game Engine - AI-powered real-time gameplay",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  python main.py server --host 0.0.0.0 --port 8000  # Start server for Next.js
-  python main.py game --player-name "Aragorn"       # CLI game mode
-  python main.py quick "attack the goblin"          # Quick test
+          Examples:
+            python main.py server --host 0.0.0.0 --port 8000  # Start server for Next.js
+            python main.py game --player-name "Aragorn"       # CLI game mode
+            python main.py quick "attack the goblin"          # Quick test
         """
     )
     

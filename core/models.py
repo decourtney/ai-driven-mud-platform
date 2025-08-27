@@ -8,6 +8,30 @@ from typing import Optional
 from enum import Enum
 
 
+class CharacterType(Enum):
+    PLAYER = "player"
+    NPC = "npc"
+    ENEMY = "enemy"
+    ALLY = "ally"
+
+
+class StatusEffect(Enum):
+    POISONED = "poisoned"
+    PARALYZED = "paralyzed"
+    STUNNED = "stunned"
+    BLESSED = "blessed"
+    CURSED = "cursed"
+    INVISIBLE = "invisible"
+    HASTE = "haste"
+    SLOW = "slow"
+    CHARMED = "charmed"
+    FRIGHTENED = "frightened"
+    PRONE = "prone"
+    GRAPPLED = "grappled"
+    RESTRAINED = "restrained"
+    INCAPACITATED = "incapacitated"
+    UNCONSCIOUS = "unconscious"
+    
 
 class GameCondition(Enum):
     CONTINUE = "continue"
