@@ -163,7 +163,7 @@ class CharacterState:
     
     def is_alive(self) -> bool:
         """Check if character is alive"""
-        return self.current_hp > 0 and not self.has_status(StatusEffect.UNCONSCIOUS)
+        return self.current_hp > 0
     
     def is_conscious(self) -> bool:
         """Check if character is conscious"""
@@ -176,6 +176,12 @@ class CharacterState:
     def is_player(self) -> bool:
         """Check if this is the player character"""
         return self.character_type == CharacterType.PLAYER
+    
+    def debug_print(self):
+        """Print detailed character state for debugging"""
+        print(f"--- {self.name} ---")
+        print(f"HP: {self.current_hp}/{self.max_hp} (Temp: {self.temporary_hp}), AC: {self.armor_class}")
+        print("-----------------------------------")
     
     
     # ------------------------------
@@ -196,14 +202,15 @@ class CharacterState:
         # Apply remaining damage to HP
         if actual_damage > 0:
             self.current_hp = max(0, self.current_hp - actual_damage)
+            
         
         self.last_updated = datetime.now()
         
         # Check for unconsciousness
-        if self.current_hp <= 0 and not self.has_status(StatusEffect.UNCONSCIOUS):
-            self.add_status_effect(StatusEffect.UNCONSCIOUS, -1)
+        # if self.current_hp <= 0 and not self.has_status(StatusEffect.UNCONSCIOUS):
+        #     self.add_status_effect(StatusEffect.UNCONSCIOUS, -1)
         
-        return damage
+        return actual_damage
     
     def heal(self, amount: int) -> int:
         """Heal character and return actual healing done"""
@@ -446,6 +453,9 @@ class CharacterState:
         # Apply status effects based on action type
         if result.parsed_action.action_type == ActionType.SPELL:
             self._apply_spell_effects(result)
+            
+        if self.current_hp <= 0 and result.damage_type != DamageType.KILL:
+            result.damage_type = DamageType.KILL
         
         self.last_updated = datetime.now()
     
@@ -457,8 +467,6 @@ class CharacterState:
             base_damage = result.dice_roll  # Use actual roll for critical
         elif result.damage_type == DamageType.WOUND:
             base_damage = max(1, result.dice_roll // 4)  # Quarter of roll
-        elif result.damage_type == DamageType.GRAZE:
-            base_damage = 1
         else:
             base_damage = 0
         

@@ -179,28 +179,17 @@ def run_streaming_game_mode(args):
             if condition != GameCondition.CONTINUE:
                 print(f"\n🎮 GAME OVER: {condition.value}")
                 break
-                
-            if not should_continue:
-                print("❌ Action failed. Try again.")
-                continue
             
             # Process NPCs
             print("\n⏳ NPCs are taking their turns...")
             living_npcs = engine.get_living_npcs()
             
             if living_npcs:
-                for npc in living_npcs:
-                    print(f"  🤖 {npc.name} is deciding...")
-                    
-                    npc_narration, success = engine.process_single_npc_action(npc)
-                    if npc_narration:
-                        print(f"  📖 {npc_narration}")
-                    
-                    # Check condition after each NPC
-                    current_condition = engine.check_game_condition()
-                    if current_condition != GameCondition.CONTINUE:
-                        print(f"\n🎮 GAME OVER: {current_condition.value}")
-                        return
+                for narration, condition in engine.execute_npc_turn():
+                    print(narration)
+                    if condition != GameCondition.CONTINUE:
+                        print(f"\n🎮 GAME OVER: {condition.value}")
+                        break
             else:
                 print("  (No living NPCs to act)")
             

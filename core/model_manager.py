@@ -1,7 +1,7 @@
 import torch
 from typing import Optional
 from core.interfaces import ActionParser, ActionNarrator
-from core.models import ParsedAction
+from core.models import ParsedAction, ValidationResult
 from parsers.codellama_parser import CodeLlamaParser
 from narrators.mistral_narrator import GGUFMistralNarrator
 
@@ -75,6 +75,16 @@ class ModelManager:
             if not self.load_all_models():
                 raise RuntimeError("Failed to load models")
         return self.narrator.generate_scene_narration(scene_state, player, npcs)
+    
+    def generate_invalid_action_narration(self, validation_result: ValidationResult) -> str:
+        """Generate narration for invalid action"""
+        if not self.is_narrator_ready():
+            if not self.load_all_models():
+                raise RuntimeError("Failed to load models")
+        return 'Invalid action' # Temporary placeholder
+        return self.narrator.generate_invalid_action_narration(
+            validation_result
+        )
     
     def get_memory_usage(self) -> dict:
         """Get current GPU memory usage"""

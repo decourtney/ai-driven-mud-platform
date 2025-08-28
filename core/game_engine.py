@@ -1,23 +1,15 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Generator
 from enum import Enum
 
 from .interfaces import ActionParser, ActionNarrator, DiceRoller
 from .models import (
     ParsedAction, ActionResult, GameContext, ActionType, 
-    DamageType, ProcessUserInputRequest, GameCondition
+    DamageType, ProcessUserInputRequest, GameCondition, ValidationResult
 )
 from .model_manager import ModelManager
 from .dice import StandardDiceRoller
 from .character_state import CharacterState
 from .game_state import GameState
-
-
-class ValidationResult:
-    """Result of action validation"""
-    def __init__(self, is_valid: bool, reason: Optional[str] = None, suggested_action: Optional[str] = None):
-        self.is_valid = is_valid
-        self.reason = reason
-        self.suggested_action = suggested_action
 
 
 class GameEngine:
@@ -57,13 +49,13 @@ class GameEngine:
         
         for result in results:
             # Update player or NPC HP, status, inventory, etc.
-            if result.parsed_action.actor == "player":
-                self.game_state.player.apply_action_result(result)
-            else:
-                npc = self.game_state.get_npc_by_name(result.parsed_action.actor)
+            if result.parsed_action.actor == self.game_state.player.name or result.parsed_action.actor == "player":
+                npc = self.game_state.get_npc_by_name(result.parsed_action.target)
                 if npc:
                     npc.apply_action_result(result)
-
+            else:
+                self.game_state.player.apply_action_result(result)
+        
         self.game_state.turn_counter += 1
 
     # ----------------------------
@@ -105,7 +97,7 @@ class GameEngine:
 
         # Validate target exists if specified
         if parsed_action.target:
-            if parsed_action.target == "player":
+            if parsed_action.target == self.game_state.player.name or parsed_action.target == "player":
                 if not self.game_state.player.is_alive():
                     return ValidationResult(False, "Cannot target defeated player")
             elif parsed_action.target != "self":
@@ -165,10 +157,43 @@ class GameEngine:
         
         return ValidationResult(True)
 
+
+    # ----------------------------
+    # Game Condition Checking
+    # ----------------------------
+    def check_game_condition(self) -> GameCondition:
+        """Check if game should continue, end in victory, or defeat"""
+        if not self.game_state:
+            return GameCondition.GAME_OVER
+        
+        # Check player defeat
+        if not self.game_state.player.is_alive():
+            return GameCondition.PLAYER_DEFEAT
+        
+        # ----------
+        # Victory conditions - should this be per scene or for whole game?
+        # ----------
+        # all_enemies_defeated = all(not npc.is_alive() for npc in self.game_state.npcs if npc.is_enemy())
+        # if all_enemies_defeated:
+        #     # Check for specific win conditions in scene
+        #     win_conditions = self.game_state.scene.get("win_conditions", {})
+        #     if win_conditions.get("defeat_all_enemies", True):
+        #         return GameCondition.PLAYER_WIN
+        
+        # # Check scene-specific win/lose conditions
+        # if self.game_state.scene.get("objective_complete", False):
+        #     return GameCondition.PLAYER_WIN
+        
+        # if self.game_state.scene.get("objective_failed", False):
+        #     return GameCondition.PLAYER_DEFEAT
+        
+        return GameCondition.CONTINUE
+
+
     # ----------------------------
     # Complete Player Turn
     # ----------------------------
-    def execute_player_turn(self, user_input: str) -> Tuple[str, GameCondition]:
+    def execute_player_turn(self, user_action: str) -> Tuple[str, GameCondition]:
         """
         Execute complete player turn with validation loop.
         Returns (narration, game_condition)
@@ -178,15 +203,14 @@ class GameEngine:
         while invalid_attempts < self.max_invalid_attempts:
             try:
                 # Parse player input
-                parsed_action = self.model_manager.parse_action(user_input)
+                parsed_action = self.model_manager.parse_action(user_action)
                 
                 # Validate action
-                validation = self.validate_action(parsed_action)
-                if not validation.is_valid:
+                validation_result = self.validate_action(parsed_action)
+                if not validation_result.is_valid:
                     invalid_attempts += 1
                     error_narration = self.model_manager.generate_invalid_action_narration(
-                        validation.reason, 
-                        validation.suggested_action
+                        validation_result
                     )
                     
                     if invalid_attempts >= self.max_invalid_attempts:
@@ -196,8 +220,8 @@ class GameEngine:
                         return f"{error_narration}\n\nTry again.", GameCondition.CONTINUE
                 
                 # Execute valid action
-                result = self.process_player_action(user_input) # need to pass parsed_action
-                self.update_game_state([result])
+                result = self._processed_parced_action(parsed_action)
+                # self.update_game_state([result])
                 
                 # Check game condition after player action
                 condition = self.check_game_condition()
@@ -209,60 +233,32 @@ class GameEngine:
 
         return "Unable to process action after multiple attempts.", GameCondition.CONTINUE
 
-    def process_player_action(self, user_input: str) -> ActionResult:
-        """Parse player input, roll dice, and generate narration (existing method enhanced)"""
-        if not self.model_manager.is_parser_ready():
-            raise RuntimeError("Parser not loaded")
-        if not self.model_manager.is_narrator_ready():
-            raise RuntimeError("Narrator not loaded")
-
-        parsed_action = self.model_manager.parse_action(user_input) # this has already been parsed in execute_player_turn, consider passing it instead
-        difficulty = self.get_default_difficulty(parsed_action.action_type, self.game_state)
-        dice_roll = self.dice_roller.roll_d20()
-        hit, damage_type_str = self.dice_roller.determine_hit(dice_roll, difficulty, parsed_action.action_type.value)
-        narration = self.model_manager.generate_input_narration(parsed_action, hit, damage_type_str)
-        
-        return ActionResult(
-            parsed_action=parsed_action,
-            hit=hit,
-            dice_roll=dice_roll,
-            damage_type=DamageType(damage_type_str),
-            narration=narration,
-            difficulty=difficulty
-        )
 
     # ----------------------------
     # Complete NPC Turn
     # ----------------------------
-    def execute_npc_turn(self) -> Tuple[str, GameCondition]:
+    def execute_npc_turn(self) -> Generator[Tuple[str, GameCondition], None, None]:
         """
-        Execute complete NPC turn with validation and AI decision making.
-        Returns (combined_narration, game_condition)
+        Execute NPC turns one at a time with validation and AI decision making.
+        Yields (narration, game_condition) after each NPC acts.
         """
         if not self.game_state:
             raise RuntimeError("Game state not initialized")
 
-        all_narrations = []
-        npc_results = []
-
         for npc in self.game_state.npcs:
-            if npc.is_alive():
-                # AI decides action with validation loop
-                action_result = self._execute_npc_action_with_validation(npc)
-                if action_result:
-                    npc_results.append(action_result)
-                    all_narrations.append(action_result.narration)
+            if not npc.is_alive():
+                continue
 
-        # Update game state with all NPC actions
-        if npc_results:
-            self.update_game_state(npc_results)
+            # AI decides action with validation loop
+            action_result = self._execute_npc_action_with_validation(npc)
+            if action_result:
+                # Update game state after each NPC action
+                # self.update_game_state([action_result])
 
-        # Check game condition after NPC turn
-        condition = self.check_game_condition()
-        
-        combined_narration = "\n\n".join(all_narrations) if all_narrations else "The enemies hesitate..."
-        
-        return combined_narration, condition
+                # Check game condition after each action
+                condition = self.check_game_condition()
+
+                yield action_result.narration, condition
 
     def _execute_npc_action_with_validation(self, npc: CharacterState) -> Optional[ActionResult]:
         """Execute NPC action with AI decision making and validation"""
@@ -272,13 +268,13 @@ class GameEngine:
         while attempts < max_attempts:
             try:
                 # AI decides action (placeholder - replace with actual AI logic)
-                proposed_action = self._ai_decide_npc_action(npc)
+                npc_action = self._ai_decide_npc_action(npc)
                 
                 # Validate proposed action
-                validation = self.validate_action(proposed_action)
+                validation = self.validate_action(npc_action)
                 if validation.is_valid:
                     # Execute valid action
-                    return self._process_npc_action(proposed_action)
+                    return self._processed_parced_action(npc_action)
                 else:
                     attempts += 1
                     # AI could learn from validation failure here
@@ -290,6 +286,7 @@ class GameEngine:
         
         return None  # NPC turn failed after max attempts
 
+    # This is a placeholder AI decision function and needs a lot more sophistication
     def _ai_decide_npc_action(self, npc: CharacterState) -> ParsedAction:
         """AI logic to decide NPC action (placeholder for now)"""
         # This is where you'd implement sophisticated AI decision making
@@ -298,7 +295,7 @@ class GameEngine:
             return ParsedAction(
                 actor=npc.name,
                 action="attacks",
-                target="player",
+                target=self.game_state.player.name,
                 action_type=ActionType.ATTACK,
                 weapon=npc.equipped_weapon,
                 subject=None,
@@ -315,50 +312,47 @@ class GameEngine:
                 details=None
             )
 
-    def _process_npc_action(self, parsed_action: ParsedAction) -> ActionResult:
-        """Process validated NPC action"""
+
+    # ----------------------------
+    # Core Action Processing
+    # ----------------------------
+    def _processed_parced_action(self, parsed_action: ParsedAction) -> ActionResult:
+        """Parse player input, roll dice, and generate narration (existing method enhanced)"""
+        if not self.model_manager.is_narrator_ready():
+            raise RuntimeError("Narrator not loaded")
+
         difficulty = self.get_default_difficulty(parsed_action.action_type, self.game_state)
+        
+        # Dice rolls and hit determination is in a base state and need to be expanded
         dice_roll = self.dice_roller.roll_d20()
         hit, damage_type_str = self.dice_roller.determine_hit(dice_roll, difficulty, parsed_action.action_type.value)
-        narration = self.model_manager.generate_input_narration(parsed_action, hit, damage_type_str)
         
-        return ActionResult(
+        # Create preliminary ActionResult without narration
+        result = ActionResult(
             parsed_action=parsed_action,
             hit=hit,
             dice_roll=dice_roll,
             damage_type=DamageType(damage_type_str),
-            narration=narration,
+            narration="",
             difficulty=difficulty
         )
+        
+        # Apply this result immediately so state is updated before narration
+        self.update_game_state([result])
+              
+        result.narration = self.model_manager.generate_input_narration(parsed_action, hit, damage_type_str)
+          
+        print("-----------------------------------")
+        print('--- Action Result ---')
+        print(f'   {parsed_action.actor} {result.damage_type.value} {parsed_action.target}')
+        print("-----------------------------------")
+        
+        self.game_state.player.debug_print()
+        for npc in self.game_state.npcs:
+            npc.debug_print()
+        
+        return result
 
-    # ----------------------------
-    # Game Condition Checking
-    # ----------------------------
-    def check_game_condition(self) -> GameCondition:
-        """Check if game should continue, end in victory, or defeat"""
-        if not self.game_state:
-            return GameCondition.GAME_OVER
-        
-        # Check player defeat
-        if not self.game_state.player.is_alive():
-            return GameCondition.PLAYER_DEFEAT
-        
-        # Check victory conditions
-        all_enemies_defeated = all(not npc.is_alive() for npc in self.game_state.npcs if npc.is_enemy())
-        if all_enemies_defeated:
-            # Check for specific win conditions in scene
-            win_conditions = self.game_state.scene.get("win_conditions", {})
-            if win_conditions.get("defeat_all_enemies", True):
-                return GameCondition.PLAYER_WIN
-        
-        # Check scene-specific win/lose conditions
-        if self.game_state.scene.get("objective_complete", False):
-            return GameCondition.PLAYER_WIN
-        
-        if self.game_state.scene.get("objective_failed", False):
-            return GameCondition.PLAYER_DEFEAT
-        
-        return GameCondition.CONTINUE
 
     # ----------------------------
     # Streaming Game Loop Components
@@ -418,40 +412,9 @@ class GameEngine:
             return []
         return [npc for npc in self.game_state.npcs if npc.is_alive()]
 
-    # ----------------------------
-    # Legacy Method (for compatibility)
-    # ----------------------------
-    def execute_full_turn(self, user_input: str) -> Tuple[str, str, GameCondition]:
-        """
-        Execute one complete game turn: scene -> player action -> NPC actions -> condition check.
-        Returns (scene_description, turn_narration, game_condition)
-        
-        NOTE: This is the old blocking method. Consider using the streaming methods instead.
-        """
-        try:
-            # Present scene to player
-            scene_description = self.present_scene()
-            
-            # Execute player turn
-            player_narration, condition = self.execute_player_turn(user_input)
-            
-            # Check if game should continue after player action
-            if condition != GameCondition.CONTINUE:
-                return scene_description, player_narration, condition
-            
-            # Execute NPC turn
-            npc_narration, final_condition = self.execute_npc_turn()
-            
-            # Combine narrations
-            full_narration = f"{player_narration}\n\n{npc_narration}" if npc_narration else player_narration
-            
-            return scene_description, full_narration, final_condition
-            
-        except Exception as e:
-            return "Error presenting scene", f"A critical error occurred: {str(e)}", GameCondition.GAME_OVER
 
     # ----------------------------
-    # Utility (Enhanced)
+    # Utility Methods
     # ----------------------------
     def get_default_difficulty(self, action_type: ActionType, context: Optional[GameState] = None) -> int:
         """Default DC/AC values by action type with context modifiers"""

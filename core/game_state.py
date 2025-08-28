@@ -50,7 +50,7 @@ class GameState:
         self.last_updated = datetime.now()
         self.save_version = "1.0"
     
-    # Character management
+    # Character management - might have to change this to use IDs instead of names
     def get_npc_by_name(self, name: str) -> Optional[CharacterState]:
         """Find NPC by name"""
         for npc in self.npcs:

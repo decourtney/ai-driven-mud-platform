@@ -8,10 +8,18 @@ from typing import Optional
 from enum import Enum
 
 
+class ValidationResult:
+    """Result of action validation"""
+    def __init__(self, is_valid: bool, reason: Optional[str] = None, suggested_action: Optional[str] = None):
+        self.is_valid = is_valid
+        self.reason = reason
+        self.suggested_action = suggested_action
+        
+        
 class CharacterType(Enum):
     PLAYER = "player"
     NPC = "npc"
-    ENEMY = "enemy"
+    ENEMY = "enemy" # Hostile NPC
     ALLY = "ally"
 
 
