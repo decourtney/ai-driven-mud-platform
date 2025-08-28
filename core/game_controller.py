@@ -156,8 +156,6 @@ class AsyncStreamingGameController:
 
 
 
-
-
 # Simple example of how to use the streaming controller
 def example_usage():
     """Example of how to integrate the streaming game loop"""
