@@ -288,7 +288,7 @@ def main():
         description="D&D Streaming Game Engine - AI-powered real-time gameplay",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-          Examples:
+            Examples:
             python main.py server --host 0.0.0.0 --port 8000  # Start server for Next.js
             python main.py game --player-name "Aragorn"       # CLI game mode
             python main.py quick "attack the goblin"          # Quick test
