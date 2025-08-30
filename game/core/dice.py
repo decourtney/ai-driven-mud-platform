@@ -1,6 +1,6 @@
-from .interfaces import DiceRoller
-from .models import ActionType, DamageType
 import random
+from game.core.interfaces import DiceRoller
+from game.core.models import ActionType, DamageType
 
 class StandardDiceRoller(DiceRoller):
     """Standard D&D 5e dice rolling implementation"""

@@ -4,7 +4,7 @@ import gc
 import re
 import os
 from pathlib import Path
-from core.character_state import CharacterState
+from game.core.character_state import CharacterState
 
 try:
     from llama_cpp import Llama
@@ -13,8 +13,8 @@ except ImportError:
     LLAMA_CPP_AVAILABLE = False
     print("[-] llama-cpp-python not installed. Install with: pip install llama-cpp-python")
 
-from core.interfaces import ActionNarrator
-from core.models import ParsedAction, ActionType
+from game.core.interfaces import ActionNarrator
+from game.core.models import ParsedAction, ActionType
 
 
 class GGUFMistralNarrator(ActionNarrator):

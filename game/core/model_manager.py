@@ -1,9 +1,9 @@
 import torch
 from typing import Optional
-from core.interfaces import ActionParser, ActionNarrator
-from core.models import ParsedAction, ValidationResult
-from parsers.codellama_parser import CodeLlamaParser
-from narrators.mistral_narrator import GGUFMistralNarrator
+from game.core.interfaces import ActionParser, ActionNarrator
+from game.core.models import ParsedAction, ValidationResult
+from game.parsers.codellama_parser import CodeLlamaParser
+from game.narrators.mistral_narrator import GGUFMistralNarrator
 
 
 class ModelManager:

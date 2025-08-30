@@ -10,9 +10,9 @@ import re
 from typing import Dict, Optional
 import gc
 
-from core.interfaces import ActionParser
-from core.models import ParsedAction, ActionType
-from .fallback_parser import FallbackParser
+from game.core.interfaces import ActionParser
+from game.core.models import ParsedAction, ActionType
+from game.parsers.fallback_parser import FallbackParser
 
 
 class CodeLlamaParser(ActionParser):

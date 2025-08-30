@@ -2,9 +2,9 @@ import asyncio
 from typing import Callable, Optional
 from concurrent.futures import ThreadPoolExecutor
 import threading
-from .models import GameCondition
-from .game_engine import GameEngine, StandardDiceRoller
-from .model_manager import ModelManager
+from game.core.models import GameCondition
+from game.core.game_engine import GameEngine, StandardDiceRoller
+from game.core.model_manager import ModelManager
 
 class StreamingGameController:
     """

@@ -1,15 +1,15 @@
 from typing import List, Optional, Tuple, Generator
 from enum import Enum
 
-from .interfaces import ActionParser, ActionNarrator, DiceRoller
-from .models import (
+from game.core.interfaces import ActionParser, ActionNarrator, DiceRoller
+from game.core.models import (
     ParsedAction, ActionResult, GameContext, ActionType, 
     DamageType, ProcessUserInputRequest, GameCondition, ValidationResult
 )
-from .model_manager import ModelManager
-from .dice import StandardDiceRoller
-from .character_state import CharacterState
-from .game_state import GameState
+from game.core.model_manager import ModelManager
+from game.core.dice import StandardDiceRoller
+from game.core.character_state import CharacterState
+from game.core.game_state import GameState
 
 
 class GameEngine:

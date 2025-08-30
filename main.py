@@ -10,11 +10,11 @@ import threading
 import uuid
 from typing import Optional
 
-from api.server import create_server
-from cli.test_parser import ParserTester
-from core.game_engine import GameEngine, GameCondition
-from core.model_manager import ModelManager
-from core.character_state import CharacterState
+from game.api.server import create_server
+from game.cli.test_parser import ParserTester
+from game.core.game_engine import GameEngine, GameCondition
+from game.core.model_manager import ModelManager
+from game.core.character_state import CharacterState
 
 
 def run_server_mode(args):

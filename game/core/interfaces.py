@@ -5,7 +5,7 @@ This allows easy swapping of implementations and testing.
 
 from abc import ABC, abstractmethod
 from typing import Dict, Optional
-from .models import ParsedAction, ActionResult
+from game.core.models import ParsedAction, ActionResult
 
 
 class ActionParser(ABC):

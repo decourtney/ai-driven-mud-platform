@@ -11,9 +11,9 @@ from typing import List
 # Add parent directory to path for imports
 sys.path.append('..')
 
-from parsers.codellama_parser import CodeLlamaParser
-from parsers.fallback_parser import FallbackParser
-from core.models import ParsedAction
+from game.parsers.codellama_parser import CodeLlamaParser
+from game.parsers.fallback_parser import FallbackParser
+from game.core.models import ParsedAction
 
 
 class ParserTester:

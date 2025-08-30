@@ -11,9 +11,8 @@ from typing import List
 # Add parent directory to path for imports
 sys.path.append('..')
 
-from narrators.pygmalion_narrator import PygmalionNarrator
-from narrators.mock_narrator import MockNarrator
-from core.models import ParsedAction, ActionType
+from game.narrators.mock_narrator import MockNarrator
+from game.core.models import ParsedAction, ActionType
 
 
 class NarratorTester:
