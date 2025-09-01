@@ -73,7 +73,7 @@ export interface GameInterfaceProps {
 }
 
 export interface GameInfo {
-  id: string;
+  slug: string;
   title: string;
   description: string;
   playerCount: number;
@@ -81,6 +81,6 @@ export interface GameInfo {
   difficulty: "beginner" | "intermediate" | "advanced";
   estimatedTime: string;
   features: string[];
-  thumbnail?: string;
-  link: string;
+  thumbnail: string;
+  tags: string[];
 }

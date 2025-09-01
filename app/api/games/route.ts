@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
+import axios from "axios"
 
-const backendUrl = process.env.DATABASE_URL || "http://localhost:8000";
+const backendUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000";
 
 export async function GET() {
-  const res = await fetch(`${backendUrl}/games`);
-
-  if (!res.ok) {
+  try {
+    const res = await axios.get(`${backendUrl}/games`); // FastAPI endpoint
+    return NextResponse.json(res.data);
+  } catch (error) {
+    console.error(error);
     return NextResponse.json(
       { error: "Failed to fetch games" },
-      { status: res.status }
+      { status: 500 }
     );
   }
-
-  const games = await res.json();
-  return NextResponse.json(games);
 }

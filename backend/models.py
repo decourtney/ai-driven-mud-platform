@@ -66,6 +66,18 @@ class DamageType(str, Enum):
     SUCCESS = "success"
     GREAT_SUCCESS = "great_success"
     OUTSTANDING_SUCCESS = "outstanding_success"
+    
+    
+class GameStatus(str, Enum):
+    active = "active"
+    maintenance = "maintenance"
+    beta = "beta"
+
+
+class GameDifficulty(str, Enum):
+    beginner = "beginner"
+    intermediate = "intermediate"
+    advanced = "advanced"
 
 
 class ParsedAction(BaseModel):
@@ -130,18 +142,6 @@ class HealthResponse(BaseModel):
     narrator_ready: bool
     memory_usage: Dict[str, Any]
     uptime_seconds: float
-   
-    
-class GameStatus(str, Enum):
-    active = "active"
-    maintenance = "maintenance"
-    beta = "beta"
-
-
-class GameDifficulty(str, Enum):
-    beginner = "beginner"
-    intermediate = "intermediate"
-    advanced = "advanced"
     
     
 class GameInfo(BaseModel):

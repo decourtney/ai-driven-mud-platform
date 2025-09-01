@@ -118,6 +118,7 @@ class GameAPI:
             return [
                 GameInfo(
                     slug=slug,
+                    engine=meta['engine'],
                     title=meta["title"],
                     description=meta["description"],
                     playerCount=meta["playerCount"],
@@ -140,6 +141,7 @@ class GameAPI:
             meta = GAME_REGISTRY[game_slug]
             return GameInfo(
                 slug=game_slug,
+                engine=meta['engine'],
                 title=meta["title"],
                 description=meta["description"],
                 playerCount=meta["playerCount"],
