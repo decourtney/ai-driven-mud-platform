@@ -1,14 +1,16 @@
-"use client";
+"use server";
 
 import React from "react";
 import Link from "next/link";
 import { Play, Users, Clock, Star } from "lucide-react";
-import { GameCard } from "@/app/types/game";
+import { GameInfo } from "@/app/types/game";
+
+export default async function LobbyPage() {
 
 
-export default function LobbyPage() {
+
   // Featured game - this will be your main MUD game
-  const featuredGame: GameCard = {
+  const featuredGame: GameInfo = {
     id: "mudai-main",
     title: "MudAI Adventure",
     description:
@@ -23,11 +25,11 @@ export default function LobbyPage() {
       "Character Progression",
       "Endless Possibilities",
     ],
-    link: "/game",
+    link: "/games/mudai",
   };
 
   // Placeholder for future games
-  const upcomingGames: GameCard[] = [
+  const upcomingGames: GameInfo[] = [
     {
       id: "space-station",
       title: "Space Station Alpha",
@@ -52,7 +54,7 @@ export default function LobbyPage() {
     },
   ];
 
-  const getStatusBadge = (status: GameCard["status"]) => {
+  const getStatusBadge = (status: GameInfo["status"]) => {
     switch (status) {
       case "active":
         return "bg-green-600 text-white";
@@ -65,7 +67,7 @@ export default function LobbyPage() {
     }
   };
 
-  const getDifficultyColor = (difficulty: GameCard["difficulty"]) => {
+  const getDifficultyColor = (difficulty: GameInfo["difficulty"]) => {
     switch (difficulty) {
       case "beginner":
         return "text-green-400";

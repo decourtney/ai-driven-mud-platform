@@ -3,8 +3,8 @@ from typing import Optional, Dict, Any, List
 import gc
 import re
 import os
+import json
 from pathlib import Path
-from game.core.character_state import CharacterState
 
 try:
     from llama_cpp import Llama
@@ -13,8 +13,8 @@ except ImportError:
     LLAMA_CPP_AVAILABLE = False
     print("[-] llama-cpp-python not installed. Install with: pip install llama-cpp-python")
 
-from game.core.interfaces import ActionNarrator
-from game.core.models import ParsedAction, ActionType
+from backend.game.core.interfaces import ActionNarrator
+from backend.models import ParsedAction, ActionType
 
 
 class GGUFMistralNarrator(ActionNarrator):
@@ -129,7 +129,7 @@ class GGUFMistralNarrator(ActionNarrator):
         return self._is_loaded and self.model is not None
 
 
-    def generate_input_narration(self, action: ParsedAction, hit: bool, damage_type: str = "wound") -> str:
+    def generate_action_narration(self, action: ParsedAction, hit: bool, damage_type: str = "wound") -> str:
         if not self.is_loaded():
             print("[-] Narrator model not loaded")
             return f"{action.actor} performs {action.action}."
@@ -141,14 +141,14 @@ class GGUFMistralNarrator(ActionNarrator):
             if self.verbose:
                 print(f"[DEBUG] Input Prompt: {input_prompt}")
             
-            raw_text = self._generate_text(input_prompt, max_tokens=64, temperature=0.4)
+            raw_text = self._generate_text(input_prompt, max_tokens=64, temperature=0.6)
             
             # Check if generation failed
             if len(raw_text.strip()) < 5:
                 print(f"[!] Generation failed, raw text: '{raw_text}'")
                 return f"{action.actor} performs {action.action}."
             
-            cleaned = self._clean_narration(raw_text, action.actor, action.target)
+            cleaned = self._clean_action_narration(raw_text, action.actor, action.target)
             
             if self.verbose:
                 print(f"[DEBUG] Raw: '{raw_text}'")
@@ -161,33 +161,30 @@ class GGUFMistralNarrator(ActionNarrator):
             print(f"[-] Full traceback: {traceback.format_exc()}")
             return f"{action.actor} performs {action.action}."
         
-        
-    def generate_scene_narration(self, scene: Dict[str, Any], player: CharacterState, npcs: List[CharacterState]):
+        # NOTE: parameters for this are not even close!
+    def generate_scene_narration(self, scene: Dict[str, Any], player: Dict[str, Any], npcs: List[Dict[str, Any]]):
         """Generate a scene description using the narrator model"""
         if not self.is_loaded():
             print("[-] Narrator model not loaded")
             return f"You find yourself in {scene.get('name', 'an unknown location')}."
         
-        try:
-            # Character information - get from CharacterState
-            player_condition = player.get_character_condition()
-            npcs_info = self._get_npcs_info(npcs)
-            
+        try: 
             # Create the prompt for scene description
             scene_prompt = self._create_scene_prompt(
                 scene,
-                player_condition, 
-                npcs_info, 
+                player, 
+                npcs, 
             )
-            
+            print(scene_prompt)
             if self.verbose:
                 print(f"[DEBUG] Scene prompt: {scene_prompt}")
             
             # Generate the scene description
-            raw_text = self._generate_text(scene_prompt, max_tokens=128, temperature=0.6)
+            raw_text = self._generate_text(scene_prompt, max_tokens=200, temperature=0.6)
             
             # Clean and format the description
-            cleaned_description = self._clean_scene_description(raw_text, scene['name'], player.name)
+            # cleaned_description = self._clean_scene_description(raw_text, scene['name'], player['name'])
+            cleaned_description = raw_text
             
             if self.verbose:
                 print(f"[DEBUG] Raw scene: '{raw_text}'")
@@ -290,38 +287,59 @@ class GGUFMistralNarrator(ActionNarrator):
             One sentence description: [/INST]"""
     
             
-    def _create_scene_prompt(self, scene, player_condition, npcs_info):
+    def _create_scene_prompt(self, scene: Dict[str, Any], player: Dict[str, Any], npcs: List[Dict[str, Any]]):
         """Create the prompt for scene description generation"""
+        # Load config from JSON file
+        with open("backend/game/parsers/narrator_parser/scene_prompts.json", "r") as f:
+            config = json.load(f)
         
+        # Handle arrays by joining with newlines
+        system_prompt_template = config["system_prompt"]
+        if isinstance(system_prompt_template, list):
+            system_prompt_template = "\n".join(system_prompt_template)
         
-        # Build context
-        context = f"""Location: {scene['name']}
-            Location description: {scene['description']}
-            Player: {player_condition['name']} is {player_condition['health_status']} and {player_condition['weapon']}
-            NPCs: {npcs_info}
-            """
+        context_template = config["context"]
+        if isinstance(context_template, list):
+            context_template = "\n".join(context_template)
         
-        # Create the full prompt
-        return f"""[INST] You are a skilled D&D dungeon master describing a scene.
-            Write exactly 2-3 vivid sentences describing this scene.
-            Focus on sensory details, atmosphere, and the immediate situation.
-            Include the player's condition and any npcs present.
-            Use the player's actual name, not "player" or "character".
-            Speak in second person ("You see...", "You stand...").
+        # Create context for template replacements
+        context_data = {
+            'scene': scene,
+            'player': player,
+            'npcs': npcs,
+            'context': self._resolve_template(context_template, {
+                'scene': scene,
+                'player': player, 
+                'npcs': npcs
+            })
+        }
+        
+        return self._resolve_template(system_prompt_template, context_data)
 
-            Context: {context}
 
-            Scene description: [/INST]"""
+    def _resolve_template(self, system_prompt_template: str, context_data: dict) -> str:
+        """Resolve {var[key]} patterns in template"""
+        def replacer(match):
+            expr = match.group(1)  # Everything inside {}
+            try:
+                return str(eval(expr, {}, context_data))
+            except:
+                return match.group(0)  # Return original if can't resolve
+        
+        return re.sub(r'\{([^}]+)\}', replacer, system_prompt_template)
 
 
-    def _generate_text(self, user_content: str, max_tokens: int = 64, temperature: float = 0.4) -> str:
+    def _generate_text(self, input: str, max_tokens: int = 64, temperature: float = 0.4) -> str:
         try:
             # Generate with llama-cpp-python
             response = self.model(
-                user_content,
+                input,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 top_p=0.9,
+                top_k=50,
+                repeat_penalty=1.15,
+                frequency_penalty=0.2,
                 stop=["</s>", "[INST]", "[/INST]"],  # Stop tokens
                 echo=False  # Don't echo the prompt
             )
@@ -343,7 +361,7 @@ class GGUFMistralNarrator(ActionNarrator):
             return "The action occurs."
 
 
-    def _clean_narration(self, text: str, actor_name: Optional[str] = None, target_name: Optional[str] = None) -> str:
+    def _clean_action_narration(self, text: str, actor_name: Optional[str] = None, target_name: Optional[str] = None) -> str:
         # Enhanced cleaning logic
         text = text.strip()
         
@@ -358,10 +376,6 @@ class GGUFMistralNarrator(ActionNarrator):
             text = re.sub(pattern, '', text, flags=re.IGNORECASE | re.DOTALL)
         text = text.strip()
 
-        # ------------------------------
-        # This will likely need to change for scene narration or 
-        # might need a separate cleaner function
-        # ------------------------------
         # Get the first good sentence
         sentences = re.split(r'[.!?]+', text)
         descriptive_sentence = ""
@@ -506,7 +520,4 @@ class GGUFMistralNarrator(ActionNarrator):
             return f"You find yourself in {scene_name}."
         
         return text
-    
 
-    def _get_npcs_info(self, npcs: list[CharacterState]) -> List[Dict[str, Any]]:
-        return [npc.get_character_condition() for npc in npcs]

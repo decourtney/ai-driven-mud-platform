@@ -5,7 +5,7 @@ This allows easy swapping of implementations and testing.
 
 from abc import ABC, abstractmethod
 from typing import Dict, Optional
-from game.core.models import ParsedAction, ActionResult
+from backend.models import ParsedAction, ActionResult
 
 
 class ActionParser(ABC):
@@ -44,7 +44,7 @@ class ActionNarrator(ABC):
         pass
     
     @abstractmethod
-    def generate_input_narration(self, action: ParsedAction, dice_roll: int, 
+    def generate_action_narration(self, action: ParsedAction, dice_roll: int, 
                           hit: bool, damage_type: str = "wound") -> str:
         """Generate narrative description of an action"""
         pass

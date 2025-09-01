@@ -4,8 +4,8 @@ Provides simple rule-based narration without requiring AI models.
 """
 
 from typing import Optional
-from game.core.interfaces import ActionNarrator
-from game.core.models import ParsedAction, ActionType
+from backend.game.core.interfaces import ActionNarrator
+from backend.models import ParsedAction, ActionType
 
 
 class MockNarrator(ActionNarrator):

@@ -2,7 +2,7 @@ from typing import List, Dict, Any, Optional, Set
 import uuid
 import json
 from datetime import datetime
-from game.core.character_state import CharacterState
+from backend.game.core.character_state import CharacterState
 
 class GameState:
     """

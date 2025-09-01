@@ -6,8 +6,8 @@ Always available and provides reasonable results for common D&D actions.
 import re
 from typing import Optional
 
-from game.core.interfaces import ActionParser
-from game.core.models import ParsedAction, ActionType
+from backend.game.core.interfaces import ActionParser
+from backend.models import ParsedAction, ActionType
 
 
 class FallbackParser(ActionParser):

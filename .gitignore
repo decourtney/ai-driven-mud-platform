@@ -72,8 +72,6 @@ venv.bak/
 # Model files and outputs
 offload/
 lora_output/
-ai_models/
-models/
 checkpoints/
 *.bin
 *.safetensors

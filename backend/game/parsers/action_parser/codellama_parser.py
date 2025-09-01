@@ -10,9 +10,9 @@ import re
 from typing import Dict, Optional
 import gc
 
-from game.core.interfaces import ActionParser
-from game.core.models import ParsedAction, ActionType
-from game.parsers.fallback_parser import FallbackParser
+from backend.game.core.interfaces import ActionParser
+from backend.models import ParsedAction, ActionType
+from .fallback_parser import FallbackParser
 
 
 class CodeLlamaParser(ActionParser):
@@ -91,21 +91,21 @@ class CodeLlamaParser(ActionParser):
         """Check if parser is ready to use"""
         return self._is_loaded and self.model is not None
     
-    def parse_action(self, user_input: str) -> ParsedAction:
+    def parse_action(self, action: str) -> ParsedAction:
         """Parse natural language input into structured action"""
         if not self.is_loaded():
             print("[-] CodeLlama not loaded, using fallback parser")
-            return self.fallback_parser.parse_action(user_input)
+            return self.fallback_parser.parse_action(action)
         
         try:
-            return self._parse_with_llama(user_input)
+            return self._parse_with_llama(action)
         except Exception as e:
             print(f"[-] CodeLlama parsing failed: {e}, using fallback")
-            return self.fallback_parser.parse_action(user_input)
+            return self.fallback_parser.parse_action(action)
     
-    def _parse_with_llama(self, user_input: str) -> ParsedAction:
+    def _parse_with_llama(self, action: str) -> ParsedAction:
         """Internal method to parse using CodeLlama"""
-        cleaned_input = user_input.strip()
+        cleaned_input = action.strip()
         cleaned_input = re.sub(r'\bInput:\s*', '', cleaned_input)
         
         prompt = self._create_prompt(cleaned_input)
@@ -152,7 +152,7 @@ class CodeLlamaParser(ActionParser):
         
         return self._parse_llama_response(response, cleaned_input)
     
-    def _create_prompt(self, user_input: str) -> str:
+    def _create_prompt(self, action: str) -> str:
         """Create a well-structured prompt for CodeLlama"""
         system_prompt = """
             You are a D&D text action parser.
@@ -205,7 +205,7 @@ class CodeLlamaParser(ActionParser):
 
         return f"""{system_prompt}
 
-        Input: "{user_input}"
+        Input: "{action}"
         Output: """
     
     def _parse_llama_response(self, response: str, original_input: str) -> ParsedAction:
@@ -252,7 +252,6 @@ class CodeLlamaParser(ActionParser):
                     weapon=parsed_json.get("weapon"),
                     subject=parsed_json.get("subject"),
                     details=parsed_json.get("details"),
-                    parsing_method="codellama"
                 )
                 
             except (json.JSONDecodeError, ValueError) as e:

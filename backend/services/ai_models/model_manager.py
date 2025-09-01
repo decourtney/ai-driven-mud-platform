@@ -1,9 +1,11 @@
 import torch
-from typing import Optional
-from game.core.interfaces import ActionParser, ActionNarrator
-from game.core.models import ParsedAction, ValidationResult
-from game.parsers.codellama_parser import CodeLlamaParser
-from game.narrators.mistral_narrator import GGUFMistralNarrator
+
+from typing import Optional, Dict, List, Any
+
+from backend.game.core.interfaces import ActionParser, ActionNarrator
+from backend.models import ParsedAction, ValidationResult
+from backend.game.parsers.action_parser.codellama_parser import CodeLlamaParser
+from backend.game.parsers.narrator_parser.mistral_narrator import GGUFMistralNarrator
 
 
 class ModelManager:
@@ -55,21 +57,21 @@ class ModelManager:
         """Check if both models are loaded"""
         return self.is_parser_ready() and self.is_narrator_ready()
     
-    def parse_action(self, user_input: str) -> ParsedAction:
+    def parse_action(self, action: str) -> ParsedAction:
         """Process user input - no loading/unloading needed"""
         if not self.is_parser_ready():
             if not self.load_all_models():
                 raise RuntimeError("Failed to load models")
-        return self.parser.parse_action(user_input)
+        return self.parser.parse_action(action)
     
-    def generate_input_narration(self, parsed_action, hit: bool, damage_type: str) -> str:
+    def generate_action_narration(self, parsed_action: ParsedAction, hit: bool, damage_type: str) -> str:
         """Generate narration response - no loading/unloading needed"""
         if not self.is_narrator_ready():
             if not self.load_all_models():
                 raise RuntimeError("Failed to load models")
-        return self.narrator.generate_input_narration(parsed_action, hit, damage_type)
+        return self.narrator.generate_action_narration(parsed_action, hit, damage_type)
     
-    def generate_scene_narration(self, scene_state, player, npcs) -> str:
+    def generate_scene_narration(self, scene_state: Dict[str, Any], player: Dict[str, Any], npcs: List[Dict[str, Any]]) -> str:
         """Generate scene description - no loading/unloading needed"""
         if not self.is_narrator_ready():
             if not self.load_all_models():

@@ -2,7 +2,7 @@ from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass, field
 import uuid
 from datetime import datetime
-from game.core.models import ActionResult, DamageType, ActionType, CharacterType, StatusEffect
+from backend.models import ActionResult, DamageType, ActionType, CharacterType, StatusEffect
 
 
 @dataclass

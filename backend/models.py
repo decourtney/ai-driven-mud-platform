@@ -4,7 +4,7 @@ Centralized data structures used across all components.
 """
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from enum import Enum
 
 
@@ -69,7 +69,6 @@ class DamageType(str, Enum):
 
 
 class ParsedAction(BaseModel):
-    """Structured representation of a parsed action"""
     actor: str
     action: str
     target: Optional[str] = None
@@ -77,11 +76,9 @@ class ParsedAction(BaseModel):
     weapon: Optional[str] = None
     subject: Optional[str] = None
     details: Optional[str] = None
-    parsing_method: Optional[str] = None
 
 
 class ActionResult(BaseModel):
-    """Result of processing an action through the game engine"""
     parsed_action: ParsedAction
     hit: bool
     dice_roll: int
@@ -93,23 +90,80 @@ class ActionResult(BaseModel):
 class GameContext(BaseModel):
     """Context information for the game session"""
     scene_description: Optional[str] = None
-    active_characters: list[str] = []
+    active_characters: List[str] = []
     environment: Optional[str] = None
     difficulty_modifier: int = 0
 
 
-# API Request/Response models
-class ProcessUserInputRequest(BaseModel):
-    user_input: str
+# API models
+class ParseActionRequest(BaseModel):
+    action: str
+    
+class ParseActionResponse(BaseModel):
+    actor: str
+    action: str
+    target: Optional[str] = None
+    action_type: ActionType
+    weapon: Optional[str] = None
+    subject: Optional[str] = None
+    details: Optional[str] = None
 
-
-class StructuredActionRequest(BaseModel):
+class GenerateActionRequest(BaseModel):
     parsed_action: ParsedAction
     hit: bool
     damage_type: Optional[str] = "wound"
-    context: Optional[GameContext] = None
+
+class GenerateSceneRequest(BaseModel):
+    scene: Dict[str, Any]
+    player: Dict[str, Any]
+    npcs: List[Dict[str, Any]] 
+
+class GenerateNarrationResponse(BaseModel):
+    # Reponse for any narration generation
+    narration: str
 
 
 class HealthResponse(BaseModel):
     status: str
-    components: dict[str, bool]  # component_name: is_loaded
+    models_loaded: bool
+    parser_ready: bool
+    narrator_ready: bool
+    memory_usage: Dict[str, Any]
+    uptime_seconds: float
+   
+    
+class GameStatus(str, Enum):
+    active = "active"
+    maintenance = "maintenance"
+    beta = "beta"
+
+
+class GameDifficulty(str, Enum):
+    beginner = "beginner"
+    intermediate = "intermediate"
+    advanced = "advanced"
+    
+    
+class GameInfo(BaseModel):
+    slug: str
+    engine: str
+    title: str
+    description: str
+    playerCount: int
+    status: GameStatus
+    difficulty: GameDifficulty
+    estimatedTime: str
+    features: List[str]
+    thumbnail: str
+    tags: List[str]
+    
+    
+class GameSessionCreate(BaseModel):
+    slug: str
+    player_name: str
+
+
+class GameSessionResponse(BaseModel):
+    session_id: str
+    slug: str
+    state: dict

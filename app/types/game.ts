@@ -72,7 +72,7 @@ export interface GameInterfaceProps {
   isProcessing?: boolean;
 }
 
-export interface GameCard {
+export interface GameInfo {
   id: string;
   title: string;
   description: string;

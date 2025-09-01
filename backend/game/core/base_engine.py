@@ -1,18 +1,18 @@
 from typing import List, Optional, Tuple, Generator
 from enum import Enum
 
-from game.core.interfaces import ActionParser, ActionNarrator, DiceRoller
-from game.core.models import (
-    ParsedAction, ActionResult, GameContext, ActionType, 
-    DamageType, ProcessUserInputRequest, GameCondition, ValidationResult
+from backend.game.core.interfaces import DiceRoller
+from backend.models import (
+    ParsedAction, ActionResult, ActionType, 
+    DamageType, GameCondition, ValidationResult
 )
-from game.core.model_manager import ModelManager
-from game.core.dice import StandardDiceRoller
-from game.core.character_state import CharacterState
-from game.core.game_state import GameState
+from backend.services.ai_models.model_manager import ModelManager
+from backend.game.core.dice import StandardDiceRoller
+from backend.game.core.character_state import CharacterState
+from backend.game.core.game_state import GameState
 
 
-class GameEngine:
+class BaseGameEngine:
     """
     Turn-based game engine skeleton for single-player text RPG.
     Player and NPC actions are processed sequentially with full validation and scene management.
