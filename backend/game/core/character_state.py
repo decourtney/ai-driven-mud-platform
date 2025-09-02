@@ -70,7 +70,7 @@ class CharacterState:
         armor_class: int = 10,
         level: int = 1,
         character_class: str = "Fighter",
-        background: str = "Folk Hero",
+        background: str = "Walking Corpse",
         equipped_weapon: Optional[Item] = None, # temporary for cli mode
     ):
         # Basic identity

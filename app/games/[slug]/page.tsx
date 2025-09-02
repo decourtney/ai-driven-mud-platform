@@ -7,7 +7,7 @@ export default async function GamePage({
   params: { slug: string };
 }) {
   const res = await axios
-    .get(`${process.env.NEXT_PUBLIC_BASE_URL}/games/${params.slug}`)
+    .get(`${process.env.NEXT_PUBLIC_BASE_URL}/games/${params.slug}`) //calling to get game info for now but will change to create session
     .catch(() => notFound());
 
   const game = res.data;

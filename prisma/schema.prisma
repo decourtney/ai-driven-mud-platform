@@ -69,8 +69,8 @@ model GameSession {
   id           String   @id @default(cuid())
   userId       String
   slug         String   
-  playerSetup  Json     // initial player setup
-  gameState   Json     // current game state
+  playerState  Json     // initial player state
+  sceneState   Json     // current scene state
   turnNumber   Int      @default(0)
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())

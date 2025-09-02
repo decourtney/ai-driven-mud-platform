@@ -9,6 +9,7 @@ from backend.models import (
 from backend.game.core.character_state import CharacterState
 from backend.game.core.game_state import GameState
 from backend.game.core.dice_system import DiceRollerFactory, BaseDiceRoller
+from backend.services.ai_models.model_client import AsyncModelServiceClient
 
 
 class DnDGameEngine(BaseGameEngine):
@@ -16,6 +17,9 @@ class DnDGameEngine(BaseGameEngine):
     D&D-specific implementation of the base game engine.
     Implements D&D rules for validation, action processing, and AI behavior.
     """
+    
+    def __init__(self, model_client: AsyncModelServiceClient, **kwargs):
+        super().__init__(model_client=model_client, **kwargs)
     
     def get_default_dice_roller(self) -> BaseDiceRoller:
         return DiceRollerFactory.create_roller('dnd')

@@ -28,31 +28,8 @@ class GameAPI:
     
     def __init__(self, model_server_url: str = "http://localhost:8001", lifespan=None):
         self.model_client = AsyncModelServiceClient(model_server_url)
-        self.session_manager = GameSessionManager()
+        self.session_manager = GameSessionManager(model_client=self.model_client)
         self.app = self._create_app(lifespan=lifespan)
-    
-    def create_sample_game_state(self, player_name: str):
-        """Create sample game state - replace with actual character creation logic"""
-        player = CharacterState(
-            name=player_name,
-            max_hp=20,
-            current_hp=20,
-            equipped_weapon="sword"
-        )
-        
-        npcs = [
-            CharacterState(name="Goblin", max_hp=8, current_hp=8, equipped_weapon="club"),
-            CharacterState(name="Orc", max_hp=15, current_hp=15, equipped_weapon="axe")
-        ]
-        
-        scene_state = {
-            "name": "Dark Dungeon",
-            "description": "A dank stone corridor lit by flickering torches",
-            "rules": {},
-            "difficulty_modifier": 0
-        }
-        
-        return player, npcs, scene_state
     
     def _create_app(self, lifespan=None) -> FastAPI:
         """Create and configure FastAPI application"""

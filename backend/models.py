@@ -159,8 +159,9 @@ class GameInfo(BaseModel):
     
     
 class GameSessionCreate(BaseModel):
+    user_id: str
     slug: str
-    player_setup: Dict[str, Any]
+    player_state: Dict[str, Any]
 
 
 class GameSessionResponse(BaseModel):

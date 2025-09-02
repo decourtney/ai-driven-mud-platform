@@ -40,8 +40,10 @@ class BaseGameEngine(ABC):
     # ----------------------------
     # Game State Management
     # ----------------------------
-    def initialize_game_state(self, player_state: CharacterState, npcs: List[CharacterState], scene_state: dict):
+    def initialize_game_state(self, player_state: CharacterState):
         """Create initial GameState with player, NPCs, and scene data"""
+        
+        # need to create initial scene and npcs if necessary
         self.game_state = GameState(
             player=player_state,
             npcs=npcs,

@@ -4,12 +4,13 @@ from backend.services.api.server import prisma
 from backend.models import GameSessionCreate
 from backend.game.game_registry import GAME_REGISTRY
 from backend.game.engine_registry import ENGINE_REGISTRY
+from backend.services.ai_models.model_client import AsyncModelServiceClient
 
 class GameSessionManager:
-    def __init__(self):
-        pass
+    def __init__(self, model_client: AsyncModelServiceClient):
+        self.model_client = model_client
 
-    async def create_session(self, request: GameSessionCreate, user_id: str) -> str:
+    async def create_session(self, request: GameSessionCreate) -> str:
         """Create a new game session and persist it to DB"""
         if request.slug not in GAME_REGISTRY:
             raise ValueError(f"Unknown game: {request.slug}")
@@ -19,17 +20,17 @@ class GameSessionManager:
             raise ValueError(f"Engine not registered: {engine_name}")
 
         engine_class = ENGINE_REGISTRY[engine_name]
-        engine = engine_class()
-        state = engine.initialize_game(request.player_setup)
+        engine = engine_class(model_client=self.model_client)
+        state = engine.initialize_game_state(request.player_state)
 
         session_id = str(uuid.uuid4())
 
         await prisma.gamesession.create(
             data={
                 "id": session_id,
-                "userId": user_id,
+                "userId": request.user_id,
                 "slug": request.slug,
-                "playerSetup": request.player_setup,
+                "playerState": request.player_state,
                 "sceneState": state,
                 "turnNumber": 0,
                 "isActive": True
@@ -46,7 +47,7 @@ class GameSessionManager:
             "id": record.id,
             "user_id": record.userId,
             "slug": record.slug,
-            "player_setup": record.playerSetup,
+            "player_state": record.playerState,
             "scene_state": record.sceneState,
             "turn_number": record.turnNumber,
             "is_active": record.isActive
