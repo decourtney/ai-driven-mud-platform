@@ -105,7 +105,7 @@ export default async function LobbyPage() {
                   </div>
 
                   {/* Play Button */}
-                  <Link href={`games/${featuredGame.slug}`}>
+                  <Link href={`game/${featuredGame.slug}`}>
                     <button className="bg-green-600 hover:bg-green-700 text-black font-mono font-bold px-8 py-4 text-lg transition-colors flex items-center border-2 border-green-400">
                       <Play size={24} className="mr-3" />[ START ADVENTURE ]
                     </button>

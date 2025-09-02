@@ -8,38 +8,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, Dict, Any
 import uuid
 from datetime import datetime
+from prisma import Prisma
+from contextlib import asynccontextmanager
 
-from backend.game.registry import GAME_REGISTRY
-from backend.game.core.base_engine import BaseGameEngine
+from backend.services.api.database import prisma
+from backend.game.game_registry import GAME_REGISTRY
+from backend.game.core.game_session_manager import GameSessionManager
 from backend.game.core.character_state import CharacterState
-from ..ai_models.model_client import AsyncModelServiceClient
+from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.models import (GameInfo, GameSessionCreate, GameSessionResponse,
                             ParseActionResponse, ParseActionRequest, GenerateActionRequest, 
                             GenerateSceneRequest, GenerateNarrationResponse, HealthResponse,
                             ParsedAction, ActionType)
 
 
-class GameSession:
-    """Represents an active game session"""
-    def __init__(self, session_id: str, game_slug: str, engine: BaseGameEngine):
-        self.session_id = session_id
-        self.game_slug = game_slug
-        self.engine = engine
-        self.created_at = datetime.now()
-        self.last_activity = datetime.now()
-    
-    def update_activity(self):
-        """Update last activity timestamp"""
-        self.last_activity = datetime.now()
-
 
 class GameAPI:
     """Main game API server - now uses model service client"""
     
     def __init__(self, model_server_url: str = "http://localhost:8001", lifespan=None):
-        # Replace ModelManager with ModelServiceClient
         self.model_client = AsyncModelServiceClient(model_server_url)
-        self.active_sessions: Dict[str, GameSession] = {}
+        self.session_manager = GameSessionManager()
         self.app = self._create_app(lifespan=lifespan)
     
     def create_sample_game_state(self, player_name: str):
@@ -157,38 +146,23 @@ class GameAPI:
         # SESSION MANAGEMENT ENDPOINTS
         # ==========================================
         
-        @app.post("/sessions", response_model=GameSessionResponse)
-        async def create_session(request: GameSessionCreate):
+        @app.post("/games/{slug}/sessions", response_model=GameSessionResponse)
+        async def create_game_session(request: GameSessionCreate):
             """Create a new game session"""
-            if request.game_slug not in GAME_REGISTRY:
+            if request.slug not in GAME_REGISTRY:
                 raise HTTPException(status_code=404, detail="Game not found")
             
             # Check if model service is available
             if not await self.model_client.is_healthy():
                 raise HTTPException(
                     status_code=503, 
-                    detail=f"Model service not available at {self.model_client.base_url}"
+                    detail=f"Model server not available at {self.model_client.base_url}"
                 )
             
             try:
-                # Create game engine using registry
-                engine_factory = GAME_REGISTRY[request.game_slug]["engine"]
-                engine = engine_factory(model_client=self.model_client)  # Pass model client to engine
+                session_id = self.session_manager.create_session(request)
                 
-                # Initialize game state
-                player, npcs, scene_state = self.create_sample_game_state(request.player_name)
-                engine.initialize_game_state(player, npcs, scene_state)
-                
-                # Create session
-                session_id = str(uuid.uuid4())
-                session = GameSession(session_id, request.game_slug, engine)
-                self.active_sessions[session_id] = session
-                
-                return GameSessionResponse(
-                    session_id=session_id,
-                    game_slug=request.game_slug,
-                    state=engine.state
-                )
+                return {"session_id": session_id}
                 
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Failed to create session: {str(e)}")

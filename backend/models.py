@@ -160,10 +160,10 @@ class GameInfo(BaseModel):
     
 class GameSessionCreate(BaseModel):
     slug: str
-    player_name: str
+    player_setup: Dict[str, Any]
 
 
 class GameSessionResponse(BaseModel):
     session_id: str
     slug: str
-    state: dict
+    state: Dict[str, Any]

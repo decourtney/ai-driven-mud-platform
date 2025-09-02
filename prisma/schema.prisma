@@ -8,6 +8,10 @@ generator client {
   provider = "prisma-client-js"
 }
 
+generator py {
+  provider = "prisma-client-py"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -62,13 +66,15 @@ model VerificationToken {
 
 /// Game-specific table to persist a player’s current playthrough
 model GameSession {
-  id          String   @id @default(cuid())
-  userId      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  sceneState  Json      // JSON representing current scene, NPCs, player, etc.
-  turnNumber  Int       @default(0)
-  isActive    Boolean   @default(true)
+  id           String   @id @default(cuid())
+  userId       String
+  slug         String   
+  playerSetup  Json     // initial player setup
+  gameState   Json     // current game state
+  turnNumber   Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

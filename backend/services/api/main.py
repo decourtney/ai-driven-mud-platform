@@ -21,10 +21,21 @@ AUTO_LOAD_MODELS = os.getenv("AUTO_LOAD_MODELS", "false").lower() == "true"
 # ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handle startup and shutdown with model service integration"""
+    """Handle startup and shutdown with model service integration AND Prisma"""
     
+    # Import here to avoid circular imports
+    from backend.services.api.database import connect_db, disconnect_db    
     # Startup
     print(f"[+] D&D Game API starting...")
+    
+    # Connect to Prisma first
+    try:
+        await connect_db()
+    except Exception as e:
+        print(f"[-] Failed to connect to database: {e}")
+        # You might want to raise here if DB is critical
+    
+    # Then handle model service
     print(f"[+] Model service URL: {MODEL_SERVER_URL}")
     
     try:
@@ -61,13 +72,23 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     print("[+] Shutting down D&D Game API...")
+    
+    # Close model client first
     try:
         api_server = app.state.game_server
         model_client = api_server.model_client
         model_client.close()
-        print("[+] ✅ Cleanup complete.")
+        print("[+] Model client closed")
     except Exception as e:
-        print(f"[-] Error during cleanup: {e}")
+        print(f"[-] Error during model client cleanup: {e}")
+    
+    # Then disconnect Prisma
+    try:
+        await disconnect_db()
+    except Exception as e:
+        print(f"[-] Error during database disconnect: {e}")
+    
+    print("[+] ✅ Cleanup complete.")
 
 # ==========================================
 # Create FastAPI app with model service
