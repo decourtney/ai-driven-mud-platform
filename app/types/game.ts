@@ -84,3 +84,35 @@ export interface GameInfo {
   thumbnail: string;
   tags: string[];
 }
+
+// Will need to add mana later
+export interface PlayerState {
+  name: string;
+  characterType: string;
+  maxHp: number; // Relative to character_class
+  currentHp: number; // Start with 10 - but will be relative to character class
+  armorClass: number; // Relative to character class
+  level: number; // Start with 1
+  characterClass: string; // Determines max hp and armor class
+  background: string;
+}
+
+export interface CharacterAttributes {
+  strength: number;
+  dexterity: number;
+  constitution: number;
+  intelligence: number;
+  wisdom: number;
+  charisma: number;
+}
+
+export interface CharacterAbilities {
+  id: string;
+  name: string;
+  icon: string;
+  requirement: string;
+  reqStat: string;
+  reqValue: number;
+  type: string;
+  description: string;
+}

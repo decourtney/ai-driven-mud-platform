@@ -123,7 +123,7 @@ class GameAPI:
         # SESSION MANAGEMENT ENDPOINTS
         # ==========================================
         
-        @app.post("/games/{slug}/sessions", response_model=GameSessionResponse)
+        @app.post("/sessions/{slug}", response_model=GameSessionResponse)
         async def create_game_session(request: GameSessionCreate):
             """Create a new game session"""
             if request.slug not in GAME_REGISTRY:
