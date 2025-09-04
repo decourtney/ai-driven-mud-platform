@@ -65,7 +65,7 @@ export default function Navbar({ variant = "solid", user }: NavbarProps) {
           <div className="hidden md:flex space-x-6">
             <Link href="/lobby">
               <button className="text-green-300 hover:text-green-400 transition-colors duration-200 px-3 py-2 font-mono border border-transparent hover:border-green-400">
-                [ HOME ]
+                [ LOBBY ]
               </button>
             </Link>
             <Link href="/lobby/news">
