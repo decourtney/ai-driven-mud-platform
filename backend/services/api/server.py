@@ -19,7 +19,7 @@ from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.models import (GameInfo, GameSessionCreate, GameSessionResponse,
                             ParseActionResponse, ParseActionRequest, GenerateActionRequest, 
                             GenerateSceneRequest, GenerateNarrationResponse, HealthResponse,
-                            ParsedAction, ActionType)
+                            ParsedAction, ActionType, GameSessionDelete)
 
 
 
@@ -121,7 +121,16 @@ class GameAPI:
         # ==========================================
         # SESSION MANAGEMENT ENDPOINTS
         # ==========================================
-        
+                
+        @app.get("/sessions/{slug}/status")
+        async def get_session_status(slug: str, user_id: str):
+            try:
+                session_id = await self.session_manager.get_session_status(user_id=user_id, slug=slug)
+                return {"session_id": session_id}
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
+
+            
         @app.post("/sessions/{slug}")
         async def create_game_session(request: GameSessionCreate):
             """Create a new game session"""
@@ -138,13 +147,14 @@ class GameAPI:
             try:
                 session_id = await self.session_manager.create_session(request)
                 
-                return {"session_id": session_id}
-                
+                return {
+                    "session_id": session_id
+                }        
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Failed to create session: {str(e)}")
-        
-        @app.get("/sessions/{session_id}")
-        def get_session(session_id: str):
+
+        @app.get("/sessions/{slug}")
+        async def get_session(session_id: str):
             """Get session information"""
             if session_id not in self.active_sessions:
                 raise HTTPException(status_code=404, detail="Session not found")
@@ -160,17 +170,21 @@ class GameAPI:
                 "last_activity": session.last_activity.isoformat()
             }
         
-        @app.delete("/sessions/{session_id}")
-        def delete_session(session_id: str):
+        @app.delete("/sessions/{slug}")
+        async def delete_session(request: GameSessionDelete):
             """Delete/end a game session"""
-            if session_id not in self.active_sessions:
-                raise HTTPException(status_code=404, detail="Session not found")
-            
-            del self.active_sessions[session_id]
-            return {"success": True, "message": "Session ended successfully"}
+            print(request)
+            try:
+                await self.session_manager.delete_session(request)
+                return {"success": True}
+            except ValueError as e:
+                raise HTTPException(status_code=404, detail=str(e))
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed to delete session: {str(e)}")
+
         
         @app.get("/sessions")
-        def list_sessions():
+        async def list_sessions():
             """List all active sessions (for admin/debugging)"""
             return {
                 "total_sessions": len(self.active_sessions),

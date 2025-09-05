@@ -7,7 +7,7 @@ import {
   EquippedGear,
   InventoryItem,
   Quest,
-} from "../../../types/game";
+} from "@/app/types/game";
 
 export default function GamePage() {
   const handlePlayerAction = (action: string) => {

@@ -1,29 +1,43 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Play, Plus, Settings, Book } from "lucide-react";
+import { Play, Plus, Settings, Book, Minus } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { toast } from "sonner";
 
 interface MainMenuProps {
   userId: string;
 }
 
 const MainMenu = ({ userId }: MainMenuProps) => {
-  const [hasExistingSession, setHasExistingSession] = useState(false);
+  const [hasExistingSession, setHasExistingSession] = useState<string | null>();
   const params = useParams();
 
   // Check for existing game session on component mount
   useEffect(() => {
-    // This would check your backend/localStorage for existing session
-    const checkExistingSession = async () => {
-      // Placeholder logic - replace with actual API call
-      const existingSession = false; // await checkSession();
-      setHasExistingSession(existingSession);
+    const checkForSession = async () => {
+      try {
+        const res = await fetch(`/api/sessions/${params.slug}/status`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText);
+        }
+
+        const data = await res.json();
+        console.log("Existing session data:", data);
+        setHasExistingSession(data.session_id);
+      } catch (err: any) {
+        toast.error(err.message || "Something went wrong");
+      }
     };
 
-    checkExistingSession();
-  }, []);
+    checkForSession();
+  }, [params.slug]);
 
   const handleContinueGame = () => {
     console.log("Continue existing game session");
@@ -35,12 +49,29 @@ const MainMenu = ({ userId }: MainMenuProps) => {
     // Navigate to character creation
   };
 
-  const handleSettings = () => {
-    console.log("Open settings menu");
-  };
-
   const handleCredits = () => {
     console.log("Show credits/about");
+  };
+
+  const handleDelete = async () => {
+    try {
+      const res = await fetch(`/api/sessions/${params.slug}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(hasExistingSession),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText);
+      }
+
+      const data = await res.json();
+      console.log("Existing session data:", data);
+      setHasExistingSession(data.session_id);
+    } catch (err: any) {
+      toast.error(err.message || "Something went wrong");
+    }
   };
 
   return (
@@ -99,20 +130,26 @@ const MainMenu = ({ userId }: MainMenuProps) => {
           </Link>
 
           {/* Credits/About Button */}
-          <Link
-            href={`${params.slug}`}
+          <button
+            onClick={handleCredits}
             className="w-full bg-black/60 backdrop-blur-sm hover:bg-green-700/60 text-green-400 hover:text-green-200 active:bg-green-600/60 font-bold py-4 px-6 transition-all duration-200 border-2 border-green-500 active:border-green-300 flex items-center gap-3"
           >
             <Book size={18} />
             <span className="text-lg">CREDITS</span>
-          </Link>
-        </div>
+          </button>
 
-        {/* Footer */}
-        <div className="mt-auto p-8">
-          <div className="text-xs text-gray-500">
-            Version 1.0.0 | Built with Next.js
-          </div>
+          {/* Delete Current Game */}
+          {hasExistingSession && (
+            <button
+              onClick={handleDelete}
+              className="w-full bg-black/60 backdrop-blur-sm hover:bg-red-700/60 text-red-500 hover:text-green-200 active:bg-red-600/60 font-bold py-4 px-6 transition-all duration-200 border-2 border-red-500 active:border-red-300 flex items-center gap-3"
+            >
+              <Minus size={20} />
+              <div className="text-left">
+                <div className="text-lg">DELETE ADVENTURE</div>
+              </div>
+            </button>
+          )}
         </div>
       </div>
 

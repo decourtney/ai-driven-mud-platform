@@ -164,6 +164,12 @@ class GameSessionCreate(BaseModel):
     player_state: Dict[str, Any]
 
 
+class GameSessionDelete(BaseModel):
+    user_id: str
+    slug: str
+    session_id: str
+
+
 class GameSessionResponse(BaseModel):
     session_id: str
     slug: str

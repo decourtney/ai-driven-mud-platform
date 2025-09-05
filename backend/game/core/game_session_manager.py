@@ -3,7 +3,7 @@ import json
 from prisma import Json
 from typing import Dict, Any, Optional
 from backend.services.api.server import prisma
-from backend.models import GameSessionCreate
+from backend.models import GameSessionCreate, GameSessionDelete
 from backend.game.game_registry import GAME_REGISTRY
 from backend.game.engine_registry import ENGINE_REGISTRY
 from backend.services.ai_models.model_client import AsyncModelServiceClient
@@ -12,6 +12,12 @@ from backend.services.ai_models.model_client import AsyncModelServiceClient
 class GameSessionManager:
     def __init__(self, model_client: AsyncModelServiceClient):
         self.model_client = model_client
+        
+    async def get_session_status(self, user_id: str, slug: str) -> Optional[str]:
+        session = await prisma.gamesession.find_first(
+            where={"user_id": user_id, "slug": slug}
+        )
+        return session.id if session else None
 
     async def create_session(self, request: GameSessionCreate) -> str:
         """Create a new game session and persist it to DB"""
@@ -66,9 +72,14 @@ class GameSessionManager:
             }
         )
 
-    async def delete_session(self, session_id: str):
-        """Delete a session from DB"""
-        await prisma.gamesession.delete(where={"id": session_id})
+    async def delete_session(self, request: GameSessionDelete):
+        session = await prisma.gamesession.find_first(
+            where={"user_id": request.user_id, "slug": request.slug, "id": request.session_id}
+        )
+        if not session:
+            raise ValueError("Session not found")
+        await prisma.gamesession.delete(where={"id": request.session_id})
+
 
     async def list_active_sessions(self, user_id: Optional[str] = None):
         """List active sessions optionally filtered by user"""

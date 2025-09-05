@@ -9,8 +9,8 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  const {slug} = await params
-  const session = await auth(); // server-side auth
+  const { slug } = await params;
+  const session = await auth();
 
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,25 +18,21 @@ export async function POST(
 
   try {
     const body = await req.json();
-    console.log({ ...body, userId: session.user.id, slug: slug });
 
     // Add the userId from auth to send to backend
-    const res = await fetch(
-      `${BACKEND_URL}/sessions/${slug}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ player_state: {...body}, user_id: session.user.id, slug: slug }),
-      }
-    );
+    const res = await fetch(`${BACKEND_URL}/sessions/${slug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        player_state: { ...body },
+        user_id: session.user.id,
+        slug: slug,
+      }),
+    });
 
     if (!res.ok) {
       const errorText = await res.text();
-      console.log(errorText);
-      return NextResponse.json(
-        { error: errorText },
-        { status: res.status }
-      );
+      return NextResponse.json({ error: errorText }, { status: res.status });
     }
 
     const data = await res.json();
@@ -44,6 +40,46 @@ export async function POST(
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message || "Failed to create session" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  const { slug } = await params;
+  const session = await auth();
+
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const session_id = await req.json();
+
+    const res = await fetch(`${BACKEND_URL}/sessions/${slug}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: session_id,
+        user_id: session.user.id,
+        slug: slug,
+      }),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.log(errorText);
+      return NextResponse.json({ error: errorText }, { status: res.status });
+    }
+
+    const data = await res.json();
+    return NextResponse.json(data);
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || "Failed to delete session" },
       { status: 500 }
     );
   }

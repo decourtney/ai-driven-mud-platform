@@ -1,7 +1,6 @@
 "use client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import { CharacterState } from "../../types/game";
 
 export default function CharacterCreateButton({
