@@ -149,10 +149,10 @@ class GameInfo(BaseModel):
     engine: str
     title: str
     description: str
-    playerCount: int
+    player_count: int
     status: GameStatus
     difficulty: GameDifficulty
-    estimatedTime: str
+    estimated_time: str
     features: List[str]
     thumbnail: str
     tags: List[str]
@@ -167,4 +167,4 @@ class GameSessionCreate(BaseModel):
 class GameSessionResponse(BaseModel):
     session_id: str
     slug: str
-    state: Dict[str, Any]
+    game_state: Dict[str, Any]

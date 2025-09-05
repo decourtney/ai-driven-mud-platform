@@ -2,7 +2,12 @@
 
 import CharacterPanel from "@/app/components/game/CharacterPanel";
 import GameInterface from "@/app/components/game/GameInterface";
-import { Character, EquippedGear, InventoryItem, Quest } from "../types/game";
+import {
+  Character,
+  EquippedGear,
+  InventoryItem,
+  Quest,
+} from "../../../types/game";
 
 export default function GamePage() {
   const handlePlayerAction = (action: string) => {
@@ -15,9 +20,9 @@ export default function GamePage() {
     level: 12,
     class: "Ranger",
     hp: 85,
-    maxHp: 100,
+    max_hp: 100,
     mp: 40,
-    maxMp: 60,
+    max_mp: 60,
     stats: {
       strength: 16,
       dexterity: 14,
@@ -51,14 +56,14 @@ export default function GamePage() {
     <div className="min-h-screen bg-black text-white flex">
       <CharacterPanel
         character={character}
-        equippedGear={equippedGear}
+        equipped_gear={equippedGear}
         inventory={inventory}
         quests={quests}
       />
 
       <GameInterface
         onPlayerAction={handlePlayerAction}
-        isProcessing={false} // Set to true when waiting for backend response
+        is_processing={false} // Set to true when waiting for backend response
       />
     </div>
   );

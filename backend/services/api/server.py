@@ -64,7 +64,6 @@ class GameAPI:
             return {
                 "status": "healthy",
                 "api_server": "running",
-                "active_sessions": len(self.active_sessions),
                 "model_service": {
                     "available": await self.model_client.is_healthy(),
                     "url": self.model_client.base_url,
@@ -87,10 +86,10 @@ class GameAPI:
                     engine=meta['engine'],
                     title=meta["title"],
                     description=meta["description"],
-                    playerCount=meta["playerCount"],
+                    player_count=meta["player_count"],
                     status=meta["status"],
                     difficulty=meta["difficulty"],
-                    estimatedTime=meta["estimatedTime"],
+                    estimated_time=meta["estimated_time"],
                     features=meta["features"],
                     thumbnail=meta["thumbnail"],
                     tags=meta["tags"],
@@ -110,10 +109,10 @@ class GameAPI:
                 engine=meta['engine'],
                 title=meta["title"],
                 description=meta["description"],
-                playerCount=meta["playerCount"],
+                player_count=meta["player_count"],
                 status=meta["status"],
                 difficulty=meta["difficulty"],
-                estimatedTime=meta["estimatedTime"],
+                estimated_time=meta["estimated_time"],
                 features=meta["features"],
                 thumbnail=meta["thumbnail"],
                 tags=meta["tags"],
@@ -123,12 +122,12 @@ class GameAPI:
         # SESSION MANAGEMENT ENDPOINTS
         # ==========================================
         
-        @app.post("/sessions/{slug}", response_model=GameSessionResponse)
+        @app.post("/sessions/{slug}")
         async def create_game_session(request: GameSessionCreate):
             """Create a new game session"""
             if request.slug not in GAME_REGISTRY:
                 raise HTTPException(status_code=404, detail="Game not found")
-            
+
             # Check if model service is available
             if not await self.model_client.is_healthy():
                 raise HTTPException(
@@ -137,7 +136,7 @@ class GameAPI:
                 )
             
             try:
-                session_id = self.session_manager.create_session(request)
+                session_id = await self.session_manager.create_session(request)
                 
                 return {"session_id": session_id}
                 

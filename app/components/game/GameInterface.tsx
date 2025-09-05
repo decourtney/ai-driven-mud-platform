@@ -3,10 +3,9 @@ import React, { useState, useRef, useEffect } from "react";
 import { Send, Terminal } from "lucide-react";
 import { GameMessage, GameInterfaceProps } from "@/app/types/game";
 
-
 export default function GameInterface({
   onPlayerAction,
-  isProcessing = false,
+  is_processing: isProcessing = false,
 }: GameInterfaceProps) {
   const [inputValue, setInputValue] = useState("");
   const [gameMessages, setGameMessages] = useState<GameMessage[]>([

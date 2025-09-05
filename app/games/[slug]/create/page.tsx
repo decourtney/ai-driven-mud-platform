@@ -41,18 +41,18 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
   }
   const slug = params.slug as string;
 
-  const [characterState, setCharacterState] = useState<CharacterState>({
-    name: "",
-    characterType: "",
-    maxHp: 10,
-    currentHp: 10,
-    armorClass: 10,
+  const [playerState, setPlayerState] = useState<CharacterState>({
+    name: "User",
+    character_type: "player",
+    max_hp: 10,
+    current_hp: 10,
+    armor_class: 10,
     level: 1,
     bio: "",
     stats: {
-      strength: 10,
-      dexterity: 10,
-      constitution: 10,
+      strength: 15,
+      dexterity: 13,
+      constitution: 14,
       intelligence: 10,
       wisdom: 10,
       charisma: 10,
@@ -66,12 +66,12 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
 
   useEffect(() => {
     setAvailablePoints(27 - getTotalSpentPoints());
-  }, [characterState.stats]);
+  }, [playerState.stats]);
 
   const adjustStat = (statName: keyof CharacterAttributes, delta: number) => {
-    if (!characterState) return;
+    if (!playerState) return;
 
-    const currentValue = characterState.stats[statName];
+    const currentValue = playerState.stats[statName];
     const newValue = currentValue + delta;
 
     if (newValue < 8 || newValue > 15) return;
@@ -82,7 +82,7 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
 
     if (costDiff > availablePoints) return;
 
-    setCharacterState((prev) =>
+    setPlayerState((prev) =>
       prev
         ? {
             ...prev,
@@ -103,7 +103,7 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
   };
 
   const getTotalSpentPoints = () => {
-    return Object.values(characterState.stats).reduce(
+    return Object.values(playerState.stats).reduce(
       (total, stat) => total + getStatCost(stat),
       0
     );
@@ -113,8 +113,8 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
 
   const isAbilityAvailable = (ability: CharacterAbilities) => {
     return (
-      characterState.stats[ability.reqStat as keyof CharacterAttributes] >=
-      ability.reqValue
+      playerState.stats[ability.req_stat as keyof CharacterAttributes] >=
+      ability.req_value
     );
   };
 
@@ -127,7 +127,7 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
   };
 
   const calculateHP = () =>
-    10 + getStatModifier(characterState.stats.constitution);
+    10 + getStatModifier(playerState.stats.constitution);
 
   const getStatIcon = (statName: string) => {
     switch (statName) {
@@ -154,8 +154,8 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
       name: "Fireball",
       icon: "🔥",
       requirement: "INT 13+",
-      reqStat: "intelligence",
-      reqValue: 13,
+      req_stat: "intelligence",
+      req_value: 13,
       type: "spell",
       description: "Launch a burning projectile",
     },
@@ -164,8 +164,8 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
       name: "Healing Touch",
       icon: "✨",
       requirement: "WIS 13+",
-      reqStat: "wisdom",
-      reqValue: 13,
+      req_stat: "wisdom",
+      req_value: 13,
       type: "spell",
       description: "Restore health to yourself or others",
     },
@@ -174,8 +174,8 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
       name: "Stealth",
       icon: "👤",
       requirement: "DEX 12+",
-      reqStat: "dexterity",
-      reqValue: 12,
+      req_stat: "dexterity",
+      req_value: 12,
       type: "skill",
       description: "Move unseen through shadows",
     },
@@ -184,8 +184,8 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
       name: "Intimidate",
       icon: "👹",
       requirement: "STR 12+",
-      reqStat: "strength",
-      reqValue: 12,
+      req_stat: "strength",
+      req_value: 12,
       type: "skill",
       description: "Strike fear into enemies",
     },
@@ -194,8 +194,8 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
       name: "Lockpicking",
       icon: "🗝️",
       requirement: "DEX 14+",
-      reqStat: "dexterity",
-      reqValue: 14,
+      req_stat: "dexterity",
+      req_value: 14,
       type: "skill",
       description: "Open locked doors and chests",
     },
@@ -204,8 +204,8 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
       name: "Detect Magic",
       icon: "🔮",
       requirement: "INT 11+",
-      reqStat: "intelligence",
-      reqValue: 11,
+      req_stat: "intelligence",
+      req_value: 11,
       type: "spell",
       description: "Sense magical auras and enchantments",
     },
@@ -214,8 +214,8 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
       name: "First Aid",
       icon: "🩹",
       requirement: "WIS 11+",
-      reqStat: "wisdom",
-      reqValue: 11,
+      req_stat: "wisdom",
+      req_value: 11,
       type: "skill",
       description: "Treat wounds and ailments",
     },
@@ -224,8 +224,8 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
       name: "Weapon Mastery",
       icon: "⚔️",
       requirement: "STR 14+",
-      reqStat: "strength",
-      reqValue: 14,
+      req_stat: "strength",
+      req_value: 14,
       type: "combat",
       description: "Enhanced combat techniques",
     },
@@ -261,9 +261,9 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
                 </label>
                 <input
                   type="text"
-                  value={characterState.name}
+                  value={playerState.name}
                   onChange={(e) =>
-                    setCharacterState((prev) => ({
+                    setPlayerState((prev) => ({
                       ...prev,
                       name: e.target.value,
                     }))
@@ -278,9 +278,9 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
               <div className="mb-4">
                 <label className="block text-sm text-green-400 mb-1">Bio</label>
                 <textarea
-                  value={characterState.bio}
+                  value={playerState.bio}
                   onChange={(e) =>
-                    setCharacterState((prev) => ({
+                    setPlayerState((prev) => ({
                       ...prev,
                       bio: e.target.value,
                     }))
@@ -291,7 +291,7 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
                   maxLength={200}
                 />
                 <div className="text-xs text-gray-500 text-right">
-                  {characterState.bio.length}/200
+                  {playerState.bio.length}/200
                 </div>
               </div>
             </div>
@@ -323,7 +323,7 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
             </div>
 
             <CharacterCreateButton
-              characterState={characterState}
+              playerState={playerState}
               slug={slug}
               availablePoints={availablePoints}
             />
@@ -402,7 +402,7 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
             </div>
 
             <div className="grid grid-cols-6 gap-2">
-              {Object.entries(characterState.stats).map(([statName, value]) => {
+              {Object.entries(playerState.stats).map(([statName, value]) => {
                 const modifier = getStatModifier(value);
                 const modifierText =
                   modifier >= 0 ? `+${modifier}` : `${modifier}`;
@@ -554,7 +554,7 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
             </div>
 
             <CharacterCreateButton
-              characterState={characterState}
+              playerState={playerState}
               slug={slug}
               availablePoints={availablePoints}
             />

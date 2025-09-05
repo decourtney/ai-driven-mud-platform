@@ -1,10 +1,13 @@
 import uuid
+import json
+from prisma import Json
 from typing import Dict, Any, Optional
 from backend.services.api.server import prisma
 from backend.models import GameSessionCreate
 from backend.game.game_registry import GAME_REGISTRY
 from backend.game.engine_registry import ENGINE_REGISTRY
 from backend.services.ai_models.model_client import AsyncModelServiceClient
+# from backend.game.core.game_state import GameState
 
 class GameSessionManager:
     def __init__(self, model_client: AsyncModelServiceClient):
@@ -18,24 +21,26 @@ class GameSessionManager:
         engine_name = GAME_REGISTRY[request.slug]["engine"]
         if engine_name not in ENGINE_REGISTRY:
             raise ValueError(f"Engine not registered: {engine_name}")
-
+                
         engine_class = ENGINE_REGISTRY[engine_name]
         engine = engine_class(model_client=self.model_client)
-        state = engine.initialize_game_state(request.player_state)
-
+        game_state = engine.create_game_state(request.player_state)
+        
+        print("DEBUG: Initialized Game State: ", game_state)
+        print("USERID: ", request.user_id)
+        
         session_id = str(uuid.uuid4())
-
+        
         await prisma.gamesession.create(
             data={
                 "id": session_id,
-                "userId": request.user_id,
+                "user_id": request.user_id,
                 "slug": request.slug,
-                "playerState": request.player_state,
-                "sceneState": state,
-                "turnNumber": 0,
-                "isActive": True
+                "game_state": Json(game_state),
+                "is_active": True
             }
         )
+        
         return session_id
 
     async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
@@ -45,12 +50,10 @@ class GameSessionManager:
             return None
         return {
             "id": record.id,
-            "user_id": record.userId,
+            "user_id": record.user_id,
             "slug": record.slug,
-            "player_state": record.playerState,
-            "scene_state": record.sceneState,
-            "turn_number": record.turnNumber,
-            "is_active": record.isActive
+            "game_state": record.game_state,
+            "is_active": record.is_active
         }
 
     async def update_session(self, session_id: str, data: Dict[str, Any]):
@@ -58,9 +61,8 @@ class GameSessionManager:
         await prisma.gamesession.update(
             where={"id": session_id},
             data={
-                "sceneState": data.get("scene_state"),
-                "turnNumber": data.get("turn_number"),
-                "isActive": data.get("is_active")
+                "game_state": data.get("game_state"),
+                "is_active": data.get("is_active")
             }
         )
 
@@ -78,10 +80,9 @@ class GameSessionManager:
         return [
             {
                 "id": r.id,
-                "user_id": r.userId,
+                "user_id": r.user_id,
                 "slug": r.slug,
-                "turn_number": r.turnNumber,
-                "is_active": r.isActive
+                "is_active": r.is_active
             }
             for r in records
         ]

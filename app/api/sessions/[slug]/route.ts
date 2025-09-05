@@ -1,7 +1,9 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000";
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BASE_URL ||
+  "http://localhost:5432/mudai_dev?schema=public";
 
 export async function POST(
   req: Request,
@@ -16,6 +18,7 @@ export async function POST(
 
   try {
     const body = await req.json();
+    console.log({ ...body, userId: session.user.id, slug: slug });
 
     // Add the userId from auth to send to backend
     const res = await fetch(
@@ -23,12 +26,13 @@ export async function POST(
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...body, userId: session.user.id }),
+        body: JSON.stringify({ player_state: {...body}, user_id: session.user.id, slug: slug }),
       }
     );
 
     if (!res.ok) {
       const errorText = await res.text();
+      console.log(errorText);
       return NextResponse.json(
         { error: errorText },
         { status: res.status }

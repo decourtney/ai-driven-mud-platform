@@ -14,9 +14,9 @@ export default {
       }
       return token;
     },
-    async session({ session, user }) {
-      if (user?.id) {
-        session.user.id = user.id;
+    async session({ session, token }) {
+      if (token?.id) {
+        session.user.id = token.id as string;
       }
       return session;
     },

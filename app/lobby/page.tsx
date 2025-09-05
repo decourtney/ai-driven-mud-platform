@@ -73,11 +73,11 @@ export default async function LobbyPage() {
                   <div className="flex flex-wrap gap-6 mb-6 text-sm font-mono">
                     <div className="flex items-center text-green-400">
                       <Users size={16} className="mr-2" />
-                      {featuredGame.playerCount} players online
+                      {featuredGame.player_count} players online
                     </div>
                     <div className="flex items-center text-cyan-400">
                       <Clock size={16} className="mr-2" />
-                      {featuredGame.estimatedTime}
+                      {featuredGame.estimated_time}
                     </div>
                     <div
                       className={`flex items-center ${getDifficultyColor(

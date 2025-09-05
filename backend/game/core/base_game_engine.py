@@ -40,17 +40,30 @@ class BaseGameEngine(ABC):
     # ----------------------------
     # Game State Management
     # ----------------------------
-    def initialize_game_state(self, player_state: CharacterState):
+    def create_game_state(self, player_state: CharacterState):
         """Create initial GameState with player, NPCs, and scene data"""
         
-        # need to create initial scene and npcs if necessary
+        player_state_obj = CharacterState.from_dict(player_state)
+        
+        initial_scene = {
+            "id": "intro",
+            "title": "Introduction",
+            "description": "And so it begins..."
+        }
+                
         self.game_state = GameState(
-            player=player_state,
-            npcs=npcs,
-            scene=scene_state,
+            player=player_state_obj,
+            npcs=[],
+            scene=initial_scene,
             turn_counter=0,
-            global_flags={}
         )
+        
+        serialized_game_state = self.game_state.to_dict()
+        
+        return serialized_game_state
+        
+    def load_game_state(self, game_state: GameState):
+        pass
 
     def update_game_state(self, results: List[ActionResult]):
         """Apply results of actions to game state"""

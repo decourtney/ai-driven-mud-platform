@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass, field
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from backend.models import ActionResult, DamageType, ActionType, CharacterType, StatusEffect
 
 
@@ -434,6 +434,8 @@ class CharacterState:
             self.charisma = value
         
         self.last_updated = datetime.now()
+        
+    
 
 
     # ------------------------------    
@@ -547,7 +549,7 @@ class CharacterState:
         
         # Restore all attributes
         for key, value in data.items():
-            if hasattr(character, key) and key not in ["status_effects", "last_updated"]:
+            if hasattr(character, key) and key not in ["status_effects", "last_updated", "character_type"]:
                 setattr(character, key, value)
         
         # Restore status effects
@@ -558,6 +560,12 @@ class CharacterState:
                 effect_data.get("intensity", 1),
                 effect_data.get("source")
             )
+            
+        # Restore last_updated
+        if "last_updated" in data and data["last_updated"]:
+            character.last_updated = datetime.fromisoformat(data["last_updated"])
+        else:
+            character.last_updated = datetime.now(timezone.utc)
         
         return character
 
