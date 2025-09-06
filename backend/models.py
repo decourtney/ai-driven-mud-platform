@@ -3,6 +3,7 @@ Pydantic models for the D&D narrator system.
 Centralized data structures used across all components.
 """
 
+from fastapi import Query
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from enum import Enum
@@ -10,16 +11,22 @@ from enum import Enum
 
 class ValidationResult:
     """Result of action validation"""
-    def __init__(self, is_valid: bool, reason: Optional[str] = None, suggested_action: Optional[str] = None):
+
+    def __init__(
+        self,
+        is_valid: bool,
+        reason: Optional[str] = None,
+        suggested_action: Optional[str] = None,
+    ):
         self.is_valid = is_valid
         self.reason = reason
         self.suggested_action = suggested_action
-        
-        
+
+
 class CharacterType(Enum):
     PLAYER = "player"
     NPC = "npc"
-    ENEMY = "enemy" # Hostile NPC
+    ENEMY = "enemy"  # Hostile NPC
     ALLY = "ally"
 
 
@@ -39,14 +46,14 @@ class StatusEffect(Enum):
     RESTRAINED = "restrained"
     INCAPACITATED = "incapacitated"
     UNCONSCIOUS = "unconscious"
-    
+
 
 class GameCondition(Enum):
     CONTINUE = "continue"
     PLAYER_WIN = "player_win"
     PLAYER_DEFEAT = "player_defeat"
     GAME_OVER = "game_over"
-    
+
 
 class ActionType(str, Enum):
     ATTACK = "attack"
@@ -66,8 +73,8 @@ class DamageType(str, Enum):
     SUCCESS = "success"
     GREAT_SUCCESS = "great_success"
     OUTSTANDING_SUCCESS = "outstanding_success"
-    
-    
+
+
 class GameStatus(str, Enum):
     active = "active"
     maintenance = "maintenance"
@@ -101,6 +108,7 @@ class ActionResult(BaseModel):
 
 class GameContext(BaseModel):
     """Context information for the game session"""
+
     scene_description: Optional[str] = None
     active_characters: List[str] = []
     environment: Optional[str] = None
@@ -110,7 +118,8 @@ class GameContext(BaseModel):
 # API models
 class ParseActionRequest(BaseModel):
     action: str
-    
+
+
 class ParseActionResponse(BaseModel):
     actor: str
     action: str
@@ -120,15 +129,18 @@ class ParseActionResponse(BaseModel):
     subject: Optional[str] = None
     details: Optional[str] = None
 
+
 class GenerateActionRequest(BaseModel):
     parsed_action: ParsedAction
     hit: bool
     damage_type: Optional[str] = "wound"
 
+
 class GenerateSceneRequest(BaseModel):
     scene: Dict[str, Any]
     player: Dict[str, Any]
-    npcs: List[Dict[str, Any]] 
+    npcs: List[Dict[str, Any]]
+
 
 class GenerateNarrationResponse(BaseModel):
     # Reponse for any narration generation
@@ -142,8 +154,8 @@ class HealthResponse(BaseModel):
     narrator_ready: bool
     memory_usage: Dict[str, Any]
     uptime_seconds: float
-    
-    
+
+
 class GameInfo(BaseModel):
     slug: str
     engine: str
@@ -156,21 +168,28 @@ class GameInfo(BaseModel):
     features: List[str]
     thumbnail: str
     tags: List[str]
-    
-    
+
+
 class GameSessionCreate(BaseModel):
     user_id: str
     slug: str
     player_state: Dict[str, Any]
 
 
-class GameSessionDelete(BaseModel):
+class GameSessionGet(BaseModel):
     user_id: str
+    slug: str
+    session_id: str
+
+
+class GameSessionDelete(BaseModel):
+    user_id: str = Query(...)
     slug: str
     session_id: str
 
 
 class GameSessionResponse(BaseModel):
     session_id: str
+    user_id: str
     slug: str
     game_state: Dict[str, Any]

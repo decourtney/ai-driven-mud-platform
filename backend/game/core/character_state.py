@@ -12,7 +12,7 @@ class StatusEffectInstance:
     duration: int  # turns remaining, -1 for permanent
     intensity: int = 1  # for effects that can stack or have varying intensity
     source: Optional[str] = None  # what caused this effect
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    # metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -23,10 +23,10 @@ class Item:
     description: str = ""
     damage_dice: Optional[str] = None  # "1d8", "2d6", etc.
     armor_class: Optional[int] = None
-    properties: Set[str] = field(default_factory=set)  # "magical", "heavy", "finesse", etc.
+    # properties: Set[str] = field(default_factory=set)  # "magical", "heavy", "finesse", etc.
     value: int = 0  # gold value
     weight: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    # metadata: Dict[str, Any] = field(default_factory=dict)
     
     def is_weapon(self) -> bool:
         return self.item_type == "weapon"
@@ -47,12 +47,12 @@ class Spell:
     casting_time: str = "1 action"
     range_str: str = "60 feet"
     duration: str = "Instantaneous"
-    components: Set[str] = field(default_factory=set)  # "V", "S", "M"
+    # components: Set[str] = field(default_factory=set)  # "V", "S", "M"
     description: str = ""
     damage_dice: Optional[str] = None
     save_type: Optional[str] = None  # "Dexterity", "Wisdom", etc.
     attack_roll: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    # metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class CharacterState:
@@ -69,8 +69,7 @@ class CharacterState:
         current_hp: Optional[int] = None,
         armor_class: int = 10,
         level: int = 1,
-        character_class: str = "Fighter",
-        background: str = "Walking Corpse",
+        bio: str = "Walking Corpse",
         equipped_weapon: Optional[Item] = None, # temporary for cli mode
     ):
         # Basic identity
@@ -78,8 +77,7 @@ class CharacterState:
         self.name = name
         self.character_type = character_type
         self.level = level
-        self.character_class = character_class
-        self.background = background
+        self.bio = bio
         
         # Core stats
         self.max_hp = max_hp
@@ -493,8 +491,7 @@ class CharacterState:
             "name": self.name,
             "character_type": self.character_type.value,
             "level": self.level,
-            "character_class": self.character_class,
-            "background": self.background,
+            "bio": self.bio,
             
             # Health
             "max_hp": self.max_hp,
@@ -544,7 +541,10 @@ class CharacterState:
             name=data["name"],
             character_type=CharacterType(data["character_type"]),
             max_hp=data["max_hp"],
-            current_hp=data["current_hp"]
+            current_hp=data["current_hp"],
+            armor_class=data["armor_class"],
+            level=data["level"],
+            bio=data["bio"]
         )
         
         # Restore all attributes
