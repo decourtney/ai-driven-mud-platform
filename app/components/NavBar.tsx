@@ -169,17 +169,6 @@ export default function Navbar({ variant = "solid", user }: NavbarProps) {
           </div>
         </div>
       </div>
-
-      {/* Mobile Menu Toggle (for future implementation) */}
-      <div className="md:hidden absolute right-4 top-4">
-        <button className="text-green-400 hover:text-green-300 transition-colors">
-          <div className="w-6 h-6 flex flex-col justify-center space-y-1">
-            <div className="h-0.5 bg-current"></div>
-            <div className="h-0.5 bg-current"></div>
-            <div className="h-0.5 bg-current"></div>
-          </div>
-        </button>
-      </div>
     </nav>
   );
 }

@@ -85,8 +85,9 @@ export default function GameInterface({
   };
 
   return (
-    <div className="flex-1 bg-gray-950 flex flex-col">
+    <div className="flex flex-col bg-gray-950">
       {/* Game Header */}
+      {/* the header could potentially be a little larger and hold images for more flavor */}
       <div className="bg-gray-800 border-b border-green-500 p-4 flex items-center">
         <Terminal className="text-green-400 mr-3" size={24} />
         <div>

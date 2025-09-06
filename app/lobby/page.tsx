@@ -43,7 +43,7 @@ export default async function LobbyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen text-white">
       <div className="max-w-6xl mx-auto p-6">
         {/* Featured Game Section */}
         <section className="mb-12">
@@ -109,7 +109,7 @@ export default async function LobbyPage() {
 
                   {/* Play Button */}
                   <Link href={`games/${featuredGame.slug}`}>
-                    <button className="bg-green-600 hover:bg-green-700 text-black font-mono font-bold px-8 py-4 text-lg transition-colors flex items-center border-2 border-green-400">
+                    <button className="bg-green-600/30 hover:bg-green-700 text-black font-mono font-bold px-8 py-4 text-lg transition-colors flex items-center border-2 border-green-400">
                       <Play size={24} className="mr-3" />[ START ADVENTURE ]
                     </button>
                   </Link>

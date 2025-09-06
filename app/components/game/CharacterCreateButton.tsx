@@ -29,8 +29,7 @@ export default function CharacterCreateButton({
         return;
       }
 
-      toast.success("Character created!");
-      router.push(`/games/${slug}/play?session=${data.session_id}`);
+      router.push(`/games/${slug}/play/${data.session_id}`);
     } catch (err: any) {
       toast.error(err.message || "Something went wrong");
     }

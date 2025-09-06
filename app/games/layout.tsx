@@ -1,14 +1,14 @@
 import React from "react";
-import DropDownMenu from "./DropDownMenu";
+import DropDownMenu from "../components/game/DropDownMenu";
 import { auth } from "@/auth";
 import { redirect, RedirectType } from "next/navigation";
 
 const GameLayout = async ({ children }: { children: React.ReactNode }) => {
   const session = await auth();
-  if (!session) redirect('/signin', RedirectType.replace)
+  if (!session) redirect("/signin", RedirectType.replace);
 
   return (
-    <div className="min-h-screen bg-black text-white font-mono">
+    <div className="flex flex-col min-h-screen text-white font-mono">
       {/* Header Bar */}
       <div className="bg-gray-900 border-b border-green-500 px-6 py-3 flex justify-between items-center">
         {/* Logo - Top Left */}
@@ -21,7 +21,7 @@ const GameLayout = async ({ children }: { children: React.ReactNode }) => {
       </div>
 
       {/* Game Content Area */}
-      {children}
+      <div className="flex flex-col flex-1 overflow-auto">{children}</div>
     </div>
   );
 };

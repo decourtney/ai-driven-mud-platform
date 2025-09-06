@@ -266,7 +266,7 @@ export default function CharacterPanel({
   };
 
   return (
-    <div className="w-150 bg-gray-900 border-r border-green-500 flex flex-col">
+    <div className="flex flex-col w-full bg-gray-900 border-r border-green-500">
       {/* Character Header */}
       <div className="bg-gray-800 border-b border-green-500 p-4">
         <div className="flex items-center space-x-3 mb-2">
