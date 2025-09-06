@@ -8,10 +8,39 @@ import {
   InventoryItem,
   Quest,
 } from "@/app/types/game";
-import { useState } from "react";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export default function GamePage() {
+  const params = useParams()
+  const [gameState, setGameState] = useState();
   const [activeTab, setActiveTab] = useState<"character" | "feed">("character");
+
+  // useEffect(() => {
+  //   const getGameState = async () => {
+  //     try {
+  //       console.log("Game Page params: ",params)
+  //       const res = await fetch(`/api/sessions/${params.slug}/${params.id}`, {
+  //         method: "GET",
+  //         headers: { "Content-Type": "application/json" },
+  //       });
+
+  //       if (!res.ok) {
+  //         const errorText = await res.text();
+  //         throw new Error(errorText);
+  //       }
+
+  //       const data = await res.json();
+  //       console.log("Game Page data: ", data);
+  //       setGameState(data)
+  //     } catch (err: any) {
+  //       toast.error(err.message || "Something went wrong");
+  //     }
+  //   };
+
+  //   getGameState();
+  // }, []);
 
   const handlePlayerAction = (action: string) => {
     console.log("Player action:", action);
