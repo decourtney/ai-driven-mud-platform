@@ -1,17 +1,25 @@
+// app/games/[slug]/page.tsx
 import { getGameComponents } from "@/lib/games/registry";
 import { notFound } from "next/navigation";
+import GameBackground from "@/components/GameBackground";
 
 export default async function GameMainMenu({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const gameComponents = getGameComponents(params.slug);
+  const { slug } = await params;
+  const gameComponents = getGameComponents(slug);
 
   if (!gameComponents) {
     notFound();
   }
 
   const MainMenu = await gameComponents.MainMenu();
-  return <MainMenu.default slug={params.slug} />;
+
+  return (
+    <GameBackground slug={slug}>
+      <MainMenu.default slug={slug} />
+    </GameBackground>
+  );
 }
