@@ -529,8 +529,8 @@ class CharacterState:
             ],
             
             # State
-            "is_alive": self.is_alive(),
-            "can_act": self.can_act(),
+            "is_alive": self.is_alive,
+            "can_act": self.can_act,
             "last_updated": self.last_updated.isoformat()
         }
     

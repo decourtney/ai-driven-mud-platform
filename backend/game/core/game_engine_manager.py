@@ -35,7 +35,7 @@ class GameEngineManager:
         while True:
             await asyncio.sleep(self.cleanup_interval)
             now = datetime.now(timezone.utc)
-            idle_threshold = timedelta(minutes=30)
+            idle_threshold = timedelta(milliseconds=5000)
             to_delete = []
             for slug, sessions in self.engines.items():
                 for session_id, entry in sessions.items():
@@ -43,11 +43,11 @@ class GameEngineManager:
                         # fetch the engine's state here
                         game_state = entry[
                             "engine"
-                        ].get_serialized_game_state()  # NOTE: Might need to await these
+                        ].get_serialized_game_state()
                         to_delete.append((slug, session_id, game_state))
             for slug, session_id, game_state in to_delete:
                 if self.on_unregister:
-                    await self.on_unregister(slug, session_id, game_state)
+                    await self.on_unregister(session_id, game_state)
                 del self.engines[slug][session_id]
 
     def register_engine(self, engine_instance, session_id: str, slug: str) -> str:

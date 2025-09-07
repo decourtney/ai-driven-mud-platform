@@ -239,6 +239,8 @@ class GameState:
         # Restore other attributes
         for key, value in data.items():
             if hasattr(game_state, key) and key not in ["player", "npcs", "scene", "turn_counter", "global_flags", "important_npcs_met"]:
+                if key in ["session_started", "last_updated"]:
+                    value = datetime.fromisoformat(value)
                 setattr(game_state, key, value)
         
         # Restore sets

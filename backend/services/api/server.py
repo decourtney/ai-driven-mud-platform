@@ -242,7 +242,7 @@ class GameAPI:
                 raise HTTPException(
                     status_code=500, detail=f"Failed to get session: {str(e)}"
                 )
-            print(session)
+
             return {
                 "session_id": session["session_id"],
                 "engine_id": session["engine_id"],

@@ -1,7 +1,7 @@
 import uuid
 import json
 from prisma import Json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from fastapi import HTTPException
 from backend.services.api.server import prisma
 from backend.game.core.game_engine_manager import GameEngineManager
@@ -11,12 +11,11 @@ from backend.game.engine_registry import ENGINE_REGISTRY
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 
 
-# NOTE CLEANUP INTERVAL AND IDLE THRESHOLD ARE SET LOW
 class GameSessionManager:
     def __init__(self, model_client: AsyncModelServiceClient):
         self.model_client = model_client
         self.engine_manager = GameEngineManager(
-            cleanup_interval=60, on_unregister=self.save_game_state
+            cleanup_interval=1, on_unregister=self.save_game_state
         )
 
     # ==========================================
@@ -65,7 +64,9 @@ class GameSessionManager:
 
         # Create Game Engine Instance
         engine_class = ENGINE_REGISTRY[engine_name]
-        engine = engine_class(model_client=self.model_client)
+        engine = engine_class(
+            model_client=self.model_client, save_state_callback=self.save_game_state
+        )
 
         # Reconstitute seralized player state into engine instance
         game_state = engine.create_game_state(player_state)
@@ -137,7 +138,7 @@ class GameSessionManager:
 
         engine_class = ENGINE_REGISTRY[engine_name]
         engine = engine_class(
-            model_client=self.model_client, save_callback=self.save_game_state
+            model_client=self.model_client, save_state_callback=self.save_game_state
         )
 
         # Reconstitute seralized game state record into engine instance
@@ -166,11 +167,13 @@ class GameSessionManager:
     # Save Game State
     # ==========================================
 
-    async def save_game_state(self, slug, session_id, game_state):
+    async def save_game_state(self, session_id, game_state):
+        print("[DEBUG] SAVING GAME STATE TO DB")
         await prisma.gamesession.update(
             where={"id": session_id},
             data={"game_state": Json(game_state)},
         )
+        return
 
     async def list_registered_engines(self):
         """List all currently registered engine instances"""

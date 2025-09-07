@@ -24,11 +24,11 @@ class DnDGameEngine(BaseGameEngine):
     def __init__(
         self,
         model_client: AsyncModelServiceClient,
-        save_callback: Callable,
+        save_state_callback: Callable,
         **kwargs,
     ):
         super().__init__(
-            model_client=model_client, save_callback=save_callback, **kwargs
+            model_client=model_client, save_state_callback=save_state_callback, **kwargs
         )
 
     def get_default_dice_roller(self) -> BaseDiceRoller:

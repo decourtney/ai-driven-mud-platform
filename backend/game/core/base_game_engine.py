@@ -25,12 +25,12 @@ class BaseGameEngine(ABC):
     def __init__(
         self,
         model_client: AsyncModelServiceClient,
-        save_callback: Callable,
+        save_state_callback: Callable,
         dice_roller: Optional[BaseDiceRoller] = None,
         **kwargs,
     ):
         self.model_client = model_client
-        self.save_callback = save_callback
+        self.save_state_callback = save_state_callback
 
         # Allow explicit dice roller override
         if dice_roller:
@@ -80,11 +80,14 @@ class BaseGameEngine(ABC):
 
         return serialized_game_state
 
-    def load_serialized_game_state(self, game_state: GameState):
+    def load_serialized_game_state(self, serialized_game_state):
         print("[DEBUG] LOADING GAME STATE INTO ENGINE")
+        self.game_state = GameState.from_dict(serialized_game_state)
 
     def get_serialized_game_state(self):
-        print("[DEBUG] GETTING GAME STATE FROM ENGINE")
+        serialized_game_state = self.game_state.to_dict()
+        print("[DEBUG] RETURNING SERIALIZED GAME STATE")
+        return serialized_game_state
 
     def update_game_state(self, results: List[ActionResult]):
         """Apply results of actions to game state"""
