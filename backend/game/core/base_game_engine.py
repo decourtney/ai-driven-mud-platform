@@ -1,10 +1,13 @@
-from typing import List, Optional, Tuple, Generator, Dict, Any
+from typing import List, Optional, Tuple, Generator, Dict, Any, Callable
 from abc import ABC, abstractmethod
 from enum import Enum
 
 from backend.models import (
-    ParsedAction, ActionResult, ActionType, 
-    GameCondition, ValidationResult
+    ParsedAction,
+    ActionResult,
+    ActionType,
+    GameCondition,
+    ValidationResult,
 )
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.game.core.dice_system import BaseDiceRoller
@@ -19,8 +22,15 @@ class BaseGameEngine(ABC):
     Subclasses implement game-specific rules and mechanics.
     """
 
-    def __init__(self, model_client: AsyncModelServiceClient, dice_roller: Optional[BaseDiceRoller] = None, **kwargs):
+    def __init__(
+        self,
+        model_client: AsyncModelServiceClient,
+        save_callback: Callable,
+        dice_roller: Optional[BaseDiceRoller] = None,
+        **kwargs,
+    ):
         self.model_client = model_client
+        self.save_callback = save_callback
 
         # Allow explicit dice roller override
         if dice_roller:
@@ -30,7 +40,7 @@ class BaseGameEngine(ABC):
             self.dice_roller = self.get_default_dice_roller()
 
         self.game_state = None
-        self.max_invalid_attempts = kwargs.get('max_invalid_attempts', 3)
+        self.max_invalid_attempts = kwargs.get("max_invalid_attempts", 3)
 
     @abstractmethod
     def get_default_dice_roller(self) -> BaseDiceRoller:
@@ -56,7 +66,7 @@ class BaseGameEngine(ABC):
         initial_scene = {
             "id": "intro",
             "title": "Introduction",
-            "description": "And so it begins..."
+            "description": "And so it begins...",
         }
 
         self.game_state = GameState(
@@ -70,10 +80,10 @@ class BaseGameEngine(ABC):
 
         return serialized_game_state
 
-    def load_game_state(self, game_state: GameState):
+    def load_serialized_game_state(self, game_state: GameState):
         print("[DEBUG] LOADING GAME STATE INTO ENGINE")
 
-    def get_game_state(self):
+    def get_serialized_game_state(self):
         print("[DEBUG] GETTING GAME STATE FROM ENGINE")
 
     def update_game_state(self, results: List[ActionResult]):
@@ -89,7 +99,10 @@ class BaseGameEngine(ABC):
     def _apply_action_result_to_state(self, result: ActionResult):
         """Apply a single action result to the game state"""
         # Update player or NPC based on who acted
-        if result.parsed_action.actor == self.game_state.player.name or result.parsed_action.actor == "player":
+        if (
+            result.parsed_action.actor == self.game_state.player.name
+            or result.parsed_action.actor == "player"
+        ):
             npc = self.game_state.get_npc_by_name(result.parsed_action.target)
             if npc:
                 npc.apply_action_result(result)
@@ -109,9 +122,7 @@ class BaseGameEngine(ABC):
 
         # Use the narrator to generate scene description based on current game state
         scene_description = self.model_manager.generate_scene_narration(
-            self.game_state.scene,
-            self.game_state.player,
-            self.game_state.npcs
+            self.game_state.scene, self.game_state.player, self.game_state.npcs
         )
 
         return scene_description
@@ -128,7 +139,9 @@ class BaseGameEngine(ABC):
         pass
 
     @abstractmethod
-    def validate_action_constraints(self, parsed_action: ParsedAction) -> ValidationResult:
+    def validate_action_constraints(
+        self, parsed_action: ParsedAction
+    ) -> ValidationResult:
         """
         Validate action type specific constraints (weapons, spells, etc.).
         Game-specific implementation required.
@@ -147,13 +160,23 @@ class BaseGameEngine(ABC):
 
         # Generic scene rule validations that most games might use
         if scene_rules.get("no_actions", False):
-            return ValidationResult(False, "No actions allowed in this area", "wait for the scene to change")
+            return ValidationResult(
+                False, "No actions allowed in this area", "wait for the scene to change"
+            )
 
         blocked_exits = scene_rules.get("blocked_exits", [])
         if parsed_action.action_type == ActionType.MOVEMENT:
-            direction = parsed_action.details.get("direction", "").lower() if parsed_action.details else ""
+            direction = (
+                parsed_action.details.get("direction", "").lower()
+                if parsed_action.details
+                else ""
+            )
             if direction in blocked_exits:
-                return ValidationResult(False, f"The {direction} exit is blocked", "try a different direction")
+                return ValidationResult(
+                    False,
+                    f"The {direction} exit is blocked",
+                    "try a different direction",
+                )
 
         return ValidationResult(True)
 
@@ -187,14 +210,22 @@ class BaseGameEngine(ABC):
                 validation_result = self.validate_action(parsed_action)
                 if not validation_result.is_valid:
                     invalid_attempts += 1
-                    error_narration = self.model_manager.generate_invalid_action_narration(
-                        validation_result
+                    error_narration = (
+                        self.model_manager.generate_invalid_action_narration(
+                            validation_result
+                        )
                     )
 
                     if invalid_attempts >= self.max_invalid_attempts:
-                        return f"{error_narration}\n\nToo many invalid attempts. Turn skipped.", GameCondition.CONTINUE
+                        return (
+                            f"{error_narration}\n\nToo many invalid attempts. Turn skipped.",
+                            GameCondition.CONTINUE,
+                        )
                     else:
-                        return f"{error_narration}\n\nTry again.", GameCondition.CONTINUE
+                        return (
+                            f"{error_narration}\n\nTry again.",
+                            GameCondition.CONTINUE,
+                        )
 
                 # Execute valid action
                 result = self.process_parsed_action(parsed_action)
@@ -207,7 +238,10 @@ class BaseGameEngine(ABC):
             except Exception as e:
                 return f"An error occurred: {str(e)}", GameCondition.GAME_OVER
 
-        return "Unable to process action after multiple attempts.", GameCondition.CONTINUE
+        return (
+            "Unable to process action after multiple attempts.",
+            GameCondition.CONTINUE,
+        )
 
     # ----------------------------
     # NPC Turn Processing
@@ -231,7 +265,9 @@ class BaseGameEngine(ABC):
                 condition = self.check_game_condition()
                 yield action_result.narration, condition
 
-    def _execute_npc_action_with_validation(self, npc: CharacterState) -> Optional[ActionResult]:
+    def _execute_npc_action_with_validation(
+        self, npc: CharacterState
+    ) -> Optional[ActionResult]:
         """Execute NPC action with AI decision making and validation"""
         max_attempts = 3
         attempts = 0
@@ -256,7 +292,9 @@ class BaseGameEngine(ABC):
 
         return None  # NPC turn failed after max attempts
 
-    def execute_single_npc_action(self, npc: CharacterState) -> Tuple[Optional[str], bool]:
+    def execute_single_npc_action(
+        self, npc: CharacterState
+    ) -> Tuple[Optional[str], bool]:
         """
         Process a single NPC's action and return narration immediately.
         Returns (npc_narration, action_successful)
@@ -312,7 +350,9 @@ class BaseGameEngine(ABC):
         if not self.model_manager.is_narrator_ready():
             raise RuntimeError("Narrator not loaded")
 
-        difficulty = self.get_action_difficulty(parsed_action.action_type, self.game_state)
+        difficulty = self.get_action_difficulty(
+            parsed_action.action_type, self.game_state
+        )
 
         # Get any modifiers for this action (game-specific)
         modifiers = self.get_action_modifiers(parsed_action)
@@ -321,7 +361,7 @@ class BaseGameEngine(ABC):
         dice_result = self.dice_roller.roll_action(
             difficulty=difficulty,
             action_type=parsed_action.action_type.value,
-            **modifiers
+            **modifiers,
         )
 
         # Create ActionResult from dice result
@@ -331,15 +371,15 @@ class BaseGameEngine(ABC):
             dice_roll=dice_result.total,
             damage_type=self.convert_outcome_to_damage_type(dice_result.outcome_type),
             narration="",
-            difficulty=difficulty
+            difficulty=difficulty,
         )
 
         # Store additional dice info if ActionResult supports it
-        if hasattr(result, 'raw_roll'):
+        if hasattr(result, "raw_roll"):
             result.raw_roll = dice_result.raw_roll
-        if hasattr(result, 'critical'):
+        if hasattr(result, "critical"):
             result.critical = dice_result.critical
-        if hasattr(result, 'fumble'):
+        if hasattr(result, "fumble"):
             result.fumble = dice_result.fumble
 
         # Apply result and generate narration
@@ -355,15 +395,17 @@ class BaseGameEngine(ABC):
 
     def get_action_modifiers(self, parsed_action: ParsedAction) -> dict:
         """
-        Get modifiers for dice rolling. 
+        Get modifiers for dice rolling.
         Override in subclasses for game-specific modifiers.
         """
         modifiers = {}
 
         # Base modifiers that most games might use
         actor_state = self.get_actor_state(parsed_action.actor)
-        if hasattr(actor_state, 'get_action_bonus'):
-            modifiers['modifier'] = actor_state.get_action_bonus(parsed_action.action_type)
+        if hasattr(actor_state, "get_action_bonus"):
+            modifiers["modifier"] = actor_state.get_action_bonus(
+                parsed_action.action_type
+            )
 
         # Environmental modifiers from scene
         scene_modifiers = self.get_scene_modifiers(parsed_action)
@@ -377,17 +419,17 @@ class BaseGameEngine(ABC):
 
         # Common environmental effects
         if self.game_state and self.game_state.scene:
-            if self.game_state.scene.get('darkness', False):
-                modifiers['environmental_penalty'] = -2
-            if self.game_state.scene.get('difficult_terrain', False):
-                modifiers['terrain_penalty'] = -1
+            if self.game_state.scene.get("darkness", False):
+                modifiers["environmental_penalty"] = -2
+            if self.game_state.scene.get("difficult_terrain", False):
+                modifiers["terrain_penalty"] = -1
 
         return modifiers
 
-    @abstractmethod 
+    @abstractmethod
     def convert_outcome_to_damage_type(self, outcome: str):
         """
-        Convert dice system outcome to damage type. 
+        Convert dice system outcome to damage type.
         Must be implemented by subclasses for game-specific mappings.
         """
         pass
@@ -407,7 +449,9 @@ class BaseGameEngine(ABC):
         pass
 
     @abstractmethod
-    def get_action_difficulty(self, action_type: ActionType, context: Optional[GameState] = None) -> int:
+    def get_action_difficulty(
+        self, action_type: ActionType, context: Optional[GameState] = None
+    ) -> int:
         """
         Get difficulty/DC for an action type.
         Must be implemented by subclasses to define game-specific difficulty scaling.
@@ -435,9 +479,11 @@ class BaseGameEngine(ABC):
     # ----------------------------
     def is_ready(self) -> bool:
         """Check if all components are ready"""
-        return (self.model_manager.is_parser_ready() and 
-                self.model_manager.is_narrator_ready() and 
-                self.game_state is not None)
+        return (
+            self.model_manager.is_parser_ready()
+            and self.model_manager.is_narrator_ready()
+            and self.game_state is not None
+        )
 
     def get_game_status(self) -> dict:
         """Get current game status for debugging/monitoring"""
@@ -449,7 +495,7 @@ class BaseGameEngine(ABC):
             "turn": self.game_state.turn_counter,
             "player_alive": self.game_state.player.is_alive(),
             "npcs_alive": sum(1 for npc in self.game_state.npcs if npc.is_alive()),
-            "scene": self.game_state.scene.get("name", "unknown")
+            "scene": self.game_state.scene.get("name", "unknown"),
         }
 
     # ----------------------------

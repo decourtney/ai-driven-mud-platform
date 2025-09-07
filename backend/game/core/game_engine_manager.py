@@ -34,7 +34,6 @@ class GameEngineManager:
     async def cleanup_loop(self):
         while True:
             await asyncio.sleep(self.cleanup_interval)
-            print("[DEBUG] CLEANUP LOOP RUNNING")
             now = datetime.now(timezone.utc)
             idle_threshold = timedelta(minutes=30)
             to_delete = []
@@ -44,7 +43,7 @@ class GameEngineManager:
                         # fetch the engine's state here
                         game_state = entry[
                             "engine"
-                        ].get_game_state()  # NOTE: Might need to await these
+                        ].get_serialized_game_state()  # NOTE: Might need to await these
                         to_delete.append((slug, session_id, game_state))
             for slug, session_id, game_state in to_delete:
                 if self.on_unregister:

@@ -10,6 +10,7 @@ from backend.game.game_registry import GAME_REGISTRY
 from backend.game.engine_registry import ENGINE_REGISTRY
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 
+
 # NOTE CLEANUP INTERVAL AND IDLE THRESHOLD ARE SET LOW
 class GameSessionManager:
     def __init__(self, model_client: AsyncModelServiceClient):
@@ -120,6 +121,7 @@ class GameSessionManager:
         # ==========================================
         # Return the existing engine if available
         # ==========================================
+
         existing_engine_id = self.engine_manager.get_registered_engine_id(
             slug, session_id
         )
@@ -132,11 +134,14 @@ class GameSessionManager:
         # ==========================================
         # Else create a new instance
         # ==========================================
+
         engine_class = ENGINE_REGISTRY[engine_name]
-        engine = engine_class(model_client=self.model_client)
+        engine = engine_class(
+            model_client=self.model_client, save_callback=self.save_game_state
+        )
 
         # Reconstitute seralized game state record into engine instance
-        engine.load_game_state(record.game_state)
+        engine.load_serialized_game_state(record.game_state)
 
         # Register engine instance in memory
         engine_id = self.engine_manager.register_engine(
