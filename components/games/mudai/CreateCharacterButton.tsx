@@ -1,9 +1,9 @@
 "use client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { CharacterState } from "../../types/game";
+import { CharacterState } from "@/app/types/game";
 
-export default function CharacterCreateButton({
+export default function CreateCharacterButton({
   playerState,
   slug,
   availablePoints,

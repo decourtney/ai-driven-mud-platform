@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 
-const DropDownMenu = () => {
+export default function DropDownMenu() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const params = useParams();
@@ -43,7 +43,7 @@ const DropDownMenu = () => {
 
       {/* Dropdown Menu */}
       {isDropdownOpen && (
-        <div className="absolute right-0 mt-1 w-32 bg-gray-800 border border-green-500 rounded shadow-lg z-10">
+        <div className="absolute right-0 mt-1 w-32 bg-gray-800 border border-green-500 rounded shadow-lg">
           <Link href={`/games/${params.slug}`}>
             <div className="w-full hover:bg-green-700/60 text-green-400 hover:text-green-200 active:bg-green-600/60 font-bold px-3 py-2 transition-all duration-200 border-b border-green-500 flex items-center gap-3">
               Main Menu
@@ -58,6 +58,4 @@ const DropDownMenu = () => {
       )}
     </div>
   );
-};
-
-export default DropDownMenu;
+}
