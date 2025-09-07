@@ -48,7 +48,7 @@ const MainMenu = () => {
       }
 
       const data = await res.json();
-      localStorage.setItem("currentSession", JSON.stringify(data))
+      localStorage.setItem(`${params.slug}Session`, JSON.stringify(data));
 
       router.push(`${params.slug}/play/${sessionId}`);
     } catch (err: any) {
@@ -62,10 +62,9 @@ const MainMenu = () => {
 
   const handleDelete = async () => {
     try {
-      const res = await fetch(`/api/sessions/${params.slug}/${sessionId}`, {
+      const res = await fetch(`/api/sessions/${params.slug}/`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sessionId),
       });
 
       if (!res.ok) {
@@ -74,7 +73,11 @@ const MainMenu = () => {
       }
 
       const data = await res.json();
-      setSessionId(data.session_id);
+
+      if (data) {
+        setSessionId(null);
+        localStorage.removeItem(`${params.slug}Session`);
+      }
     } catch (err: any) {
       toast.error(err.message || "Something went wrong");
     }

@@ -102,6 +102,22 @@ class GameAPI:
                 raise HTTPException(
                     status_code=500, detail=f"Failed to get engines: {str(e)}"
                 )
+                
+        @app.get("/sessions")
+        async def list_sessions():
+            """List all active sessions (for admin/debugging)"""
+            return {
+                "total_sessions": len(self.active_sessions),
+                "sessions": [
+                    {
+                        "session_id": session.session_id,
+                        "game_slug": session.game_slug,
+                        "created_at": session.created_at.isoformat(),
+                        "last_activity": session.last_activity.isoformat(),
+                    }
+                    for session in self.active_sessions.values()
+                ],
+            }
 
         # ==========================================
         # GAME CATALOG ENDPOINTS
@@ -191,6 +207,26 @@ class GameAPI:
                     status_code=500, detail=f"Failed to create session: {str(e)}"
                 )
 
+        @app.delete("/sessions/{slug}/{user_id}")
+        async def delete_session(
+            slug: str = Path(...),
+            user_id: str = Path(...),
+        ):
+            """Delete/end a game session"""
+            try:
+                await self.session_manager.delete_sessions(slug=slug, user_id=user_id)
+                return {"success": True}
+            except ValueError as e:
+                raise HTTPException(status_code=404, detail=str(e))
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to delete session: {str(e)}"
+                )
+
+        # ==========================================
+        # SESSION MANAGEMENT ENDPOINTS w/ SESSION ID
+        # ==========================================
+
         @app.get("/sessions/{slug}/{session_id}/{user_id}")
         async def get_session(
             slug: str = Path(...),
@@ -210,41 +246,6 @@ class GameAPI:
             return {
                 "session_id": session["session_id"],
                 "engine_id": session["engine_id"],
-            }
-
-        @app.delete("/sessions/{slug}/{session_id}/{user_id}")
-        async def delete_session(
-            slug: str = Path(...),
-            session_id: str = Path(...),
-            user_id: str = Path(...),
-        ):
-            """Delete/end a game session"""
-            try:
-                await self.session_manager.delete_session(
-                    slug=slug, session_id=session_id, user_id=user_id
-                )
-                return {"success": True}
-            except ValueError as e:
-                raise HTTPException(status_code=404, detail=str(e))
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500, detail=f"Failed to delete session: {str(e)}"
-                )
-
-        @app.get("/sessions")
-        async def list_sessions():
-            """List all active sessions (for admin/debugging)"""
-            return {
-                "total_sessions": len(self.active_sessions),
-                "sessions": [
-                    {
-                        "session_id": session.session_id,
-                        "game_slug": session.game_slug,
-                        "created_at": session.created_at.isoformat(),
-                        "last_activity": session.last_activity.isoformat(),
-                    }
-                    for session in self.active_sessions.values()
-                ],
             }
 
         # ==========================================

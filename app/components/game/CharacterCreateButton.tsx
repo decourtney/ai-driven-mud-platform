@@ -28,7 +28,7 @@ export default function CharacterCreateButton({
       }
 
       const data = await res.json();
-      localStorage.setItem("currentSession", JSON.stringify(data));
+      localStorage.setItem(`${slug}Session`, JSON.stringify(data));
 
       router.push(`/games/${slug}/play/${data.session_id}`);
     } catch (err: any) {

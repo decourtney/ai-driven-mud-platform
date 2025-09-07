@@ -71,7 +71,10 @@ class BaseGameEngine(ABC):
         return serialized_game_state
 
     def load_game_state(self, game_state: GameState):
-        pass
+        print("[DEBUG] LOADING GAME STATE INTO ENGINE")
+
+    def get_game_state(self):
+        print("[DEBUG] GETTING GAME STATE FROM ENGINE")
 
     def update_game_state(self, results: List[ActionResult]):
         """Apply results of actions to game state"""

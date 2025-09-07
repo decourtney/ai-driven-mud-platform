@@ -10,13 +10,13 @@ from backend.game.game_registry import GAME_REGISTRY
 from backend.game.engine_registry import ENGINE_REGISTRY
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 
-# from backend.game.core.game_state import GameState
-
-
+# NOTE CLEANUP INTERVAL AND IDLE THRESHOLD ARE SET LOW
 class GameSessionManager:
     def __init__(self, model_client: AsyncModelServiceClient):
         self.model_client = model_client
-        self.engine_manager = GameEngineManager(cleanup_interval=60)
+        self.engine_manager = GameEngineManager(
+            cleanup_interval=60, on_unregister=self.save_game_state
+        )
 
     # ==========================================
     # Engine Manager Cleanup Start/Stop
@@ -56,7 +56,7 @@ class GameSessionManager:
             )
 
         # Delete existing session for this user/game if it exists
-        await prisma.gamesession.delete_many(where={"user_id": user_id, "slug": slug})
+        await self.delete_sessions(slug=slug, user_id=user_id)
 
         engine_name = GAME_REGISTRY[slug]["engine"]
         if engine_name not in ENGINE_REGISTRY:
@@ -120,7 +120,9 @@ class GameSessionManager:
         # ==========================================
         # Return the existing engine if available
         # ==========================================
-        existing_engine_id = self.engine_manager.get_registered_engine_id(slug, session_id)
+        existing_engine_id = self.engine_manager.get_registered_engine_id(
+            slug, session_id
+        )
         if existing_engine_id:
             return {
                 "session_id": record.id,
@@ -146,39 +148,24 @@ class GameSessionManager:
             "engine_id": engine_id,
         }
 
-    async def update_session(self, session_id: str, data: Dict[str, Any]):
-        """Update a session in DB"""
+    async def delete_sessions(self, slug: str, user_id: str):
+        sessions = await prisma.gamesession.find_many(
+            where={"user_id": user_id, "slug": slug}
+        )
+        await prisma.gamesession.delete_many(where={"user_id": user_id, "slug": slug})
+
+        for session in sessions:
+            self.engine_manager.unregister_engine(slug=slug, session_id=session.id)
+
+    # ==========================================
+    # Save Game State
+    # ==========================================
+
+    async def save_game_state(self, slug, session_id, game_state):
         await prisma.gamesession.update(
             where={"id": session_id},
-            data={
-                "game_state": data.get("game_state"),
-                "is_active": data.get("is_active"),
-            },
+            data={"game_state": Json(game_state)},
         )
-
-    async def delete_session(self, slug: str, session_id: str, user_id: str):
-        session = await prisma.gamesession.find_first(
-            where={
-                "user_id": user_id,
-                "slug": slug,
-                "id": session_id,
-            }
-        )
-        if not session:
-            raise ValueError("Session not found")
-        await prisma.gamesession.delete(where={"id": session_id})
-
-    async def list_active_sessions(self, user_id: Optional[str] = None):
-        """List active sessions optionally filtered by user"""
-        filters = {"isActive": True}
-        if user_id:
-            filters["userId"] = user_id
-
-        records = await prisma.gamesession.find_many(where=filters)
-        return [
-            {"id": r.id, "user_id": r.user_id, "slug": r.slug, "is_active": r.is_active}
-            for r in records
-        ]
 
     async def list_registered_engines(self):
         """List all currently registered engine instances"""
@@ -193,5 +180,5 @@ class GameSessionManager:
             slug
         )
         if not engine_instances:
-            raise ValueError("No instances found")
+            return "No instances found"
         return {"engine_instances": engine_instances}
