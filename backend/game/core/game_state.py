@@ -16,14 +16,12 @@ class GameState:
         npcs: List[CharacterState],
         scene: Dict[str, Any],
         turn_counter: int = 0,
-        global_flags: Optional[Dict[str, Any]] = None
     ):
         self.game_id = str(uuid.uuid4())
         self.player = player
         self.npcs = npcs
         self.scene = scene
         self.turn_counter = turn_counter
-        self.global_flags = global_flags or {}
         
         # Game progression
         self.objectives: List[str] = []
@@ -194,7 +192,6 @@ class GameState:
             "npcs": [npc.to_dict() for npc in self.npcs],
             "scene": self.scene,
             "turn_counter": self.turn_counter,
-            "global_flags": self.global_flags,
             
             # Game progression
             "objectives": self.objectives,
@@ -237,14 +234,20 @@ class GameState:
             npcs=npcs,
             scene=data["scene"],
             turn_counter=data["turn_counter"],
-            global_flags=data.get("global_flags", {})
         )
         
-        # Restore other attributes
+        # Keys to skip when restoring attributes
+        SKIP_KEYS = {"player", "npcs", "scene", "turn_counter", "global_flags", "important_npcs_met"}
+
+        # Keys that need datetime conversion
+        DATETIME_KEYS = {"session_started", "last_updated"}
+
         for key, value in data.items():
-            if hasattr(game_state, key) and key not in ["player", "npcs", "scene", "turn_counter", "global_flags", "important_npcs_met"]:
+            if key not in SKIP_KEYS and hasattr(game_state, key):
+                if key in DATETIME_KEYS and value is not None:
+                    value = datetime.fromisoformat(value)
                 setattr(game_state, key, value)
-        
+
         # Restore sets
         game_state.important_npcs_met = set(data.get("important_npcs_met", []))
         

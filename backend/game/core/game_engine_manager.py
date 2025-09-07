@@ -9,50 +9,95 @@ class GameEngineManager:
     Manage live game engine instances in memory.
     """
 
-    def __init__(self, cleanup_interval: int = 60):
-        # Maps engine_id -> {"engine": EngineInstance, "session_id": str, "last_active": datetime}
-        self.engines: Dict[str, dict] = {}
+    def __init__(self, cleanup_interval: int = 60, on_unregister=None):
+        # engine_id -> {"engine": EngineInstance, "session_id": str, "last_active": datetime}
+        self.engines: Dict[str, Dict[str, dict]] = {}
         self.cleanup_interval = cleanup_interval
-        # Start background task for cleanup
-        asyncio.create_task(self._cleanup_loop())
+        self._cleanup_task = None  # Store cleanup loop task
+        self.on_unregister = on_unregister
 
-    def register_engine(self, engine_instance, session_id: str) -> str:
+    async def start(self):
+        """Start the cleanup loop."""
+        if not self._cleanup_task:
+            self._cleanup_task = asyncio.create_task(self.cleanup_loop())
+
+    async def stop(self):
+        """Stop the cleanup loop and wait for task to finish."""
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
+
+    async def cleanup_loop(self):
+        while True:
+            await asyncio.sleep(self.cleanup_interval)
+            now = datetime.now(timezone.utc)
+            idle_threshold = timedelta(milliseconds=5000)
+            to_delete = []
+            for slug, sessions in self.engines.items():
+                for session_id, entry in sessions.items():
+                    if now - entry["last_active"] > idle_threshold:
+                        # fetch the engine's state here
+                        game_state = entry[
+                            "engine"
+                        ].get_serialized_game_state()
+                        to_delete.append((slug, session_id, game_state))
+            for slug, session_id, game_state in to_delete:
+                if self.on_unregister:
+                    await self.on_unregister(session_id, game_state)
+                del self.engines[slug][session_id]
+
+    def register_engine(self, engine_instance, session_id: str, slug: str) -> str:
         """Register a new engine instance and return its engine_id."""
         engine_id = str(uuid.uuid4())
-        self.engines[engine_id] = {
+        if slug not in self.engines:
+            self.engines[slug] = {}
+        self.engines[slug][session_id] = {
             "engine": engine_instance,
-            "session_id": session_id,
+            "engine_id": engine_id,
             "last_active": datetime.now(timezone.utc),
         }
         return engine_id
 
-    def get_registered_engine(self, engine_id: str):
-        """Retrieve engine instance and update last_active."""
-        entry = self.engines.get(engine_id)
+    def get_registered_engine_id(self, slug: str, session_id: str) -> str | None:
+        entry = self.engines.get(slug, {}).get(session_id)
         if not entry:
-            raise ValueError(f"Engine {engine_id} not found")
+            return None
+
         entry["last_active"] = datetime.now(timezone.utc)
-        return entry["engine"]
+        return entry["engine_id"]
 
-    def unregister_engine(self, engine_id: str):
-        """Remove engine from memory."""
-        if engine_id in self.engines:
-            del self.engines[engine_id]
 
-    async def _cleanup_loop(self):
-        """Periodically remove idle engine instances."""
-        while True:
-            await asyncio.sleep(self.cleanup_interval)
-            now = datetime.now(timezone.utc)
-            idle_threshold = timedelta(minutes=30)  # adjust as needed
-            to_delete = [
-                eid
-                for eid, entry in self.engines.items()
-                if now - entry["last_active"] > idle_threshold
-            ]
-            for eid in to_delete:
-                del self.engines[eid]
+    def unregister_engine(
+        self, slug: str, session_id: str, serialize: bool = True
+    ) -> Optional[dict]:
+        entry = self.engines.get(slug, {}).pop(session_id, None)
+        if not entry:
+            return None
 
-    def list_registered_engines(self):
-        """Optional: for debugging."""
-        return {eid: entry["session_id"] for eid, entry in self.engines.items()}
+        engine_state = None
+        if serialize:
+            engine_state = entry["engine"].get_serialized_game_state()  # or await if async
+
+        if not self.engines[slug]:
+            del self.engines[slug]
+
+        return engine_state
+
+    async def list_registered_engines(self):
+        """Flat view: engine_id -> session_id"""
+        flat = {}
+        for slug_entries in self.engines.values():
+            for session_id, entry in slug_entries.items():
+                flat[entry["engine_id"]] = session_id
+        return flat
+
+    async def list_registered_engines_by_game(self, slug: str):
+        """Return engine_id → session_id for a specific game slug."""
+        slug_entries = self.engines.get(slug, {})
+        return {
+            entry["engine_id"]: session_id for session_id, entry in slug_entries.items()
+        }

@@ -170,26 +170,7 @@ class GameInfo(BaseModel):
     tags: List[str]
 
 
-class GameSessionCreate(BaseModel):
-    user_id: str
-    slug: str
-    player_state: Dict[str, Any]
-
-
-class GameSessionGet(BaseModel):
-    user_id: str
-    slug: str
-    session_id: str
-
-
-class GameSessionDelete(BaseModel):
-    user_id: str = Query(...)
-    slug: str
-    session_id: str
-
-
 class GameSessionResponse(BaseModel):
     session_id: str
-    user_id: str
-    slug: str
+    engine_id: str
     game_state: Dict[str, Any]

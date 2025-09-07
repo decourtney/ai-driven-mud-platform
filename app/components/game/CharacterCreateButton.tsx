@@ -22,12 +22,13 @@ export default function CharacterCreateButton({
         body: JSON.stringify(playerState),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        toast.error(data.error || "Failed to create character");
-        return;
+        const errorText = await res.text();
+        throw new Error(errorText);
       }
+
+      const data = await res.json();
+      localStorage.setItem(`${slug}Session`, JSON.stringify(data));
 
       router.push(`/games/${slug}/play/${data.session_id}`);
     } catch (err: any) {

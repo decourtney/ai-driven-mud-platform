@@ -1,40 +1,50 @@
 import uuid
 import json
 from prisma import Json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from fastapi import HTTPException
 from backend.services.api.server import prisma
 from backend.game.core.game_engine_manager import GameEngineManager
-from backend.models import (
-    GameSessionCreate,
-    GameSessionDelete,
-    GameSessionGet,
-    GameSessionResponse,
-)
+from backend.models import GameSessionResponse
 from backend.game.game_registry import GAME_REGISTRY
 from backend.game.engine_registry import ENGINE_REGISTRY
 from backend.services.ai_models.model_client import AsyncModelServiceClient
-
-# from backend.game.core.game_state import GameState
 
 
 class GameSessionManager:
     def __init__(self, model_client: AsyncModelServiceClient):
         self.model_client = model_client
-        self.engine_manager = GameEngineManager(cleanup_interval=60)
+        self.engine_manager = GameEngineManager(
+            cleanup_interval=1, on_unregister=self.save_game_state
+        )
 
+    # ==========================================
+    # Engine Manager Cleanup Start/Stop
+    # ==========================================
+    async def start(self):
+        await self.engine_manager.start()
+
+    async def stop(self):
+        await self.engine_manager.stop()
+
+    # ==========================================
+    # Session Status
+    # ==========================================
     async def get_session_status(self, user_id: str, slug: str) -> Optional[str]:
         session = await prisma.gamesession.find_first(
             where={"user_id": user_id, "slug": slug}
         )
         return session.id if session else None
 
+    # ==========================================
+    # Session Management
+    # ==========================================
     async def create_session(
         self,
         player_state: Dict[str, Any],
         slug: str,
         user_id: str,
-    ) -> str:
+    ):
         """Create a new game session and persist it to DB"""
         if slug not in GAME_REGISTRY:
             raise ValueError(f"Unknown game: {slug}")
@@ -46,20 +56,28 @@ class GameSessionManager:
             )
 
         # Delete existing session for this user/game if it exists
-        await prisma.gamesession.delete_many(where={"user_id": user_id, "slug": slug})
+        await self.delete_sessions(slug=slug, user_id=user_id)
 
         engine_name = GAME_REGISTRY[slug]["engine"]
         if engine_name not in ENGINE_REGISTRY:
             raise ValueError(f"Engine not registered: {engine_name}")
 
+        # Create Game Engine Instance
         engine_class = ENGINE_REGISTRY[engine_name]
-        engine = engine_class(model_client=self.model_client)
+        engine = engine_class(
+            model_client=self.model_client, save_state_callback=self.save_game_state
+        )
 
+        # Reconstitute seralized player state into engine instance
         game_state = engine.create_game_state(player_state)
 
+        # Create ID for new game session
         session_id = str(uuid.uuid4())
-        # NOTE: for now we're not going to register this engine - probably later for a bit of performance
-        # engine_id = self.engine_manager.register_engine(engine, session_id=session_id)
+
+        # Register engine instance in memory
+        engine_id = self.engine_manager.register_engine(
+            engine, session_id=session_id, slug=slug
+        )
 
         await prisma.gamesession.create(
             data={
@@ -71,11 +89,12 @@ class GameSessionManager:
             }
         )
 
-        return {"session_id": session_id}
+        return {
+            "session_id": session_id,
+            "engine_id": engine_id,
+        }
 
-    async def get_session(
-        self, slug: str, session_id: str, user_id: str
-    ) -> GameSessionResponse:
+    async def get_session(self, slug: str, session_id: str, user_id: str):
         """Load a session from DB"""
         if not await self.model_client.is_healthy():
             raise HTTPException(
@@ -100,49 +119,76 @@ class GameSessionManager:
         if engine_name not in ENGINE_REGISTRY:
             raise ValueError(f"Engine not registered: {engine_name}")
 
-        # Create Game Engine Instance
-        engine_class = ENGINE_REGISTRY[engine_name]
-        engine = engine_class(model_client=self.model_client)
-        engine_id = self.engine_manager.register_engine(engine, session_id=record.id)
+        # ==========================================
+        # Return the existing engine if available
+        # ==========================================
 
-        game_state = engine.load_game_state(record.game_state)
+        existing_engine_id = self.engine_manager.get_registered_engine_id(
+            slug, session_id
+        )
+        if existing_engine_id:
+            return {
+                "session_id": record.id,
+                "engine_id": existing_engine_id,
+            }
+
+        # ==========================================
+        # Else create a new instance
+        # ==========================================
+
+        engine_class = ENGINE_REGISTRY[engine_name]
+        engine = engine_class(
+            model_client=self.model_client, save_state_callback=self.save_game_state
+        )
+
+        # Reconstitute seralized game state record into engine instance
+        engine.load_serialized_game_state(record.game_state)
+
+        # Register engine instance in memory
+        engine_id = self.engine_manager.register_engine(
+            engine, session_id=record.id, slug=record.slug
+        )
 
         return {
             "session_id": record.id,
             "engine_id": engine_id,
-            "game_state": record.game_state,
         }
 
-    async def update_session(self, session_id: str, data: Dict[str, Any]):
-        """Update a session in DB"""
+    async def delete_sessions(self, slug: str, user_id: str):
+        sessions = await prisma.gamesession.find_many(
+            where={"user_id": user_id, "slug": slug}
+        )
+        await prisma.gamesession.delete_many(where={"user_id": user_id, "slug": slug})
+
+        for session in sessions:
+            self.engine_manager.unregister_engine(slug=slug, session_id=session.id, serialize=False)
+        
+        return
+
+    # ==========================================
+    # Save Game State
+    # ==========================================
+
+    async def save_game_state(self, session_id, game_state):
+        print("[DEBUG] SAVING GAME STATE TO DB")
         await prisma.gamesession.update(
             where={"id": session_id},
-            data={
-                "game_state": data.get("game_state"),
-                "is_active": data.get("is_active"),
-            },
+            data={"game_state": Json(game_state)},
         )
+        return
 
-    async def delete_session(self, slug: str, session_id: str, user_id: str):
-        session = await prisma.gamesession.find_first(
-            where={
-                "user_id": user_id,
-                "slug": slug,
-                "id": session_id,
-            }
+    async def list_registered_engines(self):
+        """List all currently registered engine instances"""
+        engine_instances = await self.engine_manager.list_registered_engines()
+
+        if not engine_instances:
+            raise ValueError("No instances found")
+        return {"engine_instances": engine_instances}
+
+    async def list_registered_engines_by_game(self, slug: str):
+        engine_instances = await self.engine_manager.list_registered_engines_by_game(
+            slug
         )
-        if not session:
-            raise ValueError("Session not found")
-        await prisma.gamesession.delete(where={"id": session_id})
-
-    async def list_active_sessions(self, user_id: Optional[str] = None):
-        """List active sessions optionally filtered by user"""
-        filters = {"isActive": True}
-        if user_id:
-            filters["userId"] = user_id
-
-        records = await prisma.gamesession.find_many(where=filters)
-        return [
-            {"id": r.id, "user_id": r.user_id, "slug": r.slug, "is_active": r.is_active}
-            for r in records
-        ]
+        if not engine_instances:
+            return "No instances found"
+        return {"engine_instances": engine_instances}

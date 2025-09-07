@@ -3,13 +3,13 @@
 import React, { useState, useEffect } from "react";
 import { Play, Plus, Settings, Book, Minus } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-
 const MainMenu = () => {
-  const [sessionId, setSessionId] = useState<string | null>();
+  const router = useRouter();
   const params = useParams();
+  const [sessionId, setSessionId] = useState<string | null>();
 
   // Check for existing game session on component mount
   useEffect(() => {
@@ -35,16 +35,11 @@ const MainMenu = () => {
     checkForSession();
   }, [params.slug]);
 
-  const handleCredits = () => {
-    console.log("Show credits/about");
-  };
-
-  const handleDelete = async () => {
+  const handleContinue = async () => {
     try {
       const res = await fetch(`/api/sessions/${params.slug}/${sessionId}`, {
-        method: "DELETE",
+        method: "GET",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sessionId),
       });
 
       if (!res.ok) {
@@ -53,7 +48,36 @@ const MainMenu = () => {
       }
 
       const data = await res.json();
-      setSessionId(data.session_id);
+      localStorage.setItem(`${params.slug}Session`, JSON.stringify(data));
+
+      router.push(`${params.slug}/play/${sessionId}`);
+    } catch (err: any) {
+      toast.error(err.message || "Something went wrong");
+    }
+  };
+
+  const handleCredits = () => {
+    console.log("Show credits/about");
+  };
+
+  const handleDelete = async () => {
+    try {
+      const res = await fetch(`/api/sessions/${params.slug}/`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText);
+      }
+
+      const data = await res.json();
+
+      if (data) {
+        setSessionId(null);
+        localStorage.removeItem(`${params.slug}Session`);
+      }
     } catch (err: any) {
       toast.error(err.message || "Something went wrong");
     }
@@ -89,8 +113,8 @@ const MainMenu = () => {
         <div className="px-8 space-y-4 max-w-sm">
           {/* Continue Game Button - only show if session exists */}
           {sessionId && (
-            <Link
-              href={`${params.slug}/play/${sessionId}`}
+            <button
+              onClick={handleContinue}
               className="w-full bg-green-700/30 backdrop-blur-xs hover:bg-green-700/60 text-green-400 hover:text-green-200 active:bg-green-600/60 font-bold py-4 px-6 transition-all duration-200 border-2 border-green-500 active:border-green-300 flex items-center gap-3"
             >
               <Play size={20} />
@@ -98,7 +122,7 @@ const MainMenu = () => {
                 <div className="text-lg">CONTINUE ADVENTURE</div>
                 <div className="text-sm opacity-80">Resume your journey</div>
               </div>
-            </Link>
+            </button>
           )}
 
           {/* Start New Game Button */}

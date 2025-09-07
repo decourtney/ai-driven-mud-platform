@@ -3,7 +3,7 @@ FastAPI server for D&D Streaming Game Engine.
 Now uses decoupled model service instead of direct model management.
 """
 
-from fastapi import FastAPI, HTTPException, Query, Path
+from fastapi import FastAPI, HTTPException, Query, Path, Body
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, Dict, Any
 import uuid
@@ -18,18 +18,12 @@ from backend.game.core.character_state import CharacterState
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.models import (
     GameInfo,
-    GameSessionCreate,
     GameSessionResponse,
-    ParseActionResponse,
     ParseActionRequest,
     GenerateActionRequest,
     GenerateSceneRequest,
-    GenerateNarrationResponse,
-    HealthResponse,
     ParsedAction,
     ActionType,
-    GameSessionDelete,
-    GameSessionGet,
 )
 
 
@@ -67,7 +61,7 @@ class GameAPI:
         )
 
         # ==========================================
-        # HEALTH & STATUS ENDPOINTS
+        # Health & Status Endpoints
         # ==========================================
 
         @app.get("/health")
@@ -91,6 +85,38 @@ class GameAPI:
                         "narrator_loaded", False
                     ),
                 },
+            }
+
+        @app.get("/{slug}/engines")
+        async def list_engines(
+            slug: str = Path(...),
+        ):
+            """List all registered engine instances by game"""
+            try:
+                instances = await self.session_manager.list_registered_engines_by_game(
+                    slug=slug
+                )
+
+                return instances
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to get engines: {str(e)}"
+                )
+                
+        @app.get("/sessions")
+        async def list_sessions():
+            """List all active sessions (for admin/debugging)"""
+            return {
+                "total_sessions": len(self.active_sessions),
+                "sessions": [
+                    {
+                        "session_id": session.session_id,
+                        "game_slug": session.game_slug,
+                        "created_at": session.created_at.isoformat(),
+                        "last_activity": session.last_activity.isoformat(),
+                    }
+                    for session in self.active_sessions.values()
+                ],
             }
 
         # ==========================================
@@ -159,24 +185,47 @@ class GameAPI:
 
         @app.post("/sessions/{slug}/{user_id}")
         async def create_game_session(
-            player_state: Dict[str, Any],
             slug: str = Path(...),
             user_id: str = Path(...),
+            player_state: Dict[str, Any] = Body(...),
         ):
             """Create a new game session"""
             if slug not in GAME_REGISTRY:
                 raise HTTPException(status_code=404, detail="Game not found")
 
             try:
-                session_id = await self.session_manager.create_session(
+                session = await self.session_manager.create_session(
                     player_state=player_state, slug=slug, user_id=user_id
                 )
 
-                return {"session_id": session_id}
+                return {
+                    "session_id": session["session_id"],
+                    "engine_id": session["engine_id"],
+                }
             except Exception as e:
                 raise HTTPException(
                     status_code=500, detail=f"Failed to create session: {str(e)}"
                 )
+
+        @app.delete("/sessions/{slug}/{user_id}")
+        async def delete_session(
+            slug: str = Path(...),
+            user_id: str = Path(...),
+        ):
+            """Delete/end a game session"""
+            try:
+                await self.session_manager.delete_sessions(slug=slug, user_id=user_id)
+                return {"success": True}
+            except ValueError as e:
+                raise HTTPException(status_code=404, detail=str(e))
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to delete session: {str(e)}"
+                )
+
+        # ==========================================
+        # SESSION MANAGEMENT ENDPOINTS w/ SESSION ID
+        # ==========================================
 
         @app.get("/sessions/{slug}/{session_id}/{user_id}")
         async def get_session(
@@ -184,8 +233,7 @@ class GameAPI:
             session_id: str = Path(...),
             user_id: str = Path(...),
         ):
-            """Get session information"""
-
+            """Get session"""
             try:
                 session = await self.session_manager.get_session(
                     slug=slug, session_id=session_id, user_id=user_id
@@ -196,47 +244,13 @@ class GameAPI:
                 )
 
             return {
-                "session_id": session.session_id,
-                "game_slug": session.game_slug,
-                "state": session.engine.state,
-                "created_at": session.created_at.isoformat(),
-                "last_activity": session.last_activity.isoformat(),
+                "session_id": session["session_id"],
+                "engine_id": session["engine_id"],
             }
 
-        @app.delete("/sessions/{slug}/{session_id}/{user_id}")
-        async def delete_session(
-            slug: str = Path(...),
-            session_id: str = Path(...),
-            user_id: str = Path(...),
-        ):
-            """Delete/end a game session"""
-            try:
-                await self.session_manager.delete_session(
-                    slug=slug, session_id=session_id, user_id=user_id
-                )
-                return {"success": True}
-            except ValueError as e:
-                raise HTTPException(status_code=404, detail=str(e))
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500, detail=f"Failed to delete session: {str(e)}"
-                )
-
-        @app.get("/sessions")
-        async def list_sessions():
-            """List all active sessions (for admin/debugging)"""
-            return {
-                "total_sessions": len(self.active_sessions),
-                "sessions": [
-                    {
-                        "session_id": session.session_id,
-                        "game_slug": session.game_slug,
-                        "created_at": session.created_at.isoformat(),
-                        "last_activity": session.last_activity.isoformat(),
-                    }
-                    for session in self.active_sessions.values()
-                ],
-            }
+        # ==========================================
+        # GAME ENGINE ENDPOINTS
+        # ==========================================
 
         # ==========================================
         # GAME ACTION ENDPOINTS
