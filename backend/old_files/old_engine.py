@@ -7,7 +7,7 @@ from backend.models import (
     DamageType, GameCondition, ValidationResult
 )
 from backend.services.ai_models.model_manager import ModelManager
-from backend.game.core.dice import StandardDiceRoller
+from backend.game.core.dice_system import StandardDiceRoller
 from backend.game.core.character_state import CharacterState
 from backend.game.core.game_state import GameState
 

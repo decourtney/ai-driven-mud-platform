@@ -14,9 +14,9 @@ export interface Character {
   level: number;
   class: string;
   hp: number;
-  maxHp: number;
+  max_hp: number;
   mp: number;
-  maxMp: number;
+  max_mp: number;
   stats: CharacterStats;
 }
 
@@ -54,7 +54,7 @@ export interface Quest {
 
 export interface CharacterPanelProps {
   character?: Character;
-  equippedGear?: EquippedGear;
+  equipped_gear?: EquippedGear;
   inventory?: InventoryItem[];
   quests?: Quest[];
 }
@@ -69,18 +69,50 @@ export interface GameMessage {
 
 export interface GameInterfaceProps {
   onPlayerAction?: (action: string) => void;
-  isProcessing?: boolean;
+  is_processing?: boolean;
 }
 
 export interface GameInfo {
-  id: string;
+  slug: string;
   title: string;
   description: string;
-  playerCount: number;
+  player_count: number;
   status: "active" | "maintenance" | "beta";
   difficulty: "beginner" | "intermediate" | "advanced";
-  estimatedTime: string;
+  estimated_time: string;
   features: string[];
-  thumbnail?: string;
-  link: string;
+  thumbnail: string;
+  tags: string[];
+}
+
+// Will need to add mana later
+export interface CharacterState {
+  name: string;
+  character_type: string;
+  max_hp?: number;
+  current_hp?: number;
+  armor_class?: number;
+  level?: number;
+  bio: string;
+  stats: CharacterAttributes;
+}
+
+export interface CharacterAttributes {
+  strength: number;
+  dexterity: number;
+  constitution: number;
+  intelligence: number;
+  wisdom: number;
+  charisma: number;
+}
+
+export interface CharacterAbilities {
+  id: string;
+  name: string;
+  icon: string;
+  requirement: string;
+  req_stat: string;
+  req_value: number;
+  type: string;
+  description: string;
 }

@@ -1,4 +1,4 @@
-from game.registry import GAME_REGISTRY
+from backend.game.game_registry import GAME_REGISTRY
 
 def create_game_engine(game_slug, **kwargs):
     if game_slug not in GAME_REGISTRY:

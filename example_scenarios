@@ -1,50 +1,73 @@
 {
   "scenarios": [
     {
-      "id": "tavern_brawl",
+      "id": "intro",
+      "title": "Introduction",
+      "description": "And so it begins..."
+    },
+    {
+      "id": "tavern",
       "title": "The Rusty Dragon Tavern Brawl",
       "description": "You're sitting in the crowded Rusty Dragon tavern when a heated argument erupts between a drunken merchant and a hooded stranger at the next table. The merchant accuses the stranger of cheating at cards and throws his ale mug. The stranger's hood falls back, revealing pointed ears and cold blue eyes - clearly an elf. The tavern grows tense as other patrons turn to watch. The barkeep, a burly dwarf named Thorek, starts reaching under the bar. You notice the elf's hand moving toward a dagger at their belt, while the merchant's two bodyguards start to stand up from their corner table. A serving wench carrying a tray of drinks is frozen between the two arguing parties, and there's a narrow staircase leading upstairs behind you. The front door is across the crowded room, and you spot a back exit near the kitchen.",
       "environment": {
         "location": "tavern interior",
         "lighting": "dim candlelight",
         "crowd": "20-30 patrons",
-        "obstacles": ["tables", "chairs", "serving staff"],
-        "exits": ["front door", "back exit", "upstairs"]
+        "obstacles": [
+          "tables",
+          "chairs",
+          "serving staff"
+        ],
+        "exits": [
+          "front door",
+          "back exit",
+          "upstairs"
+        ]
       },
       "npcs": [
         {
           "name": "drunken merchant",
           "status": "angry, intoxicated",
-          "equipment": ["purse", "fine clothes"],
+          "equipment": [
+            "purse",
+            "fine clothes"
+          ],
           "disposition": "hostile to elf"
         },
         {
           "name": "hooded elf",
           "status": "alert, dangerous",
-          "equipment": ["dagger", "traveling clothes"],
+          "equipment": [
+            "dagger",
+            "traveling clothes"
+          ],
           "disposition": "defensive"
         },
         {
           "name": "Thorek the barkeep",
           "status": "concerned, reaching for weapon",
-          "equipment": ["club under bar"],
+          "equipment": [
+            "club under bar"
+          ],
           "disposition": "wants to maintain order"
         },
         {
           "name": "two bodyguards",
           "status": "alert, standing",
-          "equipment": ["swords", "leather armor"],
+          "equipment": [
+            "swords",
+            "leather armor"
+          ],
           "disposition": "protective of merchant"
         },
         {
           "name": "serving wench",
           "status": "scared, frozen",
-          "equipment": ["tray of drinks"],
+          "equipment": [
+            "tray of drinks"
+          ],
           "disposition": "wants to escape"
         }
-      ],
-      "possible_actions": [
-        "attack", "spell", "skill_check", "social", "movement", "interact"
       ]
     },
     {
@@ -55,20 +78,35 @@
         "location": "ancient magical library",
         "lighting": "dim colored light from windows",
         "atmosphere": "dusty, magical, dangerous",
-        "obstacles": ["tall shelves", "reading desks", "magical wards"],
-        "special_features": ["moving ladder", "glowing spellbook", "crystal orb"]
+        "obstacles": [
+          "tall shelves",
+          "reading desks",
+          "magical wards"
+        ],
+        "special_features": [
+          "moving ladder",
+          "glowing spellbook",
+          "crystal orb"
+        ]
       },
       "npcs": [
         {
           "name": "spectral librarian",
           "status": "patrolling, unaware of you yet",
-          "equipment": ["ethereal form", "supernatural senses"],
+          "equipment": [
+            "ethereal form",
+            "supernatural senses"
+          ],
           "disposition": "hostile to intruders"
         },
         {
           "name": "unknown scholar",
           "status": "hidden, copying texts",
-          "equipment": ["quill", "parchment", "possibly weapons"],
+          "equipment": [
+            "quill",
+            "parchment",
+            "possibly weapons"
+          ],
           "disposition": "unknown"
         }
       ],
@@ -93,9 +131,6 @@
           "location": "against shelves",
           "description": "access to higher shelves"
         }
-      ],
-      "possible_actions": [
-        "attack", "spell", "skill_check", "social", "movement", "interact"
       ]
     },
     {
@@ -106,26 +141,44 @@
         "location": "narrow mountain trail",
         "lighting": "bright afternoon sun",
         "terrain": "rocky, treacherous footing",
-        "obstacles": ["steep walls", "loose scree", "large boulder"],
-        "features": ["hidden cave entrance", "cliff edge", "loose rocks"]
+        "obstacles": [
+          "steep walls",
+          "loose scree",
+          "large boulder"
+        ],
+        "features": [
+          "hidden cave entrance",
+          "cliff edge",
+          "loose rocks"
+        ]
       },
       "npcs": [
         {
           "name": "goblin leader",
           "status": "aggressive, commanding",
-          "equipment": ["piecemeal armor", "weapon", "shield"],
+          "equipment": [
+            "piecemeal armor",
+            "weapon",
+            "shield"
+          ],
           "disposition": "hostile, wants to rob you"
         },
         {
           "name": "goblin archer",
           "status": "positioned above, aiming",
-          "equipment": ["short bow", "arrows"],
+          "equipment": [
+            "short bow",
+            "arrows"
+          ],
           "disposition": "hostile, providing ranged support"
         },
         {
           "name": "two goblin warriors",
           "status": "attacking with melee weapons",
-          "equipment": ["rusty scimitars", "crude shields"],
+          "equipment": [
+            "rusty scimitars",
+            "crude shields"
+          ],
           "disposition": "hostile, reckless fighters"
         }
       ],
@@ -144,9 +197,6 @@
           "name": "loose rocks",
           "description": "potential improvised weapons"
         }
-      ],
-      "possible_actions": [
-        "attack", "spell", "skill_check", "social", "movement", "interact"
       ]
     },
     {
@@ -157,50 +207,77 @@
         "location": "royal throne room",
         "lighting": "bright from windows and chandeliers",
         "atmosphere": "formal, tense, political",
-        "features": ["marble columns", "painted ceiling", "tapestries"],
-        "exits": ["main entrance", "hidden door to gardens"]
+        "features": [
+          "marble columns",
+          "painted ceiling",
+          "tapestries"
+        ],
+        "exits": [
+          "main entrance",
+          "hidden door to gardens"
+        ]
       },
       "npcs": [
         {
           "name": "King Aldric the Just",
           "status": "listening, judging",
-          "equipment": ["crown", "royal robes"],
+          "equipment": [
+            "crown",
+            "royal robes"
+          ],
           "disposition": "neutral, values truth and justice"
         },
         {
           "name": "Lord Blackthorne",
           "status": "accusing, confident",
-          "equipment": ["rich clothing", "noble's sword"],
+          "equipment": [
+            "rich clothing",
+            "noble's sword"
+          ],
           "disposition": "hostile, politically powerful"
         },
         {
           "name": "The Queen",
           "status": "observing, intelligent",
-          "equipment": ["crown", "royal jewelry"],
+          "equipment": [
+            "crown",
+            "royal jewelry"
+          ],
           "disposition": "neutral, perceptive"
         },
         {
           "name": "Ser Marcus, Captain of Guards",
           "status": "alert, ready to act",
-          "equipment": ["plate armor", "longsword", "authority"],
+          "equipment": [
+            "plate armor",
+            "longsword",
+            "authority"
+          ],
           "disposition": "loyal to crown, professional"
         },
         {
           "name": "nervous servant",
           "status": "anxious, conflicted witness",
-          "equipment": ["simple clothes"],
+          "equipment": [
+            "simple clothes"
+          ],
           "disposition": "uncertain, possibly coerced"
         },
         {
           "name": "well-dressed woman",
           "status": "confident witness",
-          "equipment": ["fine dress", "jewelry"],
+          "equipment": [
+            "fine dress",
+            "jewelry"
+          ],
           "disposition": "suspicious, possibly bought"
         },
         {
           "name": "hooded figure",
           "status": "watching intently from crowd",
-          "equipment": ["concealing robes"],
+          "equipment": [
+            "concealing robes"
+          ],
           "disposition": "unknown, suspicious interest"
         }
       ],
@@ -214,9 +291,6 @@
           "name": "court scribe's records",
           "description": "official record of proceedings"
         }
-      ],
-      "possible_actions": [
-        "social", "skill_check", "movement", "interact", "spell"
       ]
     },
     {
@@ -227,14 +301,26 @@
         "location": "dragon's treasure hoard cavern",
         "lighting": "dim light from ceiling cracks",
         "terrain": "uneven piles of treasure, loose coins",
-        "features": ["high ledges", "underground stream", "mining tracks"],
-        "dangers": ["sleeping dragon", "unstable treasure piles", "potential traps"]
+        "features": [
+          "high ledges",
+          "underground stream",
+          "mining tracks"
+        ],
+        "dangers": [
+          "sleeping dragon",
+          "unstable treasure piles",
+          "potential traps"
+        ]
       },
       "npcs": [
         {
           "name": "Pyraxes the Red",
           "status": "sleeping but restless",
-          "equipment": ["ancient dragon abilities", "massive size", "treasure sense"],
+          "equipment": [
+            "ancient dragon abilities",
+            "massive size",
+            "treasure sense"
+          ],
           "disposition": "will be extremely hostile if awakened"
         }
       ],
@@ -268,9 +354,6 @@
           "name": "fresh footprints",
           "description": "someone else has been here recently - friend or foe?"
         }
-      ],
-      "possible_actions": [
-        "skill_check", "movement", "interact", "spell", "attack"
       ]
     }
   ]

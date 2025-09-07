@@ -12,7 +12,7 @@ import { CharacterPanelProps, EquipmentItem } from "@/app/types/game";
 
 export default function CharacterPanel({
   character,
-  equippedGear,
+  equipped_gear: equippedGear,
   inventory,
   quests,
 }: CharacterPanelProps) {
@@ -125,12 +125,12 @@ export default function CharacterPanel({
                   <div className="flex justify-between text-sm font-mono">
                     <span className="text-red-400">HP</span>
                     <span className="text-white">
-                      {character?.hp}/{character?.maxHp}
+                      {character?.hp}/{character?.max_hp}
                     </span>
                   </div>
                   <StatBar
                     current={character?.hp || 0}
-                    max={character?.maxHp || 1}
+                    max={character?.max_hp || 1}
                     color="#ef4444"
                   />
                 </div>
@@ -138,12 +138,12 @@ export default function CharacterPanel({
                   <div className="flex justify-between text-sm font-mono">
                     <span className="text-blue-400">MP</span>
                     <span className="text-white">
-                      {character?.mp}/{character?.maxMp}
+                      {character?.mp}/{character?.max_mp}
                     </span>
                   </div>
                   <StatBar
                     current={character?.mp || 0}
-                    max={character?.maxMp || 1}
+                    max={character?.max_mp || 1}
                     color="#3b82f6"
                   />
                 </div>
@@ -266,7 +266,7 @@ export default function CharacterPanel({
   };
 
   return (
-    <div className="w-150 bg-gray-900 border-r border-green-500 flex flex-col">
+    <div className="flex flex-col w-full bg-gray-900 border-r border-green-500">
       {/* Character Header */}
       <div className="bg-gray-800 border-b border-green-500 p-4">
         <div className="flex items-center space-x-3 mb-2">

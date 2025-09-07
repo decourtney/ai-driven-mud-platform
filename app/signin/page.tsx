@@ -18,7 +18,7 @@ export default function SignIn() {
             href="/lobby"
             className="inline-flex items-center text-green-400 hover:text-green-300 font-mono text-sm mb-8 transition-colors"
           >
-            <ArrowLeft size={16} className="mr-2" />[ BACK TO HOME ]
+            <ArrowLeft size={16} className="mr-2" />[ BACK TO THE LOBBY ]
           </Link>
 
           {/* Header */}

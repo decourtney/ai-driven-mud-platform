@@ -4,55 +4,17 @@ import React from "react";
 import Link from "next/link";
 import { Play, Users, Clock, Star } from "lucide-react";
 import { GameInfo } from "@/app/types/game";
+import axios from "axios";
+import { notFound } from "next/navigation";
 
 export default async function LobbyPage() {
-
-
-
-  // Featured game - this will be your main MUD game
-  const featuredGame: GameInfo = {
-    id: "mudai-main",
-    title: "MudAI Adventure",
-    description:
-      "Embark on an epic text-based adventure powered by artificial intelligence. Every choice matters, every story is unique. Experience classic MUD gameplay enhanced with modern AI storytelling.",
-    playerCount: 147,
-    status: "active",
-    difficulty: "beginner",
-    estimatedTime: "30+ min",
-    features: [
-      "AI-Powered Storytelling",
-      "Dynamic World Events",
-      "Character Progression",
-      "Endless Possibilities",
-    ],
-    link: "/games/mudai",
-  };
-
-  // Placeholder for future games
-  const upcomingGames: GameInfo[] = [
-    {
-      id: "space-station",
-      title: "Space Station Alpha",
-      description: "Manage a space station in the far reaches of the galaxy.",
-      playerCount: 0,
-      status: "beta",
-      difficulty: "intermediate",
-      estimatedTime: "45+ min",
-      features: ["Resource Management", "Crew Dynamics", "Alien Encounters"],
-      link: "/coming-soon",
-    },
-    {
-      id: "fantasy-kingdom",
-      title: "Kingdom Builder",
-      description: "Build and rule your own fantasy kingdom.",
-      playerCount: 0,
-      status: "maintenance",
-      difficulty: "advanced",
-      estimatedTime: "60+ min",
-      features: ["City Building", "Diplomacy", "Economic Systems"],
-      link: "/coming-soon",
-    },
-  ];
+  const res = await axios
+    .get(`${process.env.NEXT_PUBLIC_BASE_URL}/games`)
+    .catch(() => notFound());
+  const games: GameInfo[] = res.data;
+  const featuredGame =
+    games.find((game) => game.tags?.includes("featured")) ?? games[0];
+  const upcomingGames = games.filter((game) => game.tags?.includes("upcoming"));
 
   const getStatusBadge = (status: GameInfo["status"]) => {
     switch (status) {
@@ -81,7 +43,7 @@ export default async function LobbyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen text-white">
       <div className="max-w-6xl mx-auto p-6">
         {/* Featured Game Section */}
         <section className="mb-12">
@@ -111,11 +73,11 @@ export default async function LobbyPage() {
                   <div className="flex flex-wrap gap-6 mb-6 text-sm font-mono">
                     <div className="flex items-center text-green-400">
                       <Users size={16} className="mr-2" />
-                      {featuredGame.playerCount} players online
+                      {featuredGame.player_count} players online
                     </div>
                     <div className="flex items-center text-cyan-400">
                       <Clock size={16} className="mr-2" />
-                      {featuredGame.estimatedTime}
+                      {featuredGame.estimated_time}
                     </div>
                     <div
                       className={`flex items-center ${getDifficultyColor(
@@ -146,8 +108,8 @@ export default async function LobbyPage() {
                   </div>
 
                   {/* Play Button */}
-                  <Link href={featuredGame.link}>
-                    <button className="bg-green-600 hover:bg-green-700 text-black font-mono font-bold px-8 py-4 text-lg transition-colors flex items-center border-2 border-green-400">
+                  <Link href={`games/${featuredGame.slug}`}>
+                    <button className="bg-green-600/30 hover:bg-green-700 text-black font-mono font-bold px-8 py-4 text-lg transition-colors flex items-center border-2 border-green-400">
                       <Play size={24} className="mr-3" />[ START ADVENTURE ]
                     </button>
                   </Link>
@@ -194,7 +156,7 @@ export default async function LobbyPage() {
           <div className="grid md:grid-cols-2 gap-6">
             {upcomingGames.map((game) => (
               <div
-                key={game.id}
+                key={game.slug}
                 className="bg-gray-900 border border-gray-600 rounded-lg p-6 opacity-75"
               >
                 <div className="flex items-center gap-3 mb-3">
