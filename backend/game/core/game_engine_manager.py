@@ -70,13 +70,18 @@ class GameEngineManager:
         entry["last_active"] = datetime.now(timezone.utc)
         return entry["engine_id"]
 
-    def unregister_engine(self, slug: str, session_id: str) -> Optional[dict]:
-        """Remove engine from memory and return its current game state."""
+
+    def unregister_engine(
+        self, slug: str, session_id: str, serialize: bool = True
+    ) -> Optional[dict]:
         entry = self.engines.get(slug, {}).pop(session_id, None)
         if not entry:
             return None
 
-        engine_state = entry["engine"].get_game_state()  # or await if async
+        engine_state = None
+        if serialize:
+            engine_state = entry["engine"].get_serialized_game_state()  # or await if async
+
         if not self.engines[slug]:
             del self.engines[slug]
 

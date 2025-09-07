@@ -161,7 +161,9 @@ class GameSessionManager:
         await prisma.gamesession.delete_many(where={"user_id": user_id, "slug": slug})
 
         for session in sessions:
-            self.engine_manager.unregister_engine(slug=slug, session_id=session.id)
+            self.engine_manager.unregister_engine(slug=slug, session_id=session.id, serialize=False)
+        
+        return
 
     # ==========================================
     # Save Game State

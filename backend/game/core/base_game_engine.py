@@ -62,7 +62,7 @@ class BaseGameEngine(ABC):
             player_state.update(player_state.pop("stats"))
 
         player_state_obj = CharacterState.from_dict(player_state)
-
+        
         initial_scene = {
             "id": "intro",
             "title": "Introduction",
@@ -85,6 +85,7 @@ class BaseGameEngine(ABC):
         self.game_state = GameState.from_dict(serialized_game_state)
 
     def get_serialized_game_state(self):
+        print("[DEBUG] SERIALIZING GAME STATE")
         serialized_game_state = self.game_state.to_dict()
         print("[DEBUG] RETURNING SERIALIZED GAME STATE")
         return serialized_game_state

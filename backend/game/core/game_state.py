@@ -236,13 +236,18 @@ class GameState:
             turn_counter=data["turn_counter"],
         )
         
-        # Restore other attributes
+        # Keys to skip when restoring attributes
+        SKIP_KEYS = {"player", "npcs", "scene", "turn_counter", "global_flags", "important_npcs_met"}
+
+        # Keys that need datetime conversion
+        DATETIME_KEYS = {"session_started", "last_updated"}
+
         for key, value in data.items():
-            if hasattr(game_state, key) and key not in ["player", "npcs", "scene", "turn_counter", "global_flags", "important_npcs_met"]:
-                if key in ["session_started", "last_updated"]:
+            if key not in SKIP_KEYS and hasattr(game_state, key):
+                if key in DATETIME_KEYS and value is not None:
                     value = datetime.fromisoformat(value)
                 setattr(game_state, key, value)
-        
+
         # Restore sets
         game_state.important_npcs_met = set(data.get("important_npcs_met", []))
         
