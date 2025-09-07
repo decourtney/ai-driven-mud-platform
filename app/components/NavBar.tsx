@@ -1,9 +1,10 @@
-// components/Navbar.tsx
 "use client";
+
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { Play, User, LogOut, UserCircle } from "lucide-react";
 import { signOut } from "next-auth/react";
+import Image from "next/image";
 
 interface NavbarProps {
   variant?: "solid" | "transparent";
@@ -94,10 +95,13 @@ export default function Navbar({ variant = "solid", user }: NavbarProps) {
                   className="w-10 h-10 bg-gray-800 border-2 border-green-500 hover:border-green-400 flex items-center justify-center transition-colors duration-200 cursor-pointer group relative"
                 >
                   {user?.image ? (
-                    <img
+                    <Image
                       src={user.image}
                       alt={user.name || "User"}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full"
+                      width={40}
+                      height={40}
+                      unoptimized
                     />
                   ) : (
                     <User
@@ -115,10 +119,13 @@ export default function Navbar({ variant = "solid", user }: NavbarProps) {
                       <div className="flex items-center space-x-3">
                         <div className="w-12 h-12 bg-gray-800 border-2 border-green-400 flex items-center justify-center">
                           {user?.image ? (
-                            <img
+                            <Image
                               src={user.image}
                               alt={user.name || "User"}
                               className="w-full h-full object-cover"
+                              width={40}
+                              height={40}
+                              unoptimized
                             />
                           ) : (
                             <UserCircle size={24} className="text-green-400" />
