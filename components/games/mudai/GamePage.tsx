@@ -24,7 +24,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
   const [playerState, setPlayerState] = useState<PlayerState | null>(null);
   const [npcsState, setNpcsState] = useState<CharacterState[] | null>([]);
   const [sceneState, setSceneState] = useState<SceneState | null>(null);
-  const [activeTab, setActiveTab] = useState<"character" | "feed">("character");
+  const [activeTab, setActiveTab] = useState<"character" | "chat">("character");
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Load game state from localStorage on component mount
@@ -120,11 +120,11 @@ export default function GamePage({ slug, id }: GamePageProps) {
         </button>
         <button
           className={`flex-1 p-2 ${
-            activeTab === "feed" ? "bg-gray-800" : "bg-gray-900"
+            activeTab === "chat" ? "bg-gray-800" : "bg-gray-900"
           }`}
-          onClick={() => setActiveTab("feed")}
+          onClick={() => setActiveTab("chat")}
         >
-          Feed
+          Chat
         </button>
       </div>
 
@@ -140,7 +140,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
       {/* Chat Interface */}
       <div
         className={`flex flex-1 ${
-          activeTab !== "feed" ? "hidden md:flex" : ""
+          activeTab !== "chat" ? "hidden md:flex" : ""
         }`}
       >
         <ChatInterface

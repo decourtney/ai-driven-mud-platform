@@ -117,7 +117,7 @@ export default function ChatInterface({
   };
 
   return (
-    <div className="flex flex-col bg-gray-950 h-full">
+    <div className="flex flex-col w-full bg-gray-950">
       {/* Game Header */}
       <div className="bg-gray-800 border-b border-green-500 p-4 flex items-center">
         <Terminal className="text-green-400 mr-3" size={24} />
