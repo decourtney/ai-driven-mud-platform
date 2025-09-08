@@ -58,25 +58,18 @@ class GameSessionManager:
         # Delete existing session for this user/game if it exists
         await self.delete_sessions(slug=slug, user_id=user_id)
 
-        engine_name = GAME_REGISTRY[slug]["engine"]
-        if engine_name not in ENGINE_REGISTRY:
-            raise ValueError(f"Engine not registered: {engine_name}")
-
-        # Create Game Engine Instance
-        engine_class = ENGINE_REGISTRY[engine_name]
-        engine = engine_class(
-            model_client=self.model_client, save_state_callback=self.save_game_state
-        )
+        # Create engine instance
+        engine_instance = self.engine_factory(slug=slug)
 
         # Reconstitute seralized player state into engine instance
-        game_state = engine.create_game_state(player_state)
+        game_state = engine_instance.create_game_state(player_state)
 
         # Create ID for new game session
         session_id = str(uuid.uuid4())
 
         # Register engine instance in memory
         engine_id = self.engine_manager.register_engine(
-            engine, session_id=session_id, slug=slug
+            engine_instance, session_id=session_id, slug=slug
         )
 
         await prisma.gamesession.create(
@@ -115,43 +108,41 @@ class GameSessionManager:
                 detail=f"Couldn't locate this session.",
             )
 
-        engine_name = GAME_REGISTRY[slug]["engine"]
-        if engine_name not in ENGINE_REGISTRY:
-            raise ValueError(f"Engine not registered: {engine_name}")
-
         # ==========================================
         # Return the existing engine if available
         # ==========================================
 
-        existing_engine_id = self.engine_manager.get_registered_engine_id(
+        result = self.engine_manager.get_registered_engine(
             slug, session_id
         )
-        if existing_engine_id:
+
+        if result:
+            engine_id, engine = result
+            game_state = engine.get_serialized_game_state()
             return {
                 "session_id": record.id,
-                "engine_id": existing_engine_id,
+                "engine_id": engine_id,
+                "game_state": game_state,
             }
 
         # ==========================================
         # Else create a new instance
         # ==========================================
 
-        engine_class = ENGINE_REGISTRY[engine_name]
-        engine = engine_class(
-            model_client=self.model_client, save_state_callback=self.save_game_state
-        )
+        engine_instance = self.engine_factory(slug=slug)
 
         # Reconstitute seralized game state record into engine instance
-        engine.load_serialized_game_state(record.game_state)
+        game_state = engine_instance.load_serialized_game_state(record.game_state)
 
         # Register engine instance in memory
         engine_id = self.engine_manager.register_engine(
-            engine, session_id=record.id, slug=record.slug
+            engine_instance, session_id=record.id, slug=record.slug
         )
 
         return {
             "session_id": record.id,
             "engine_id": engine_id,
+            "game_state": game_state,
         }
 
     async def delete_sessions(self, slug: str, user_id: str):
@@ -161,8 +152,10 @@ class GameSessionManager:
         await prisma.gamesession.delete_many(where={"user_id": user_id, "slug": slug})
 
         for session in sessions:
-            self.engine_manager.unregister_engine(slug=slug, session_id=session.id, serialize=False)
-        
+            self.engine_manager.unregister_engine(
+                slug=slug, session_id=session.id, serialize=False
+            )
+
         return
 
     # ==========================================
@@ -192,3 +185,20 @@ class GameSessionManager:
         if not engine_instances:
             return "No instances found"
         return {"engine_instances": engine_instances}
+
+    # ==========================================
+    # ENGINE FACTORY
+    # ==========================================
+
+    def engine_factory(self, slug: str):
+        engine_name = GAME_REGISTRY[slug]["engine"]
+        if engine_name not in ENGINE_REGISTRY:
+            raise ValueError(f"Engine not registered: {engine_name}")
+
+        # Create Game Engine Instance
+        engine_class = ENGINE_REGISTRY[engine_name]
+        engine = engine_class(
+            model_client=self.model_client, save_state_callback=self.save_game_state
+        )
+
+        return engine

@@ -102,7 +102,7 @@ class GameAPI:
                 raise HTTPException(
                     status_code=500, detail=f"Failed to get engines: {str(e)}"
                 )
-                
+
         @app.get("/sessions")
         async def list_sessions():
             """List all active sessions (for admin/debugging)"""
@@ -120,10 +120,10 @@ class GameAPI:
             }
 
         # ==========================================
-        # GAME CATALOG ENDPOINTS
+        # LOBBY ENDPOINTS
         # ==========================================
 
-        @app.get("/games", response_model=list[GameInfo])
+        @app.get("/lobby", response_model=list[GameInfo])
         def list_games():
             """Get list of available games"""
             return [
@@ -143,7 +143,7 @@ class GameAPI:
                 for slug, meta in GAME_REGISTRY.items()
             ]
 
-        @app.get("/games/{game_slug}")
+        @app.get("/lobby/{game_slug}")
         def get_game_details(game_slug: str):
             """Get detailed information about a specific game"""
             if game_slug not in GAME_REGISTRY:
@@ -165,10 +165,10 @@ class GameAPI:
             )
 
         # ==========================================
-        # SESSION MANAGEMENT ENDPOINTS
+        # MAIN MENU ENDPOINTS
         # ==========================================
 
-        @app.get("/sessions/{slug}/{user_id}")
+        @app.get("/play/{slug}/{user_id}")
         async def get_session_status(
             slug: str = Path(...),
             user_id: str = Path(...),
@@ -183,7 +183,7 @@ class GameAPI:
                     status_code=500, detail=f"Failed to get status: {str(e)}"
                 )
 
-        @app.post("/sessions/{slug}/{user_id}")
+        @app.post("/play/{slug}/{user_id}")
         async def create_game_session(
             slug: str = Path(...),
             user_id: str = Path(...),
@@ -207,7 +207,7 @@ class GameAPI:
                     status_code=500, detail=f"Failed to create session: {str(e)}"
                 )
 
-        @app.delete("/sessions/{slug}/{user_id}")
+        @app.delete("/play/{slug}/{user_id}")
         async def delete_session(
             slug: str = Path(...),
             user_id: str = Path(...),
@@ -224,10 +224,10 @@ class GameAPI:
                 )
 
         # ==========================================
-        # SESSION MANAGEMENT ENDPOINTS w/ SESSION ID
+        # PLAY SESSION ENDPOINTS
         # ==========================================
 
-        @app.get("/sessions/{slug}/{session_id}/{user_id}")
+        @app.get("/play/{slug}/{session_id}/{user_id}")
         async def get_session(
             slug: str = Path(...),
             session_id: str = Path(...),
@@ -247,61 +247,27 @@ class GameAPI:
                 "session_id": session["session_id"],
                 "engine_id": session["engine_id"],
             }
+        
+        @app.get("/play/{slug}/{session_id}/action/{user_id}")
+        async def get_game_state():
+            pass
 
-        # ==========================================
-        # GAME ENGINE ENDPOINTS
-        # ==========================================
-
-        # ==========================================
-        # GAME ACTION ENDPOINTS
-        # ==========================================
-
-        @app.post("/sessions/{session_id}/action")
-        async def process_player_action(session_id: str, action: str):
-            """Process a player action"""
-            if session_id not in self.active_sessions:
-                raise HTTPException(status_code=404, detail="Session not found")
-
-            session = self.active_sessions[session_id]
-            session.update_activity()
-
-            # Check model service availability
-            if not await self.model_client.is_healthy():
-                raise HTTPException(
-                    status_code=503, detail="Model service not available"
-                )
-
+        @app.post("/play/{slug}/{session_id}/action/{user_id}")
+        async def process_player_action(
+            slug: str = Path(...),
+            session_id: str = Path(...),
+            user_id: str = Path(...),
+            action: str = Body(...),
+        ):
             try:
-                # Process action using the game engine (which now uses model_client)
-                result = session.engine.process_player_action(action)
 
-                return {"success": True, "session_id": session_id, "result": result}
+                print("Action received: ", action)
+
+                return {"success": True, "session_id": session_id}
 
             except Exception as e:
                 raise HTTPException(
                     status_code=500, detail=f"Action processing failed: {str(e)}"
-                )
-
-        @app.get("/sessions/{session_id}/scene")
-        def get_current_scene(session_id: str):
-            """Get current game scene"""
-            if session_id not in self.active_sessions:
-                raise HTTPException(status_code=404, detail="Session not found")
-
-            session = self.active_sessions[session_id]
-            session.update_activity()
-
-            try:
-                scene_description = session.engine.get_current_scene()
-                return {
-                    "session_id": session_id,
-                    "scene_description": scene_description,
-                    "game_state": session.engine.state,
-                }
-
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500, detail=f"Failed to get scene: {str(e)}"
                 )
 
         # ==========================================
