@@ -1,9 +1,10 @@
 "use client";
+
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { CharacterState } from "../../types/game";
+import { CharacterState } from "@/app/types/game";
 
-export default function CharacterCreateButton({
+export default function CreateCharacterButton({
   playerState,
   slug,
   availablePoints,
@@ -16,7 +17,7 @@ export default function CharacterCreateButton({
 
   const handleSubmit = async () => {
     try {
-      const res = await fetch(`/api/sessions/${slug}`, {
+      const res = await fetch(`/api/play/${slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(playerState),
@@ -30,7 +31,7 @@ export default function CharacterCreateButton({
       const data = await res.json();
       localStorage.setItem(`${slug}Session`, JSON.stringify(data));
 
-      router.push(`/games/${slug}/play/${data.session_id}`);
+      router.push(`/play/${slug}/${data.session_id}`);
     } catch (err: any) {
       toast.error(err.message || "Something went wrong");
     }

@@ -5,7 +5,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000";
 
 export async function GET() {
   try {
-    const res = await fetch(`${BACKEND_URL}/games}`, {
+    const res = await fetch(`${BACKEND_URL}/lobby}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });

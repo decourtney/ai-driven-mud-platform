@@ -22,7 +22,7 @@ export async function GET(
   try {
     // add user_id for backend and prisma verification
     const res = await fetch(
-      `${BACKEND_URL}/sessions/${slug}/${session.user.id}`,
+      `${BACKEND_URL}/play/${slug}/${session.user.id}`,
       { method: "GET" }
     );
 
@@ -58,7 +58,7 @@ export async function POST(
 
     // Add the userId from auth to send to backend
     const res = await fetch(
-      `${BACKEND_URL}/sessions/${slug}/${session.user.id}`,
+      `${BACKEND_URL}/play/${slug}/${session.user.id}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -94,7 +94,7 @@ export async function DELETE(
 
   try {
     const res = await fetch(
-      `${BACKEND_URL}/sessions/${slug}/${session.user.id}`,
+      `${BACKEND_URL}/play/${slug}/${session.user.id}`,
       {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },

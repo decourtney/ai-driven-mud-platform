@@ -3,19 +3,22 @@
 import React, { useState, useEffect } from "react";
 import { Play, Plus, Settings, Book, Minus } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-const MainMenu = () => {
+interface MainMenuProps {
+  slug: string;
+}
+
+export default function MainMenu({ slug }: MainMenuProps) {
   const router = useRouter();
-  const params = useParams();
   const [sessionId, setSessionId] = useState<string | null>();
 
   // Check for existing game session on component mount
   useEffect(() => {
     const checkForSession = async () => {
       try {
-        const res = await fetch(`/api/sessions/${params.slug}`, {
+        const res = await fetch(`/api/play/${slug}`, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
         });
@@ -33,11 +36,11 @@ const MainMenu = () => {
     };
 
     checkForSession();
-  }, [params.slug]);
+  }, [slug]);
 
   const handleContinue = async () => {
     try {
-      const res = await fetch(`/api/sessions/${params.slug}/${sessionId}`, {
+      const res = await fetch(`/api/play/${slug}/${sessionId}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
@@ -48,9 +51,9 @@ const MainMenu = () => {
       }
 
       const data = await res.json();
-      localStorage.setItem(`${params.slug}Session`, JSON.stringify(data));
+      localStorage.setItem(`${slug}Session`, JSON.stringify(data));
 
-      router.push(`${params.slug}/play/${sessionId}`);
+      router.push(`${slug}/${sessionId}`);
     } catch (err: any) {
       toast.error(err.message || "Something went wrong");
     }
@@ -62,7 +65,7 @@ const MainMenu = () => {
 
   const handleDelete = async () => {
     try {
-      const res = await fetch(`/api/sessions/${params.slug}/`, {
+      const res = await fetch(`/api/play/${slug}/`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
       });
@@ -76,7 +79,7 @@ const MainMenu = () => {
 
       if (data) {
         setSessionId(null);
-        localStorage.removeItem(`${params.slug}Session`);
+        localStorage.removeItem(`${slug}Session`);
       }
     } catch (err: any) {
       toast.error(err.message || "Something went wrong");
@@ -86,7 +89,7 @@ const MainMenu = () => {
   return (
     <div className="relative flex-1 text-white font-mono">
       {/* Background Image */}
-      <div className="absolute inset-0 w-full h-full">
+      {/* <div className="absolute inset-0 w-full h-full">
         <img
           src="/images/mudai.jpeg"
           alt="Fantasy adventure scene with mystical landscape"
@@ -96,9 +99,8 @@ const MainMenu = () => {
           }}
         />
 
-        {/* Gradient overlay from left */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent"></div>
-      </div>
+      </div> */}
 
       {/* Content */}
       <div className="relative max-w-7xl h-full mx-auto z-10">
@@ -115,7 +117,7 @@ const MainMenu = () => {
           {sessionId && (
             <button
               onClick={handleContinue}
-              className="w-full bg-green-700/30 backdrop-blur-xs hover:bg-green-700/60 text-green-400 hover:text-green-200 active:bg-green-600/60 font-bold py-4 px-6 transition-all duration-200 border-2 border-green-500 active:border-green-300 flex items-center gap-3"
+              className="w-full bg-green-700/30 backdrop-blur-md hover:bg-green-700/60 text-green-400 hover:text-green-200 active:bg-green-600/60 font-bold py-4 px-6 transition-all duration-200 border-2 border-green-500 active:border-green-300 flex items-center gap-3"
             >
               <Play size={20} />
               <div className="text-left">
@@ -127,8 +129,8 @@ const MainMenu = () => {
 
           {/* Start New Game Button */}
           <Link
-            href={`${params.slug}/create`}
-            className="w-full bg-black/30 backdrop-blur-xs hover:bg-green-700/60 text-green-400 hover:text-green-200 active:bg-green-600/60 font-bold py-4 px-6 transition-all duration-200 border-2 border-green-500 active:border-green-300 flex items-center gap-3"
+            href={`${slug}/create`}
+            className="w-full bg-black/30 backdrop-blur-md hover:bg-green-700/60 text-green-400 hover:text-green-200 active:bg-green-600/60 font-bold py-4 px-6 transition-all duration-200 border-2 border-green-500 active:border-green-300 flex items-center gap-3"
           >
             <Plus size={20} />
             <div className="text-left">
@@ -140,7 +142,7 @@ const MainMenu = () => {
           {/* Credits/About Button */}
           <button
             onClick={handleCredits}
-            className="w-full bg-black/30 backdrop-blur-xs hover:bg-green-700/60 text-green-400 hover:text-green-200 active:bg-green-600/60 font-bold py-4 px-6 transition-all duration-200 border-2 border-green-500 active:border-green-300 flex items-center gap-3"
+            className="w-full bg-black/30 backdrop-blur-md hover:bg-green-700/60 text-green-400 hover:text-green-200 active:bg-green-600/60 font-bold py-4 px-6 transition-all duration-200 border-2 border-green-500 active:border-green-300 flex items-center gap-3"
           >
             <Book size={18} />
             <span className="text-lg">CREDITS</span>
@@ -150,7 +152,7 @@ const MainMenu = () => {
           {sessionId && (
             <button
               onClick={handleDelete}
-              className="w-full bg-black/30 backdrop-blur-xs hover:bg-red-700/60 text-red-500 hover:text-green-200 active:bg-red-600/60 font-bold py-4 px-6 transition-all duration-200 border-2 border-red-500 active:border-red-300 flex items-center gap-3"
+              className="w-full bg-black/30 backdrop-blur-md hover:bg-red-700/60 text-red-500 hover:text-green-200 active:bg-red-600/60 font-bold py-4 px-6 transition-all duration-200 border-2 border-red-500 active:border-red-300 flex items-center gap-3"
             >
               <Minus size={20} />
               <div className="text-left">
@@ -167,6 +169,4 @@ const MainMenu = () => {
       </div> */}
     </div>
   );
-};
-
-export default MainMenu;
+}

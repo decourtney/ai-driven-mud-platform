@@ -28,19 +28,13 @@ import {
 import axios from "axios";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import CharacterCreateButton from "@/app/components/game/CharacterCreateButton";
+import CreateCharacterButton from "./CreateCharacterButton";
 
-interface CharacterCreationProps {
-  userId: string;
+interface CreateCharacterProps {
+  slug: string;
 }
 
-const CharacterCreation = ({ userId }: CharacterCreationProps) => {
-  const params = useParams();
-  if (!params.slug) {
-    return <div>Loading...</div>;
-  }
-  const slug = params.slug as string;
-
+export default function CreateCharacter({ slug }: CreateCharacterProps) {
   const [playerState, setPlayerState] = useState<CharacterState>({
     name: "User",
     character_type: "player",
@@ -233,6 +227,7 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
 
   return (
     <div className="flex flex-col md:flex-row flex-1 max-w-7xl mx-auto text-white font-mono bg-blue-300">
+      <div className="absolute backdrop-blur-xs inset-0 w-full h-full bg-black/30 -z-10"></div>
       {/* Left Panel - Character Panel */}
       <div className="flex flex-col w-full md:w-xl bg-gray-900 md:border-r md:border-l border-green-500">
         <div className="relative flex-1 w-full min-h-dvh md:min-h-auto">
@@ -310,7 +305,7 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
             </div>
           </div>
 
-          <CharacterCreateButton
+          <CreateCharacterButton
             playerState={playerState}
             slug={slug}
             availablePoints={availablePoints}
@@ -538,7 +533,7 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
             </div>
           </div>
 
-          <CharacterCreateButton
+          <CreateCharacterButton
             playerState={playerState}
             slug={slug}
             availablePoints={availablePoints}
@@ -547,6 +542,4 @@ const CharacterCreation = ({ userId }: CharacterCreationProps) => {
       </div>
     </div>
   );
-};
-
-export default CharacterCreation;
+}

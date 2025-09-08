@@ -1,7 +1,7 @@
 "use client";
 
-import CharacterPanel from "@/app/components/game/CharacterPanel";
-import GameInterface from "@/app/components/game/GameInterface";
+import CharacterPanel from "@/components/games/mudai/CharacterPanel";
+import ChatInterface from "@/components/games/mudai/ChatInterface";
 import {
   Character,
   EquippedGear,
@@ -12,39 +12,37 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-export default function GamePage() {
-  const params = useParams()
+interface GamePageProps {
+  slug: string;
+  id: string;
+}
+
+export default function GamePage({ slug, id }: GamePageProps) {
   const [gameState, setGameState] = useState();
   const [activeTab, setActiveTab] = useState<"character" | "feed">("character");
 
-  // useEffect(() => {
-  //   const getGameState = async () => {
-  //     try {
-  //       console.log("Game Page params: ",params)
-  //       const res = await fetch(`/api/sessions/${params.slug}/${params.id}`, {
-  //         method: "GET",
-  //         headers: { "Content-Type": "application/json" },
-  //       });
 
-  //       if (!res.ok) {
-  //         const errorText = await res.text();
-  //         throw new Error(errorText);
-  //       }
 
-  //       const data = await res.json();
-  //       console.log("Game Page data: ", data);
-  //       setGameState(data)
-  //     } catch (err: any) {
-  //       toast.error(err.message || "Something went wrong");
-  //     }
-  //   };
-
-  //   getGameState();
-  // }, []);
-
-  const handlePlayerAction = (action: string) => {
+  const handlePlayerAction = async (action: string) => {
     console.log("Player action:", action);
-    // This will connect to your FastAPI backend later
+    try {
+      const res = await fetch(`/api/play/${slug}/${id}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText);
+      }
+
+      const data = await res.json();
+      console.log(data)
+
+    } catch (err: any) {
+      toast.error(err.message || "Something went wrong");
+    }
   };
 
   const character: Character = {
@@ -126,7 +124,7 @@ export default function GamePage() {
           activeTab !== "feed" ? "hidden md:flex" : ""
         }`}
       >
-        <GameInterface
+        <ChatInterface
           onPlayerAction={handlePlayerAction}
           is_processing={false}
         />
