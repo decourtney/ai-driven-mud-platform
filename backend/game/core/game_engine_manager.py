@@ -1,6 +1,6 @@
 import uuid
 import asyncio
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from datetime import datetime, timedelta, timezone
 
 
@@ -35,15 +35,13 @@ class GameEngineManager:
         while True:
             await asyncio.sleep(self.cleanup_interval)
             now = datetime.now(timezone.utc)
-            idle_threshold = timedelta(milliseconds=5000)
+            idle_threshold = timedelta(milliseconds=10000)
             to_delete = []
             for slug, sessions in self.engines.items():
                 for session_id, entry in sessions.items():
                     if now - entry["last_active"] > idle_threshold:
                         # fetch the engine's state here
-                        game_state = entry[
-                            "engine"
-                        ].get_serialized_game_state()
+                        game_state = entry["engine"].get_serialized_game_state()
                         to_delete.append((slug, session_id, game_state))
             for slug, session_id, game_state in to_delete:
                 if self.on_unregister:
@@ -62,14 +60,13 @@ class GameEngineManager:
         }
         return engine_id
 
-    def get_registered_engine_id(self, slug: str, session_id: str) -> str | None:
+    def get_registered_engine(self, slug: str, session_id: str):
         entry = self.engines.get(slug, {}).get(session_id)
         if not entry:
             return None
 
         entry["last_active"] = datetime.now(timezone.utc)
-        return entry["engine_id"]
-
+        return entry["engine_id"], entry["engine"]
 
     def unregister_engine(
         self, slug: str, session_id: str, serialize: bool = True
@@ -80,7 +77,9 @@ class GameEngineManager:
 
         engine_state = None
         if serialize:
-            engine_state = entry["engine"].get_serialized_game_state()  # or await if async
+            engine_state = entry[
+                "engine"
+            ].get_serialized_game_state()  # or await if async
 
         if not self.engines[slug]:
             del self.engines[slug]
