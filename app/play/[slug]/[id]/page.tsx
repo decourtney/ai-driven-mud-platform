@@ -1,24 +1,24 @@
-// app/games/[slug]/create/page.tsx
+// app/play/[slug]/play/[id]/page.tsx
 import GameBackground from "@/components/GameBackground";
 import { getGameComponents } from "@/lib/games/registry";
 import { notFound } from "next/navigation";
 
-export default async function CreateCharacter({
+export default async function GamePage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string; id: string }>;
 }) {
-  const { slug } = await params;
+  const { slug, id } = await params;
   const gameComponents = getGameComponents(slug);
 
   if (!gameComponents) {
     notFound();
   }
 
-  const CreateCharacter = await gameComponents.CreateCharacter();
+  const GamePage = await gameComponents.GamePage();
   return (
     <GameBackground slug={slug}>
-      <CreateCharacter.default slug={slug} />
+      <GamePage.default slug={slug} id={id} />
     </GameBackground>
   );
 }

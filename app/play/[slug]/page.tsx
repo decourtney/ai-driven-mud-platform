@@ -1,4 +1,4 @@
-// app/games/[slug]/page.tsx
+// app/play/[slug]/page.tsx
 import { getGameComponents } from "@/lib/games/registry";
 import { notFound } from "next/navigation";
 import GameBackground from "@/components/GameBackground";

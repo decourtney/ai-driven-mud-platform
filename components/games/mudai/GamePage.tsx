@@ -1,7 +1,7 @@
 "use client";
 
 import CharacterPanel from "@/components/games/mudai/CharacterPanel";
-import GameInterface from "@/components/games/mudai/GameInterface";
+import ChatInterface from "@/components/games/mudai/ChatInterface";
 import {
   Character,
   EquippedGear,
@@ -18,13 +18,31 @@ interface GamePageProps {
 }
 
 export default function GamePage({ slug, id }: GamePageProps) {
-  const params = useParams();
   const [gameState, setGameState] = useState();
   const [activeTab, setActiveTab] = useState<"character" | "feed">("character");
 
-  const handlePlayerAction = (action: string) => {
+
+
+  const handlePlayerAction = async (action: string) => {
     console.log("Player action:", action);
-    // This will connect to your FastAPI backend later
+    try {
+      const res = await fetch(`/api/play/${slug}/${id}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText);
+      }
+
+      const data = await res.json();
+      console.log(data)
+
+    } catch (err: any) {
+      toast.error(err.message || "Something went wrong");
+    }
   };
 
   const character: Character = {
@@ -106,7 +124,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
           activeTab !== "feed" ? "hidden md:flex" : ""
         }`}
       >
-        <GameInterface
+        <ChatInterface
           onPlayerAction={handlePlayerAction}
           is_processing={false}
         />

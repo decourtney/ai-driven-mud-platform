@@ -44,7 +44,7 @@ export default function DropDownMenu() {
       {/* Dropdown Menu */}
       {isDropdownOpen && (
         <div className="absolute right-0 mt-1 w-32 bg-gray-800 border border-green-500 rounded shadow-lg">
-          <Link href={`/games/${params.slug}`}>
+          <Link href={`/play/${params.slug}`}>
             <div className="w-full hover:bg-green-700/60 text-green-400 hover:text-green-200 active:bg-green-600/60 font-bold px-3 py-2 transition-all duration-200 border-b border-green-500 flex items-center gap-3">
               Main Menu
             </div>

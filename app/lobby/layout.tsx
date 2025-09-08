@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { auth } from "@/auth";
-import Navbar from "@/app/components/NavBar";
+import Navbar from "@/components/NavBar";
 
 interface LobbyLayoutProps {
   children: React.ReactNode;

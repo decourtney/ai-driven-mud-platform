@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { Github, Chrome, ArrowLeft } from "lucide-react";
 import { signIn } from "@/auth";
-import Navbar from "@/app/components/NavBar";
+import Navbar from "@/components/NavBar";
 
 export default function SignIn() {
   return (
