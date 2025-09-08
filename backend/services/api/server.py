@@ -201,6 +201,7 @@ class GameAPI:
                 return {
                     "session_id": session["session_id"],
                     "engine_id": session["engine_id"],
+                    "game_state": session["game_state"],
                 }
             except Exception as e:
                 raise HTTPException(
@@ -246,12 +247,9 @@ class GameAPI:
             return {
                 "session_id": session["session_id"],
                 "engine_id": session["engine_id"],
+                "game_state": session["game_state"]
             }
         
-        @app.get("/play/{slug}/{session_id}/action/{user_id}")
-        async def get_game_state():
-            pass
-
         @app.post("/play/{slug}/{session_id}/action/{user_id}")
         async def process_player_action(
             slug: str = Path(...),

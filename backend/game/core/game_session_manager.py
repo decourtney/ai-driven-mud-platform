@@ -85,6 +85,7 @@ class GameSessionManager:
         return {
             "session_id": session_id,
             "engine_id": engine_id,
+            "game_state": game_state,
         }
 
     async def get_session(self, slug: str, session_id: str, user_id: str):
@@ -112,9 +113,7 @@ class GameSessionManager:
         # Return the existing engine if available
         # ==========================================
 
-        result = self.engine_manager.get_registered_engine(
-            slug, session_id
-        )
+        result = self.engine_manager.get_registered_engine(slug, session_id)
 
         if result:
             engine_id, engine = result
