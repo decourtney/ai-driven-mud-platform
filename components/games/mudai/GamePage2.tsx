@@ -1,14 +1,13 @@
-// Enhanced GamePage.tsx with pipeline processing
 "use client";
 
 import CharacterPanel from "@/components/games/mudai/CharacterPanel";
 import ChatInterface from "@/components/games/mudai/ChatInterface";
 import {
   Character,
+  CharacterState,
   EquippedGear,
   InventoryItem,
   Quest,
-  GameMessage,
 } from "@/app/types/game";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -19,67 +18,38 @@ interface GamePageProps {
   id: string;
 }
 
-interface ActionResponse {
-  userNarration: string;
-  aiWillAct: boolean;
-  aiActionId?: string; // For tracking the AI's pending action
-  gameState?: any; // Updated game state if needed
-}
-
-interface AiActionResponse {
-  aiNarration: string;
-  gameState?: any;
-}
-
 export default function GamePage({ slug, id }: GamePageProps) {
-  const [gameState, setGameState] = useState();
+  const [gameState, setGameState] = useState<CharacterState | null>(null);
   const [activeTab, setActiveTab] = useState<"character" | "feed">("character");
-  const [gameMessages, setGameMessages] = useState<GameMessage[]>([
-    {
-      id: "1",
-      type: "scene",
-      content:
-        "You find yourself standing at the entrance of a dark, foreboding dungeon. Ancient stone walls drip with moisture, and the air carries the musty scent of ages past. Flickering torchlight dances across carved symbols that seem to watch your every move.",
-      timestamp: new Date(),
-    },
-    {
-      id: "2",
-      type: "system",
-      content:
-        "Welcome to MudAI! Type your actions to interact with the world.",
-      timestamp: new Date(),
-    },
-  ]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [pendingAiAction, setPendingAiAction] = useState<string | null>(null);
 
-  const addMessage = (message: Omit<GameMessage, "id" | "timestamp">) => {
-    const newMessage: GameMessage = {
-      ...message,
-      id: Date.now().toString() + Math.random(),
-      timestamp: new Date(),
-    };
-    setGameMessages((prev) => [...prev, newMessage]);
-  };
+  useEffect(() => {
+    const gameStateKey = `${slug}Session`;
+
+    try {
+      const savedState = localStorage.getItem(gameStateKey);
+      if (savedState) {
+        console.log("Saved game state: ", savedState);
+        const parsedState = JSON.parse(savedState);
+        setGameState(parsedState);
+        console.log("Loaded game state from localStorage:", parsedState);
+      } else {
+        console.log("No saved game state found");
+        // You might want to redirect to character creation or load default state
+      }
+    } catch (error) {
+      console.error("Error loading game state from localStorage:", error);
+      toast.error("Failed to load game state");
+    }
+  }, [slug, id]);
 
   const handlePlayerAction = async (action: string) => {
     console.log("Player action:", action);
-
-    // Add player message immediately
-    addMessage({
-      type: "player",
-      content: action,
-      speaker: "You",
-    });
-
-    setIsProcessing(true);
-
     try {
-      // Step 1: Send user action for parsing and narration
       const res = await fetch(`/api/play/${slug}/${id}/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(action),
       });
 
       if (!res.ok) {
@@ -87,86 +57,13 @@ export default function GamePage({ slug, id }: GamePageProps) {
         throw new Error(errorText);
       }
 
-      const data: ActionResponse = await res.json();
-
-      // Step 2: Display user action narration immediately
-      addMessage({
-        type: "scene",
-        content: data.userNarration,
-      });
-
-      // Step 3: Update game state if provided
-      if (data.gameState) {
-        setGameState(data.gameState);
-      }
-
-      // Step 4: Check if AI will act
-      if (data.aiWillAct && data.aiActionId) {
-        // Keep input disabled, but user can read the narration
-        setPendingAiAction(data.aiActionId);
-
-        // Add a subtle indicator that AI is thinking
-        addMessage({
-          type: "system",
-          content: "The world stirs with activity...",
-        });
-
-        // Process AI action in the background
-        handleAiAction(data.aiActionId);
-      } else {
-        // No AI action needed, unlock input
-        setIsProcessing(false);
-      }
+      const data = await res.json();
+      console.log(data);
     } catch (err: any) {
       toast.error(err.message || "Something went wrong");
-      addMessage({
-        type: "error",
-        content: `Error: ${err.message || "Something went wrong"}`,
-      });
-      setIsProcessing(false);
     }
   };
 
-  const handleAiAction = async (actionId: string) => {
-    try {
-      // This runs in the background while user reads their action narration
-      const res = await fetch(
-        `/api/play/${slug}/${id}/ai-action/${actionId}`,
-        {
-          method: "GET",
-        }
-      );
-
-      if (!res.ok) {
-        throw new Error("AI action failed");
-      }
-
-      const data: AiActionResponse = await res.json();
-
-      // Display AI narration
-      addMessage({
-        type: "scene", // or "npc" depending on what happened
-        content: data.aiNarration,
-      });
-
-      // Update game state if provided
-      if (data.gameState) {
-        setGameState(data.gameState);
-      }
-    } catch (err: any) {
-      console.error("AI action error:", err);
-      addMessage({
-        type: "error",
-        content: "Something unexpected happened...",
-      });
-    } finally {
-      // Always unlock input after AI action completes
-      setPendingAiAction(null);
-      setIsProcessing(false);
-    }
-  };
-
-  // Rest of your component remains the same
   const character: Character = {
     name: "Aragorn",
     level: 12,
@@ -196,10 +93,12 @@ export default function GamePage({ slug, id }: GamePageProps) {
 
   const inventory: InventoryItem[] = [
     { id: 1, name: "Health Potion", quantity: 3, type: "consumable" },
+    // ... rest of inventory
   ];
 
   const quests: Quest[] = [
     { id: 1, name: "Rescue the Princess", status: "active", progress: "2/3" },
+    // ... rest of quests
   ];
 
   return (
@@ -238,7 +137,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
         />
       </div>
 
-      {/* Chat Interface */}
+      {/* feed Interface */}
       <div
         className={`flex flex-1 ${
           activeTab !== "feed" ? "hidden md:flex" : ""
@@ -246,9 +145,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
       >
         <ChatInterface
           onPlayerAction={handlePlayerAction}
-          is_processing={isProcessing}
-          gameMessages={gameMessages}
-          pendingAiAction={pendingAiAction}
+          is_processing={false}
         />
       </div>
     </div>
