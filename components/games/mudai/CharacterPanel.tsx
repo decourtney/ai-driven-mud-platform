@@ -1,4 +1,4 @@
-import React, { ComponentType, useState } from "react";
+import React, { ComponentType, useEffect, useState } from "react";
 import {
   User,
   Package,
@@ -8,7 +8,13 @@ import {
   Hand,
   Shirt,
 } from "lucide-react";
-import { CharacterPanelProps, EquipmentItem } from "@/app/types/game";
+import { CharacterPanelProps, EquipmentItem, Quest } from "@/app/types/game";
+import { PlayerState } from "./GamePage";
+
+const quests: Quest[] = [
+  { id: 1, name: "Rescue the Princess", status: "active", progress: "2/3" },
+  // ... rest of quests
+];
 
 export default function CharacterPanel({
   playerState,
@@ -16,6 +22,13 @@ export default function CharacterPanel({
   playerState: PlayerState;
 }) {
   const [activeTab, setActiveTab] = useState("gear");
+
+  useEffect(() => {
+    // console.log("CHARACTER: ", character);
+    // console.log("EQUIPPED GEAR: ", equippedGear)
+    // console.log("INVENTORY: ", inventory)
+    // console.log("QUESTS: ", quests)
+  }, []);
 
   const EquipmentSlot = ({
     item,
@@ -76,39 +89,15 @@ export default function CharacterPanel({
             {/* Equipment Grid */}
             <div className="grid grid-cols-3 gap-3">
               <div></div>
-              <EquipmentSlot
-                item={equippedGear?.helm}
-                slotName="helm"
-                icon={Crown}
-              />
+              <EquipmentSlot item={undefined} slotName="helm" icon={Crown} />
               <div></div>
 
-              <EquipmentSlot
-                item={equippedGear?.weapon}
-                slotName="weapon"
-                icon={Shield}
-              />
-              <EquipmentSlot
-                item={equippedGear?.armor}
-                slotName="armor"
-                icon={Shirt}
-              />
-              <EquipmentSlot
-                item={equippedGear?.shield}
-                slotName="shield"
-                icon={Shield}
-              />
+              <EquipmentSlot item={undefined} slotName="weapon" icon={Shield} />
+              <EquipmentSlot item={undefined} slotName="armor" icon={Shirt} />
+              <EquipmentSlot item={undefined} slotName="shield" icon={Shield} />
 
-              <EquipmentSlot
-                item={equippedGear?.hands}
-                slotName="hands"
-                icon={Hand}
-              />
-              <EquipmentSlot
-                item={equippedGear?.legs}
-                slotName="legs"
-                icon={Shirt}
-              />
+              <EquipmentSlot item={undefined} slotName="hands" icon={Hand} />
+              <EquipmentSlot item={undefined} slotName="legs" icon={Shirt} />
               <div></div>
             </div>
 
@@ -124,12 +113,12 @@ export default function CharacterPanel({
                   <div className="flex justify-between text-sm font-mono">
                     <span className="text-red-400">HP</span>
                     <span className="text-white">
-                      {character?.hp}/{character?.max_hp}
+                      {playerState.current_hp}/{playerState.max_hp}
                     </span>
                   </div>
                   <StatBar
-                    current={character?.hp || 0}
-                    max={character?.max_hp || 1}
+                    current={playerState.current_hp || 0}
+                    max={playerState.max_hp || 1}
                     color="#ef4444"
                   />
                 </div>
@@ -137,12 +126,12 @@ export default function CharacterPanel({
                   <div className="flex justify-between text-sm font-mono">
                     <span className="text-blue-400">MP</span>
                     <span className="text-white">
-                      {character?.mp}/{character?.max_mp}
+                      {playerState.current_mp}/{playerState.max_mp}
                     </span>
                   </div>
                   <StatBar
-                    current={character?.mp || 0}
-                    max={character?.max_mp || 1}
+                    current={playerState.current_mp || 0}
+                    max={playerState.max_mp || 1}
                     color="#3b82f6"
                   />
                 </div>
@@ -153,37 +142,35 @@ export default function CharacterPanel({
                 <div className="flex justify-between">
                   <span className="text-gray-300">STR</span>
                   <span className="text-white">
-                    {character?.stats?.strength || 0}
+                    {playerState.strength || 0}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">DEX</span>
                   <span className="text-white">
-                    {character?.stats?.dexterity || 0}
+                    {playerState.dexterity || 0}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">CON</span>
                   <span className="text-white">
-                    {character?.stats?.constitution || 0}
+                    {playerState.constitution || 0}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">INT</span>
                   <span className="text-white">
-                    {character?.stats?.intelligence || 0}
+                    {playerState.intelligence || 0}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">WIS</span>
-                  <span className="text-white">
-                    {character?.stats?.wisdom || 0}
-                  </span>
+                  <span className="text-white">{playerState.wisdom || 0}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">CHA</span>
                   <span className="text-white">
-                    {character?.stats?.charisma || 0}
+                    {playerState.charisma || 0}
                   </span>
                 </div>
               </div>
@@ -197,7 +184,7 @@ export default function CharacterPanel({
             <h3 className="text-green-400 font-mono font-bold text-center mb-4">
               INVENTORY
             </h3>
-            {inventory?.map((item) => (
+            {playerState.inventory.map((item) => (
               <div
                 key={item.id}
                 className="bg-gray-800 border border-gray-600 rounded p-3 hover:bg-gray-700 transition-colors cursor-pointer"
@@ -213,11 +200,11 @@ export default function CharacterPanel({
                 </div>
               </div>
             ))}
-            {(!inventory || inventory.length === 0) && (
+            {/* {(playerState.inventory || playerState.inventory.length === 0) && (
               <div className="text-center text-gray-500 font-mono">
                 No items in inventory
               </div>
-            )}
+            )} */}
           </div>
         );
 
@@ -227,7 +214,7 @@ export default function CharacterPanel({
             <h3 className="text-green-400 font-mono font-bold text-center mb-4">
               QUESTS
             </h3>
-            {quests?.map((quest) => (
+            {quests.map((quest) => (
               <div
                 key={quest.id}
                 className="bg-gray-800 border border-gray-600 rounded p-3 hover:bg-gray-700 transition-colors cursor-pointer"
@@ -274,10 +261,10 @@ export default function CharacterPanel({
           </div>
           <div>
             <h2 className="text-green-400 font-mono font-bold text-lg">
-              {character?.name || "Loading..."}
+              {playerState.name || "Loading..."}
             </h2>
             <p className="text-gray-300 font-mono text-sm">
-              Level {character?.level || 0} {character?.class || "Unknown"}
+              Level {playerState.level || 0}
             </p>
           </div>
         </div>

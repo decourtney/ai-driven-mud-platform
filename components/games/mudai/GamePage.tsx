@@ -4,6 +4,7 @@ import CharacterPanel from "@/components/games/mudai/CharacterPanel";
 import ChatInterface from "@/components/games/mudai/ChatInterface";
 import {
   Character,
+  CharacterState,
   EquippedGear,
   InventoryItem,
   Quest,
@@ -50,30 +51,6 @@ export default function GamePage({ slug, id }: GamePageProps) {
     }
   }, [slug, id]);
 
-  const handlePlayerAction = async (action: string) => {
-    console.log("Player action:", action);
-    try {
-      const res = await fetch(`/api/play/${slug}/${id}/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(action),
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText);
-      }
-
-      const data = await res.json();
-      console.log(data)
-
-    } catch (err: any) {
-      toast.error(err.message || "Something went wrong");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   // Save game state to localStorage whenever it changes
   const saveGameState = (newState: GameState) => {
     const gameData = `${slug}Session`;
@@ -84,6 +61,36 @@ export default function GamePage({ slug, id }: GamePageProps) {
     } catch (error) {
       console.error("Error saving game state to localStorage:", error);
       toast.error("Failed to save game state");
+    }
+  };
+  console.log("GAMESTATE: ", playerState);
+  const handlePlayerAction = async (action: string) => {
+    console.log("Player action:", action);
+    setIsProcessing(true);
+
+    try {
+      const res = await fetch(`/api/play/${slug}/${id}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, gameState }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText);
+      }
+
+      const data = await res.json();
+      console.log("Response from server:", data);
+
+      // If the server returns updated game state, save it
+      if (data.gameState) {
+        saveGameState(data.gameState);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Something went wrong");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -100,7 +107,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
   }
 
   return (
-    <div className="flex flex-col md:flex-row flex-1 min-h-0 text-white">
+    <div className="flex flex-col md:flex-row flex-1 text-white">
       {/* Mobile Tabs */}
       <div className="md:hidden flex border-b border-green-500">
         <button
@@ -113,11 +120,11 @@ export default function GamePage({ slug, id }: GamePageProps) {
         </button>
         <button
           className={`flex-1 p-2 ${
-            activeTab === "feed" ? "bg-gray-800" : "bg-gray-900"
+            activeTab === "chat" ? "bg-gray-800" : "bg-gray-900"
           }`}
-          onClick={() => setActiveTab("feed")}
+          onClick={() => setActiveTab("chat")}
         >
-          Feed
+          Chat
         </button>
       </div>
 
@@ -127,23 +134,94 @@ export default function GamePage({ slug, id }: GamePageProps) {
           activeTab !== "character" ? "hidden md:flex" : ""
         }`}
       >
-        <CharacterPanel
-          character={character}
-          equipped_gear={equippedGear}
-          inventory={inventory}
-          quests={quests}
-        />
+        <CharacterPanel playerState={playerState!} />
       </div>
 
       {/* Chat Interface */}
-      <div className={`flex flex-1 min-h-0 ${ activeTab !== "chat" ? "hidden md:flex" : "" }`}>
+      <div
+        className={`flex flex-1 ${
+          activeTab !== "chat" ? "hidden md:flex" : ""
+        }`}
+      >
         <ChatInterface
           onPlayerAction={handlePlayerAction}
-          isProcessing={isProcessing}
+          is_processing={isProcessing}
           scene={sceneState!}
           npcs={npcsState!}
         />
       </div>
     </div>
   );
+}
+
+export interface PlayerState {
+  character_id: string;
+  name: string;
+  character_type: "player" | string;
+  level: number;
+  bio: string;
+  max_hp: number;
+  current_hp: number;
+  temporary_hp: number;
+  armor_class: number;
+  strength: number;
+  dexterity: number;
+  constitution: number;
+  intelligence: number;
+  wisdom: number;
+  charisma: number;
+  initiative_bonus: number;
+  speed: number;
+  proficiency_bonus: number;
+  max_mp: number;
+  current_mp: number;
+  hit_dice: string;
+  equipped_weapon: string | null;
+  equipped_armor: string | null;
+  equipped_shield: string | null;
+  inventory: any[];
+  gold: number;
+  known_spells: any[];
+  spell_slots: Record<string, any>;
+  abilities: any[];
+  status_effects: any[];
+  is_surprised: boolean;
+  has_taken_action: boolean;
+  has_taken_bonus_action: boolean;
+  has_moved: boolean;
+  movement_used: number;
+  ai_personality: string;
+  ai_priorities: any[];
+  metadata: Record<string, any>;
+  last_updated: string;
+}
+
+export interface NpcsState {
+  npcs: CharacterState[];
+}
+
+export interface SceneState {
+  id: string;
+  title: string;
+  description: string;
+}
+
+export interface GameState {
+  game_id: string;
+  turn_counter: number;
+  objectives: any[];
+  completed_objectives: any[];
+  story_beats: any[];
+  in_combat: boolean;
+  initiative_order: string[];
+  current_turn_character: string | null;
+  weather: string;
+  time_of_day: string;
+  location_history: any[];
+  recent_events: any[];
+  important_npcs_met: string[];
+  items_discovered: any[];
+  session_started: string;
+  last_updated: string;
+  save_version: string;
 }
