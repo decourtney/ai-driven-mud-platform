@@ -1,29 +1,59 @@
 // components/game/GameInterface.tsx
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Terminal } from "lucide-react";
-import { GameMessage, GameInterfaceProps } from "@/app/types/game";
+import { Send, Terminal, Brain } from "lucide-react";
+import {
+  GameMessage,
+  GameInterfaceProps,
+  CharacterState,
+} from "@/app/types/game";
+import { NpcsState, SceneState } from "./GamePage";
+
+export interface ChatInterfaceProps {
+  onPlayerAction?: (action: string) => void;
+  isProcessing?: boolean;
+  scene: SceneState;
+  npcs: CharacterState[]
+}
 
 export default function ChatInterface({
   onPlayerAction,
-  is_processing: isProcessing = false,
-}: GameInterfaceProps) {
+  isProcessing = false,
+  scene,
+  npcs,
+}: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState("");
-  const [gameMessages, setGameMessages] = useState<GameMessage[]>([
-    {
-      id: "1",
-      type: "scene",
-      content:
-        "You find yourself standing at the entrance of a dark, foreboding dungeon. Ancient stone walls drip with moisture, and the air carries the musty scent of ages past. Flickering torchlight dances across carved symbols that seem to watch your every move.",
-      timestamp: new Date(),
-    },
-    {
-      id: "2",
-      type: "system",
-      content:
-        "Welcome to MudAI! Type your actions to interact with the world.",
-      timestamp: new Date(),
-    },
-  ]);
+  const [gameMessages, setGameMessages] = useState<GameMessage[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize messages with scene description on mount
+  useEffect(() => {
+    if (gameMessages.length === 0) {
+      const initialMessages: GameMessage[] = [];
+
+      if (scene) {
+        initialMessages.push({
+          id: "system-welcome",
+          type: "system",
+          content:
+            "Welcome to MudAI! Type your actions to interact with the world.",
+          timestamp: new Date(),
+        });
+        initialMessages.push({
+          id: "scene-intro",
+          type: "scene",
+          content: `${scene.title}: ${scene.description}`,
+          timestamp: new Date(),
+        });
+      } else {
+        initialMessages.push({
+          id: "1",
+          type: "scene",
+          content:
+            "You find yourself in a mysterious location, ready for adventure.",
+          timestamp: new Date(),
+        });
+      }
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -107,7 +137,7 @@ export default function ChatInterface({
       </div>
 
       {/* Messages Display */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
         {gameMessages.map((message) => (
           <div
             key={message.id}
@@ -161,9 +191,15 @@ export default function ChatInterface({
           </button>
         </form>
 
-        {/* Command Hints */}
-        <div className="mt-2 text-xs font-mono text-gray-500">
-          Try: "look around", "attack goblin", "open door", "check inventory"
+        {/* Enhanced Command Hints */}
+        <div className="mt-3 space-y-1">
+          <div className="text-xs font-mono text-gray-500">
+            {npcs && npcs.length > 0 && (
+              <span className="text-yellow-400 ml-2">
+                | NPCs present: {npcs.map((npc) => npc.name).join(", ")}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

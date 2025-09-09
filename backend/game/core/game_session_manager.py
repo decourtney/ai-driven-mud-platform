@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, Callable
 from fastapi import HTTPException
 from backend.services.api.server import prisma
 from backend.game.core.game_engine_manager import GameEngineManager
-from backend.models import GameSessionResponse
+from backend.models import ParseActionRequest, GenerateActionRequest, GeneratedNarration
 from backend.game.game_registry import GAME_REGISTRY
 from backend.game.engine_registry import ENGINE_REGISTRY
 from backend.services.ai_models.model_client import AsyncModelServiceClient
@@ -19,26 +19,15 @@ class GameSessionManager:
         )
 
     # ==========================================
-    # Engine Manager Cleanup Start/Stop
+    # Session Management
     # ==========================================
-    async def start(self):
-        await self.engine_manager.start()
 
-    async def stop(self):
-        await self.engine_manager.stop()
-
-    # ==========================================
-    # Session Status
-    # ==========================================
-    async def get_session_status(self, user_id: str, slug: str) -> Optional[str]:
+    async def query_session_status(self, user_id: str, slug: str) -> Optional[str]:
         session = await prisma.gamesession.find_first(
             where={"user_id": user_id, "slug": slug}
         )
         return session.id if session else None
 
-    # ==========================================
-    # Session Management
-    # ==========================================
     async def create_session(
         self,
         player_state: Dict[str, Any],
@@ -60,6 +49,11 @@ class GameSessionManager:
 
         # Create engine instance
         engine_instance = self.engine_factory(slug=slug)
+        
+        ##############################################
+        # NEED TO GENERATE INITIAL SCENE DESCRIPTION 
+        # WHEN INITIALIZING A NEW SESSION IN THE ENGINE
+        ##############################################
 
         # Reconstitute seralized player state into engine instance
         game_state = engine_instance.create_game_state(player_state)
@@ -108,9 +102,9 @@ class GameSessionManager:
                 detail=f"Couldn't locate this session.",
             )
 
-        # ==========================================
-        # Return the existing engine if available
-        # ==========================================
+        # ------------------------------------------
+        # if available Return the existing engine
+        # ------------------------------------------
 
         result = self.engine_manager.get_registered_engine(
             slug, session_id
@@ -125,9 +119,9 @@ class GameSessionManager:
                 "game_state": game_state,
             }
 
-        # ==========================================
+        # ------------------------------------------
         # Else create a new instance
-        # ==========================================
+        # ------------------------------------------
 
         engine_instance = self.engine_factory(slug=slug)
 
@@ -159,16 +153,61 @@ class GameSessionManager:
         return
 
     # ==========================================
-    # Save Game State
+    # GAME MANAGEMENT
     # ==========================================
 
-    async def save_game_state(self, session_id, game_state):
+    async def save_game_state(self, session_id: str, game_state: Dict[str, Any]):
         print("[DEBUG] SAVING GAME STATE TO DB")
         await prisma.gamesession.update(
             where={"id": session_id},
             data={"game_state": Json(game_state)},
         )
         return
+
+    async def parse_action_request(self, action: ParseActionRequest) -> GeneratedNarration:
+        print("[DEBUG] Parse action requested")
+        if not await self.model_client.is_healthy():
+            raise HTTPException(status_code=503, detail="Model service not available")
+
+        try:
+            action_request = ParseActionRequest(action=action)
+            parsed_action = await self.model_client.parse_action(action_request)
+            print('[DEBUG] Parsed Action: ', parsed_action)
+            generate_action_request = GenerateActionRequest(
+                parsed_action=parsed_action, hit=True, damage_type="wound"
+            )
+            generated_action = await self.model_client.generate_action(
+                generate_action_request
+            )
+
+            return generated_action
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Parse action failed: {str(e)}"
+            )
+
+    # ==========================================
+    # ENGINE MANAGEMENT
+    # ==========================================
+
+    async def start(self):
+        await self.engine_manager.start()
+
+    async def stop(self):
+        await self.engine_manager.stop()
+
+    def engine_factory(self, slug: str):
+        engine_name = GAME_REGISTRY[slug]["engine"]
+        if engine_name not in ENGINE_REGISTRY:
+            raise ValueError(f"Engine not registered: {engine_name}")
+
+        # Create Game Engine Instance
+        engine_class = ENGINE_REGISTRY[engine_name]
+        engine = engine_class(
+            model_client=self.model_client, save_state_callback=self.save_game_state
+        )
+
+        return engine
 
     async def list_registered_engines(self):
         """List all currently registered engine instances"""
@@ -185,20 +224,3 @@ class GameSessionManager:
         if not engine_instances:
             return "No instances found"
         return {"engine_instances": engine_instances}
-
-    # ==========================================
-    # ENGINE FACTORY
-    # ==========================================
-
-    def engine_factory(self, slug: str):
-        engine_name = GAME_REGISTRY[slug]["engine"]
-        if engine_name not in ENGINE_REGISTRY:
-            raise ValueError(f"Engine not registered: {engine_name}")
-
-        # Create Game Engine Instance
-        engine_class = ENGINE_REGISTRY[engine_name]
-        engine = engine_class(
-            model_client=self.model_client, save_state_callback=self.save_game_state
-        )
-
-        return engine

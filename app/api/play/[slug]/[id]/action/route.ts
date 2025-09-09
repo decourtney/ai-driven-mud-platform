@@ -5,18 +5,6 @@ const BACKEND_URL =
   process.env.NEXT_PUBLIC_BASE_URL ||
   "http://localhost:5432/mudai_dev?schema=public";
 
-export async function GET(
-  req: Request,
-  { params }: { params: Promise<{ slug: string; id: string }> }
-) {
-  const { slug, id } = await params;
-  const session = await auth();
-
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-}
-
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ slug: string; id: string }> }

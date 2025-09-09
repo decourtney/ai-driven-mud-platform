@@ -11,11 +11,10 @@ import {
 import { CharacterPanelProps, EquipmentItem } from "@/app/types/game";
 
 export default function CharacterPanel({
-  character,
-  equipped_gear: equippedGear,
-  inventory,
-  quests,
-}: CharacterPanelProps) {
+  playerState,
+}: {
+  playerState: PlayerState;
+}) {
   const [activeTab, setActiveTab] = useState("gear");
 
   const EquipmentSlot = ({

@@ -174,7 +174,7 @@ class GameAPI:
             user_id: str = Path(...),
         ):
             try:
-                session_id = await self.session_manager.get_session_status(
+                session_id = await self.session_manager.query_session_status(
                     user_id=user_id, slug=slug
                 )
                 return {"session_id": session_id}
@@ -246,11 +246,8 @@ class GameAPI:
             return {
                 "session_id": session["session_id"],
                 "engine_id": session["engine_id"],
+                "game_state": session["game_state"],
             }
-        
-        @app.get("/play/{slug}/{session_id}/action/{user_id}")
-        async def get_game_state():
-            pass
 
         @app.post("/play/{slug}/{session_id}/action/{user_id}")
         async def process_player_action(
@@ -261,10 +258,11 @@ class GameAPI:
         ):
             try:
 
-                print("Action received: ", action)
+                generated_action = await self.session_manager.parse_action_request(
+                    action
+                )
 
-                return {"success": True, "session_id": session_id}
-
+                return {"narration": generated_action.narration}
             except Exception as e:
                 raise HTTPException(
                     status_code=500, detail=f"Action processing failed: {str(e)}"

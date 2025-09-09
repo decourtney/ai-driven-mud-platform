@@ -15,7 +15,7 @@ export default async function GameLayout({
   const { slug } = await params;
 console.log(slug)
   return (
-    <div className="flex flex-col min-h-screen text-white font-mono">
+    <div className="flex flex-col h-screen text-white font-mono">
       {/* Header Bar */}
       <div className="bg-gray-900/80 backdrop-blur-md border-b border-green-500 px-6 py-3 flex justify-between items-center z-10">
         {/* Logo - Top Left */}

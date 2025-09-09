@@ -142,7 +142,7 @@ class GenerateSceneRequest(BaseModel):
     npcs: List[Dict[str, Any]]
 
 
-class GenerateNarrationResponse(BaseModel):
+class GeneratedNarration(BaseModel):
     # Reponse for any narration generation
     narration: str
 

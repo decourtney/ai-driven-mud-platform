@@ -18,10 +18,37 @@ interface GamePageProps {
 }
 
 export default function GamePage({ slug, id }: GamePageProps) {
-  const [gameState, setGameState] = useState();
-  const [activeTab, setActiveTab] = useState<"character" | "feed">("character");
+  const [engineId, setEngineId] = useState<string | null>(null);
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [playerState, setPlayerState] = useState<PlayerState | null>(null);
+  const [npcsState, setNpcsState] = useState<CharacterState[] | null>([]);
+  const [sceneState, setSceneState] = useState<SceneState | null>(null);
+  const [activeTab, setActiveTab] = useState<"character" | "chat">("character");
+  const [isProcessing, setIsProcessing] = useState(false);
 
+  // Load game state from localStorage on component mount
+  useEffect(() => {
+    const gameData = `${slug}Session`;
 
+    try {
+      const savedData = localStorage.getItem(gameData);
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        setEngineId(parsedData.engine_id);
+        setGameState(parsedData.game_state);
+        setPlayerState(parsedData.game_state.player);
+        setNpcsState(parsedData.game_state.npcs);
+        setSceneState(parsedData.game_state.scene);
+        console.log("Loaded game state from localStorage:", parsedData);
+      } else {
+        console.log("No saved game state found");
+        // You might want to redirect to character creation or load default state
+      }
+    } catch (error) {
+      console.error("Error loading game state from localStorage:", error);
+      toast.error("Failed to load game state");
+    }
+  }, [slug, id]);
 
   const handlePlayerAction = async (action: string) => {
     console.log("Player action:", action);
@@ -42,48 +69,38 @@ export default function GamePage({ slug, id }: GamePageProps) {
 
     } catch (err: any) {
       toast.error(err.message || "Something went wrong");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const character: Character = {
-    name: "Aragorn",
-    level: 12,
-    class: "Ranger",
-    hp: 85,
-    max_hp: 100,
-    mp: 40,
-    max_mp: 60,
-    stats: {
-      strength: 16,
-      dexterity: 14,
-      constitution: 15,
-      intelligence: 12,
-      wisdom: 13,
-      charisma: 11,
-    },
+  // Save game state to localStorage whenever it changes
+  const saveGameState = (newState: GameState) => {
+    const gameData = `${slug}Session`;
+    try {
+      localStorage.setItem(gameData, JSON.stringify(newState));
+      setGameState(newState);
+      console.log("Game state saved to localStorage");
+    } catch (error) {
+      console.error("Error saving game state to localStorage:", error);
+      toast.error("Failed to save game state");
+    }
   };
 
-  const equippedGear: EquippedGear = {
-    helm: { name: "Iron Helm", defense: 3 },
-    armor: { name: "Chainmail Armor", defense: 8 },
-    hands: { name: "Leather Gloves", defense: 1 },
-    legs: { name: "Steel Greaves", defense: 4 },
-    weapon: { name: "Elven Sword", damage: "1d8+2" },
-    shield: { name: "Round Shield", defense: 2 },
-  };
-
-  const inventory: InventoryItem[] = [
-    { id: 1, name: "Health Potion", quantity: 3, type: "consumable" },
-    // ... rest of inventory
-  ];
-
-  const quests: Quest[] = [
-    { id: 1, name: "Rescue the Princess", status: "active", progress: "2/3" },
-    // ... rest of quests
-  ];
+  // Don't render until game state is loaded
+  if (!gameState) {
+    return (
+      <div className="flex items-center justify-center flex-1 text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mb-4"></div>
+          <p className="text-green-400 font-mono">Loading game state...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col md:flex-row flex-1 text-white">
+    <div className="flex flex-col md:flex-row flex-1 min-h-0 text-white">
       {/* Mobile Tabs */}
       <div className="md:hidden flex border-b border-green-500">
         <button
@@ -118,15 +135,13 @@ export default function GamePage({ slug, id }: GamePageProps) {
         />
       </div>
 
-      {/* feed Interface */}
-      <div
-        className={`flex flex-1 ${
-          activeTab !== "feed" ? "hidden md:flex" : ""
-        }`}
-      >
+      {/* Chat Interface */}
+      <div className={`flex flex-1 min-h-0 ${ activeTab !== "chat" ? "hidden md:flex" : "" }`}>
         <ChatInterface
           onPlayerAction={handlePlayerAction}
-          is_processing={false}
+          isProcessing={isProcessing}
+          scene={sceneState!}
+          npcs={npcsState!}
         />
       </div>
     </div>

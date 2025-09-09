@@ -290,7 +290,7 @@ class GGUFMistralNarrator(ActionNarrator):
     def _create_scene_prompt(self, scene: Dict[str, Any], player: Dict[str, Any], npcs: List[Dict[str, Any]]):
         """Create the prompt for scene description generation"""
         # Load config from JSON file
-        with open("backend/game/parsers/narrator_parser/scene_prompts.json", "r") as f:
+        with open("backend/game/parsers/narrator_parser/scene_prompt_conf.json", "r") as f:
             config = json.load(f)
         
         # Handle arrays by joining with newlines

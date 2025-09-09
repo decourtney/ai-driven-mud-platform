@@ -4,14 +4,20 @@ import React from "react";
 import Link from "next/link";
 import { Play, Users, Clock, Star } from "lucide-react";
 import { GameInfo } from "@/app/types/game";
-import axios from "axios";
 import { notFound } from "next/navigation";
 
 export default async function LobbyPage() {
-  const res = await axios
-    .get(`${process.env.NEXT_PUBLIC_BASE_URL}/lobby`)
-    .catch(() => notFound());
-  const games: GameInfo[] = res.data;
+  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/lobby`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText);
+  }
+
+  const games: GameInfo[] = await res.json();
   const featuredGame =
     games.find((game) => game.tags?.includes("featured")) ?? games[0];
   const upcomingGames = games.filter((game) => game.tags?.includes("upcoming"));

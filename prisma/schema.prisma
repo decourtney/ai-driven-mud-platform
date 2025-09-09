@@ -66,13 +66,40 @@ model VerificationToken {
 
 /// Game-specific table to persist a player’s current playthrough
 model GameSession {
-  id         String   @id @default(cuid())
+  id         String        @id @default(cuid())
   user_id    String
   slug       String
   game_state Json // game state
-  is_active  Boolean  @default(false)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  is_active  Boolean       @default(false)
+  created_at DateTime      @default(now())
+  updated_at DateTime      @updatedAt
+  messages   ChatMessage[]
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+enum SpeakerType {
+  player
+  narrator
+}
+
+enum ActionType {
+  attack
+  spell
+  social
+  interact
+  movement
+  user_prompt // User input
+  narrate // For any narrations not prompted by actions
+}
+
+model ChatMessage {
+  id         String      @id @default(cuid())
+  session_id String
+  speaker    SpeakerType
+  action     ActionType
+  content    String
+  timestamp  DateTime    @default(now())
+
+  gameSession GameSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
 }

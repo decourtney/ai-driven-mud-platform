@@ -25,16 +25,15 @@ import {
   CharacterAttributes,
   CharacterState,
 } from "@/app/types/game";
-import axios from "axios";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import CreateCharacterButton from "./CreateCharacterButton";
 
 interface CreateCharacterProps {
   slug: string;
 }
 
 export default function CreateCharacter({ slug }: CreateCharacterProps) {
+  const router = useRouter();
   const [playerState, setPlayerState] = useState<CharacterState>({
     name: "User",
     character_type: "player",
@@ -61,6 +60,28 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
   useEffect(() => {
     setAvailablePoints(27 - getTotalSpentPoints());
   }, [playerState.stats]);
+
+  const handleSubmit = async () => {
+    try {
+      const res = await fetch(`/api/play/${slug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(playerState),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText);
+      }
+
+      const data = await res.json();
+      localStorage.setItem(`${slug}Session`, JSON.stringify(data));
+
+      router.replace(`/play/${slug}/${data.session_id}`);
+    } catch (err: any) {
+      toast.error(err.message || "Something went wrong");
+    }
+  };
 
   const adjustStat = (statName: keyof CharacterAttributes, delta: number) => {
     if (!playerState) return;
@@ -103,6 +124,9 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
     );
   };
 
+  const calculateHP = () =>
+    10 + getStatModifier(playerState.stats.constitution);
+
   const getStatModifier = (value: number) => Math.floor((value - 10) / 2);
 
   const isAbilityAvailable = (ability: CharacterAbilities) => {
@@ -119,9 +143,6 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
       setSelectedAbilities((prev) => [...prev, abilityId]);
     }
   };
-
-  const calculateHP = () =>
-    10 + getStatModifier(playerState.stats.constitution);
 
   const getStatIcon = (statName: string) => {
     switch (statName) {
@@ -232,11 +253,11 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
       <div className="flex flex-col w-full md:w-xl bg-gray-900 md:border-r md:border-l border-green-500">
         <div className="relative flex-1 w-full min-h-dvh md:min-h-auto">
           <img
-            src="/images/fighter.webp"
+            src="/images/fighter.jpeg"
             alt="Picture of a fighter in armor wielding sword and shield"
             className="absolute w-full h-full object-cover"
             style={{
-              filter: "contrast(.8) brightness(0.8) sepia(0.4) saturate(0.7)",
+              filter: "contrast(1.1) brightness(0.4) sepia(0.7) saturate(0.8)",
             }}
           />
 
@@ -305,11 +326,13 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
             </div>
           </div>
 
-          <CreateCharacterButton
-            playerState={playerState}
-            slug={slug}
-            availablePoints={availablePoints}
-          />
+          <button
+            onClick={handleSubmit}
+            disabled={!playerState.name.trim() || availablePoints > 0}
+            className="w-full mt-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-bold py-3 transition-colors"
+          >
+            CREATE CHARACTER
+          </button>
         </div>
       </div>
 
@@ -533,11 +556,13 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
             </div>
           </div>
 
-          <CreateCharacterButton
-            playerState={playerState}
-            slug={slug}
-            availablePoints={availablePoints}
-          />
+          <button
+            onClick={handleSubmit}
+            disabled={!playerState.name.trim() || availablePoints > 0}
+            className="w-full mt-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-bold py-3 transition-colors"
+          >
+            CREATE CHARACTER
+          </button>
         </div>
       </div>
     </div>

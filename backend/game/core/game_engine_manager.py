@@ -41,7 +41,9 @@ class GameEngineManager:
                 for session_id, entry in sessions.items():
                     if now - entry["last_active"] > idle_threshold:
                         # fetch the engine's state here
-                        game_state = entry["engine"].get_serialized_game_state()
+                        game_state: Dict[str, Any] = entry[
+                            "engine"
+                        ].get_serialized_game_state()
                         to_delete.append((slug, session_id, game_state))
             for slug, session_id, game_state in to_delete:
                 if self.on_unregister:
