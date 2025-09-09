@@ -193,6 +193,20 @@ npm run dev
 - Model service health: `curl http://localhost:8001/health`
 - Model status: `curl http://localhost:8001/status`
 
+## Screenshots
+
+### Game Lobby
+![Game Lobby](docs/screenshots/lobby-screen.png)
+*Browse available game worlds and create new sessions*
+
+### Gameplay Interface
+![Gameplay Example](docs/screenshots/gameplay-example.png)
+*Interactive text adventure with AI-generated narration*
+
+### Character Creation
+![Character Creation](docs/screenshots/character-creation.png)
+*Create and customize your character before starting*
+
 ## Usage
 
 1. **Sign In**: Use Google OAuth to create an account
