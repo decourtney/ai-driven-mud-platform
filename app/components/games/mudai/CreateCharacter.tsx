@@ -337,7 +337,7 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
       </div>
 
       {/* Right Panel - Stats & Abilities */}
-      <div className="flex flex-col">
+      <div className="flex flex-col md:border-r border-green-500">
         {/* Gear Section */}
         <div className="bg-gray-900 border-b border-green-500 p-4 flex-1">
           <h3 className="text-green-400 font-mono font-bold mb-4">

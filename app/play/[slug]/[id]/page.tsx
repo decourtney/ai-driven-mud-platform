@@ -1,5 +1,5 @@
 // app/play/[slug]/play/[id]/page.tsx
-import GameBackground from "@/components/GameBackground";
+import GameBackground from "@/app/components/GameBackground";
 import { getGameComponents } from "@/lib/games/registry";
 import { notFound } from "next/navigation";
 

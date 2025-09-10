@@ -17,7 +17,7 @@ from typing import Dict, Any, List
 
 from .model_manager import ModelManager
 from backend.models import (
-    ParseActionResponse,
+    ParsedAction,
     ParseActionRequest,
     GenerateActionRequest,
     GenerateSceneRequest,
@@ -192,7 +192,7 @@ class ModelServer:
         # MODEL INFERENCE ENDPOINTS
         # ==========================================
 
-        @app.post("/parse_action", response_model=ParseActionResponse)
+        @app.post("/parse_action", response_model=ParsedAction)
         def parse_action(request: ParseActionRequest):
             """Parse player action using CodeLlama"""
             if not self.model_manager.is_parser_ready():
@@ -207,7 +207,7 @@ class ModelServer:
                 # Use your existing parser logic
                 result = self.model_manager.parse_action(request.action)
 
-                return ParseActionResponse(
+                return ParsedAction(
                     actor=result.actor,
                     action=result.action,
                     target=result.target,
@@ -257,9 +257,7 @@ class ModelServer:
 
             try:
                 # Use your existing narrator logic
-                narration = self.model_manager.generate_scene_narration(
-                    scene_state=request.scene, player=request.player, npcs=request.npcs
-                )
+                narration = self.model_manager.generate_scene_narration(request)
 
                 return GeneratedNarration(narration=narration)
 
@@ -287,7 +285,7 @@ class ModelServer:
                         req.text, context=req.context
                     )
                     results.append(
-                        ParseActionResponse(
+                        ParsedAction(
                             success=True,
                             action_type=result.get("action_type", "unknown"),
                             target=result.get("target"),
@@ -297,9 +295,7 @@ class ModelServer:
                     )
                 except Exception as e:
                     results.append(
-                        ParseActionResponse(
-                            success=False, action_type="error", error=str(e)
-                        )
+                        ParsedAction(success=False, action_type="error", error=str(e))
                     )
 
             return {"results": results}

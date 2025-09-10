@@ -81,6 +81,8 @@ model GameSession {
 enum SpeakerType {
   player
   narrator
+  system
+  error
 }
 
 enum ActionType {

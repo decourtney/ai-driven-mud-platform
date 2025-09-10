@@ -1,13 +1,11 @@
 "use client";
 
-import CharacterPanel from "@/components/games/mudai/CharacterPanel";
-import ChatInterface from "@/components/games/mudai/ChatInterface";
+import CharacterPanel from "@/app/components/games/mudai/CharacterPanel";
+import ChatPanel from "@/app/components/games/mudai/ChatPanel2";
 import {
-  Character,
   CharacterState,
-  EquippedGear,
-  InventoryItem,
-  Quest,
+  ChatMessage,
+
 } from "@/app/types/game";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -24,6 +22,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
   const [playerState, setPlayerState] = useState<PlayerState | null>(null);
   const [npcsState, setNpcsState] = useState<CharacterState[] | null>([]);
   const [sceneState, setSceneState] = useState<SceneState | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[] | null>(null);
   const [activeTab, setActiveTab] = useState<"character" | "chat">("character");
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -40,6 +39,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
         setPlayerState(parsedData.game_state.player);
         setNpcsState(parsedData.game_state.npcs);
         setSceneState(parsedData.game_state.scene);
+        setChatHistory(parsedData.chat_history);
         console.log("Loaded game state from localStorage:", parsedData);
       } else {
         console.log("No saved game state found");
@@ -63,7 +63,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
       toast.error("Failed to save game state");
     }
   };
-  console.log("GAMESTATE: ", playerState);
+
   const handlePlayerAction = async (action: string) => {
     console.log("Player action:", action);
     setIsProcessing(true);
@@ -72,7 +72,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
       const res = await fetch(`/api/play/${slug}/${id}/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, gameState }),
+        body: JSON.stringify(action),
       });
 
       if (!res.ok) {
@@ -143,11 +143,13 @@ export default function GamePage({ slug, id }: GamePageProps) {
           activeTab !== "chat" ? "hidden md:flex" : ""
         }`}
       >
-        <ChatInterface
+        <ChatPanel
           onPlayerAction={handlePlayerAction}
           is_processing={isProcessing}
           scene={sceneState!}
           npcs={npcsState!}
+          chatHistory={chatHistory!}
+          slug={slug}
         />
       </div>
     </div>

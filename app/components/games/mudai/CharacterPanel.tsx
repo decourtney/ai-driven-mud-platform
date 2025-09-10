@@ -8,8 +8,8 @@ import {
   Hand,
   Shirt,
 } from "lucide-react";
-import { CharacterPanelProps, EquipmentItem, Quest } from "@/app/types/game";
-import { PlayerState } from "./GamePage";
+import { EquipmentItem, Quest } from "@/app/types/game";
+import { PlayerState } from "./GamePage2";
 
 const quests: Quest[] = [
   { id: 1, name: "Rescue the Princess", status: "active", progress: "2/3" },

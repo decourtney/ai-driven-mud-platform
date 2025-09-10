@@ -1,7 +1,7 @@
 // app/play/[slug]/page.tsx
 import { getGameComponents } from "@/lib/games/registry";
 import { notFound } from "next/navigation";
-import GameBackground from "@/components/GameBackground";
+import GameBackground from "@/app/components/GameBackground";
 
 export default async function GameMainMenu({
   params,

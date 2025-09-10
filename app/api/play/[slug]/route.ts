@@ -103,7 +103,6 @@ export async function DELETE(
 
     if (!res.ok) {
       const errorText = await res.text();
-      console.log(errorText);
       return NextResponse.json({ error: errorText }, { status: res.status });
     }
 

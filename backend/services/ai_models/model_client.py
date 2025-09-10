@@ -10,7 +10,7 @@ import asyncio
 from typing import Optional, Dict, Any, List
 
 from backend.models import (
-    ParseActionResponse,
+    ParsedAction,
     ParseActionRequest,
     GenerateActionRequest,
     GenerateSceneRequest,
@@ -210,11 +210,11 @@ class AsyncModelServiceClient:
             except Exception:
                 error_detail = str(http_err)
             print(f"[CLIENT] Parse request failed: {error_detail}")
-            return ParseActionResponse(action_type="unknown", details=error_detail)
+            return ParsedAction(action_type="unknown", details=error_detail)
 
         except Exception as e:
             print(f"[CLIENT] Parse request failed: {e}")
-            return ParseActionResponse(action_type="unknown", details=str(e))
+            return ParsedAction(action_type="unknown", details=str(e))
 
     async def generate_action(
         self, request: GenerateActionRequest

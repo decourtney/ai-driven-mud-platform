@@ -58,7 +58,6 @@ class GameCondition(Enum):
 class ActionType(str, Enum):
     ATTACK = "attack"
     SPELL = "spell"
-    SKILL_CHECK = "skill_check"
     SOCIAL = "social"
     MOVEMENT = "movement"
     INTERACT = "interact"
@@ -120,16 +119,6 @@ class ParseActionRequest(BaseModel):
     action: str
 
 
-class ParseActionResponse(BaseModel):
-    actor: str
-    action: str
-    target: Optional[str] = None
-    action_type: ActionType
-    weapon: Optional[str] = None
-    subject: Optional[str] = None
-    details: Optional[str] = None
-
-
 class GenerateActionRequest(BaseModel):
     parsed_action: ParsedAction
     hit: bool
@@ -139,8 +128,7 @@ class GenerateActionRequest(BaseModel):
 class GenerateSceneRequest(BaseModel):
     scene: Dict[str, Any]
     player: Dict[str, Any]
-    npcs: List[Dict[str, Any]]
-
+    
 
 class GeneratedNarration(BaseModel):
     # Reponse for any narration generation

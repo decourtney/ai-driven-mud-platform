@@ -1,46 +1,9 @@
 // types/game.ts
 
-export interface CharacterStats {
-  strength: number;
-  dexterity: number;
-  constitution: number;
-  intelligence: number;
-  wisdom: number;
-  charisma: number;
-}
-
-export interface Character {
-  name: string;
-  level: number;
-  class: string;
-  hp: number;
-  max_hp: number;
-  mp: number;
-  max_mp: number;
-  stats: CharacterStats;
-}
-
 export interface EquipmentItem {
   name: string;
   defense?: number;
   damage?: string;
-  description?: string;
-}
-
-export interface EquippedGear {
-  helm?: EquipmentItem;
-  armor?: EquipmentItem;
-  weapon?: EquipmentItem;
-  shield?: EquipmentItem;
-  hands?: EquipmentItem;
-  legs?: EquipmentItem;
-}
-
-export interface InventoryItem {
-  id: number;
-  name: string;
-  quantity: number;
-  type: "consumable" | "weapon" | "armor" | "misc";
   description?: string;
 }
 
@@ -50,26 +13,6 @@ export interface Quest {
   status: "active" | "completed" | "failed";
   progress: string;
   description?: string;
-}
-
-export interface CharacterPanelProps {
-  character?: Character;
-  equipped_gear?: EquippedGear;
-  inventory?: InventoryItem[];
-  quests?: Quest[];
-}
-
-export interface GameMessage {
-  id: string;
-  type: "system" | "player" | "npc" | "scene" | "error";
-  content: string;
-  timestamp: Date;
-  speaker?: string;
-}
-
-export interface GameInterfaceProps {
-  onPlayerAction?: (action: string) => void;
-  is_processing?: boolean;
 }
 
 export interface GameInfo {
@@ -115,4 +58,44 @@ export interface CharacterAbilities {
   req_value: number;
   type: string;
   description: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  speaker: string;
+  content: string;
+  timestamp: string;
+}
+
+export interface GameMessage {
+  type: string;
+  data: any;
+  timestamp: string;
+}
+
+export interface GameState {
+  // Your game state structure - adjust based on what your backend sends
+  player?: {
+    name?: string;
+    level?: number;
+    current_hp?: number;
+    max_hp?: number;
+    current_mp?: number;
+    max_mp?: number;
+    strength?: number;
+    dexterity?: number;
+    constitution?: number;
+    intelligence?: number;
+    wisdom?: number;
+    charisma?: number;
+    inventory?: any[];
+    [key: string]: any;
+  };
+  scene?: {
+    name?: string;
+    description?: string;
+    [key: string]: any;
+  };
+  npcs?: any[];
+  [key: string]: any;
 }
