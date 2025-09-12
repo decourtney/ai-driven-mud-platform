@@ -225,23 +225,14 @@ class GGUFMistralNarrator(ActionNarrator):
 
         # Build the base scenario
         if not hit:
-            if action.action_type == ActionType.SKILL_CHECK:
-                scenario = f"{actor} attempts to {action_desc} but fails to succeed."
-            elif action.action_type == ActionType.SPELL:
+            if action.action_type == ActionType.SPELL:
                 scenario = f"{actor} tries to cast {action_desc} against {target} but the magic fails."
             elif action.action_type == ActionType.SOCIAL:
                 scenario = f"{actor} attempts to {action_desc} with {target} but fails to persuade them."
             else:
                 scenario = f"{actor} tries to {action_desc} against {target} but misses completely."
         else:
-            if action.action_type == ActionType.SKILL_CHECK:
-                if damage_type == "outstanding_success":
-                    scenario = f"{actor} executes {action_desc} with masterful skill."
-                elif damage_type == "great_success":
-                    scenario = f"{actor} performs {action_desc} with expert technique."
-                else:
-                    scenario = f"{actor} successfully completes {action_desc}."
-            elif (
+            if (
                 action.action_type == ActionType.SPELL
             ):  # Will have to determine if spell type is an attack or not
                 if damage_type == "kill":
@@ -276,8 +267,6 @@ class GGUFMistralNarrator(ActionNarrator):
         if action.subject:
             if action.action_type == ActionType.SOCIAL:
                 subject_context = f" The topic is: {action.subject}."
-            elif action.action_type == ActionType.SKILL_CHECK:
-                subject_context = f" Focus: {action.subject}."
             elif action.action_type == ActionType.SPELL:
                 subject_context = f" The spell targets: {action.subject}."
             else:

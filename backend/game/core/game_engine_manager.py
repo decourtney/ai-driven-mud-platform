@@ -8,7 +8,6 @@ class GameEngineManager:
     """
     Manage live game engine instances in memory.
     """
-
     def __init__(self, cleanup_interval: int = 60, on_unregister=None):
         # engine_id -> {"engine": EngineInstance, "session_id": str, "last_active": datetime}
         self.engines: Dict[str, Dict[str, dict]] = {}
@@ -35,7 +34,7 @@ class GameEngineManager:
         while True:
             await asyncio.sleep(self.cleanup_interval)
             now = datetime.now(timezone.utc)
-            idle_threshold = timedelta(milliseconds=10000)
+            idle_threshold = timedelta(milliseconds=5000)
             to_delete = []
             for slug, sessions in self.engines.items():
                 for session_id, entry in sessions.items():

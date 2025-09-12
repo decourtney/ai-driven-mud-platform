@@ -1,6 +1,6 @@
 // app/play/[slug]/create/page.tsx
 import GameBackground from "@/app/components/GameBackground";
-import { getGameComponents } from "@/lib/games/registry";
+import { getGameComponents } from "@/app/lib/games/registry";
 import { notFound } from "next/navigation";
 
 export default async function CreateCharacter({

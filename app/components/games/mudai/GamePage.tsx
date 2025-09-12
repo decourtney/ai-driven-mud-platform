@@ -5,6 +5,7 @@ import ChatPanel from "./ChatPanel";
 import { useGameWebSocket } from "@/app/hooks/useGameWebSocket";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { CharacterState } from "@/app/types/game";
 
 interface GamePageProps {
   slug: string;
@@ -13,7 +14,6 @@ interface GamePageProps {
 
 export default function GamePage({ slug, id }: GamePageProps) {
   const [activeTab, setActiveTab] = useState<"character" | "chat">("character");
-  const userId = "user123"; // Get this from your auth system
 
   // Use the WebSocket hook - no more localStorage or REST calls needed!
   const {
@@ -26,7 +26,6 @@ export default function GamePage({ slug, id }: GamePageProps) {
   } = useGameWebSocket({
     slug,
     sessionId: id,
-    userId,
     onError: (error) => {
       console.error("WebSocket error:", error);
       toast.error(error);
@@ -50,6 +49,8 @@ export default function GamePage({ slug, id }: GamePageProps) {
       toast.error(lastError);
     }
   }, [lastError]);
+
+  console.log("[DEBUG]GameState on GamePage:", gameState);
 
   // Show loading until we have game state
   if (!gameState || !isConnected) {
@@ -79,112 +80,54 @@ export default function GamePage({ slug, id }: GamePageProps) {
     );
   }
 
-  // Extract player state from game state
-  // Adjust these paths based on your actual game state structure
-  const playerState = {
-    character_id: gameState.player?.character_id || "",
-    name: gameState.player?.name || "Unknown",
-    character_type: "player",
-    level: gameState.player?.level || 1,
-    bio: gameState.player?.bio || "",
-    max_hp: gameState.player?.max_hp || 100,
-    current_hp: gameState.player?.current_hp || 100,
-    temporary_hp: gameState.player?.temporary_hp || 0,
-    armor_class: gameState.player?.armor_class || 10,
-    strength: gameState.player?.strength || 10,
-    dexterity: gameState.player?.dexterity || 10,
-    constitution: gameState.player?.constitution || 10,
-    intelligence: gameState.player?.intelligence || 10,
-    wisdom: gameState.player?.wisdom || 10,
-    charisma: gameState.player?.charisma || 10,
-    initiative_bonus: gameState.player?.initiative_bonus || 0,
-    speed: gameState.player?.speed || 30,
-    proficiency_bonus: gameState.player?.proficiency_bonus || 2,
-    max_mp: gameState.player?.max_mp || 0,
-    current_mp: gameState.player?.current_mp || 0,
-    hit_dice: gameState.player?.hit_dice || "1d8",
-    equipped_weapon: gameState.player?.equipped_weapon || null,
-    equipped_armor: gameState.player?.equipped_armor || null,
-    equipped_shield: gameState.player?.equipped_shield || null,
-    inventory: gameState.player?.inventory || [],
-    gold: gameState.player?.gold || 0,
-    known_spells: gameState.player?.known_spells || [],
-    spell_slots: gameState.player?.spell_slots || {},
-    abilities: gameState.player?.abilities || [],
-    status_effects: gameState.player?.status_effects || [],
-    is_surprised: gameState.player?.is_surprised || false,
-    has_taken_action: gameState.player?.has_taken_action || false,
-    has_taken_bonus_action: gameState.player?.has_taken_bonus_action || false,
-    has_moved: gameState.player?.has_moved || false,
-    movement_used: gameState.player?.movement_used || 0,
-    ai_personality: gameState.player?.ai_personality || "",
-    ai_priorities: gameState.player?.ai_priorities || [],
-    metadata: gameState.player?.metadata || {},
-    last_updated: new Date().toISOString(),
-  };
-
   const handlePlayerAction = (action: string) => {
     console.log("Sending action via WebSocket:", action);
     sendAction(action);
   };
 
   return (
-    <div className="flex flex-col md:flex-row flex-1 text-white">
-      {/* Connection Status Bar */}
-      <div
-        className={`fixed top-0 left-0 right-0 z-50 p-2 text-center text-sm font-mono ${
-          isConnected ? "bg-green-600 text-white" : "bg-red-600 text-white"
-        } transition-all duration-300`}
-      >
-        {isConnected
-          ? "🟢 Connected to Game Server"
-          : "🔴 Disconnected - Trying to reconnect..."}
+    <div className="flex flex-col md:flex-row flex-1 min-h-0 text-white">
+      {/* Mobile Tabs */}
+      <div className="md:hidden flex border-b border-green-500">
+        <button
+          className={`flex-1 p-2 ${
+            activeTab === "character" ? "bg-gray-800" : "bg-gray-900"
+          }`}
+          onClick={() => setActiveTab("character")}
+        >
+          Character
+        </button>
+        <button
+          className={`flex-1 p-2 ${
+            activeTab === "chat" ? "bg-gray-800" : "bg-gray-900"
+          }`}
+          onClick={() => setActiveTab("chat")}
+        >
+          Chat
+        </button>
       </div>
 
-      {/* Add top padding to account for status bar */}
-      <div className="pt-12 flex flex-col md:flex-row flex-1">
-        {/* Mobile Tabs */}
-        <div className="md:hidden flex border-b border-green-500">
-          <button
-            className={`flex-1 p-2 ${
-              activeTab === "character" ? "bg-gray-800" : "bg-gray-900"
-            }`}
-            onClick={() => setActiveTab("character")}
-          >
-            Character
-          </button>
-          <button
-            className={`flex-1 p-2 ${
-              activeTab === "chat" ? "bg-gray-800" : "bg-gray-900"
-            }`}
-            onClick={() => setActiveTab("chat")}
-          >
-            Chat
-          </button>
-        </div>
+      {/* Character Panel */}
+      <div
+        className={`flex flex-1 md:flex-initial md:w-150 ${
+          activeTab !== "character" ? "hidden md:flex" : ""
+        }`}
+      >
+        <CharacterPanel playerState={gameState.player} />
+      </div>
 
-        {/* Character Panel */}
-        <div
-          className={`flex flex-1 md:flex-initial md:w-150 ${
-            activeTab !== "character" ? "hidden md:flex" : ""
-          }`}
-        >
-          <CharacterPanel playerState={playerState} />
-        </div>
-
-        {/* Chat Interface */}
-        <div
-          className={`flex flex-1 ${
-            activeTab !== "chat" ? "hidden md:flex" : ""
-          }`}
-        >
-          <ChatPanel
-            onPlayerAction={handlePlayerAction}
-            chatHistory={chatHistory}
-            isConnected={isConnected}
-            slug={slug}
-          />
-        </div>
+      {/* Chat Interface */}
+      <div
+        className={`flex flex-1 min-h-0 ${
+          activeTab !== "chat" ? "hidden md:flex" : ""
+        }`}
+      >
+        <ChatPanel
+          onPlayerAction={handlePlayerAction}
+          chatHistory={chatHistory}
+          isConnected={isConnected}
+          slug={slug}
+        />
       </div>
     </div>
   );

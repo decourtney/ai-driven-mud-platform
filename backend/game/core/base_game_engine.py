@@ -8,6 +8,7 @@ from backend.models import (
     ActionType,
     GameCondition,
     ValidationResult,
+    CharacterType,
 )
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.game.core.dice_system import BaseDiceRoller
@@ -57,12 +58,21 @@ class BaseGameEngine(ABC):
         # If wrapped in `player_state` key from API
         if "player_state" in player_state:
             player_state = player_state["player_state"]
-        # Flatten nested stats if present
-        if "stats" in player_state:
-            player_state.update(player_state.pop("stats"))
 
-        player_state_obj = CharacterState.from_dict(player_state)
+        print(player_state)
 
+        player_state_obj = CharacterState(
+            name=player_state["name"],
+            strength=player_state["strength"],
+            dexterity=player_state["dexterity"],
+            constitution=player_state["constitution"],
+            intelligence=player_state["intelligence"],
+            wisdom=player_state["wisdom"],
+            charisma=player_state["charisma"],
+            character_type=CharacterType(player_state["character_type"]),
+            bio=player_state["bio"],
+        )
+        print("[DEBUG]Player State Object:", player_state_obj)
         initial_scene = {
             "id": "intro",
             "title": "Introduction",
@@ -75,7 +85,7 @@ class BaseGameEngine(ABC):
             scene=initial_scene,
             turn_counter=0,
         )
-
+        print("[DEBUG]Game State Object:",self.game_state)
         serialized_game_state = self.game_state.to_dict()
 
         return serialized_game_state

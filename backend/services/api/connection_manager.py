@@ -3,6 +3,7 @@ WebSocket Connection Manager for D&D Game Engine
 Handles real-time communication between clients and the game server.
 """
 
+from websockets.exceptions import ConnectionClosedError
 from fastapi import WebSocket, WebSocketDisconnect
 from typing import Dict, List, Optional, Any
 import json
@@ -75,10 +76,26 @@ class ConnectionManager:
 
             logger.info(f"Client {user_id} disconnected from session {session_id}")
 
+
     async def send_to_client(self, websocket: WebSocket, message: Dict[str, Any]):
         """Send message to a specific client"""
+        # Check if websocket is still in our managed connections
+        if websocket not in self.websocket_sessions:
+            logger.warning("WebSocket not in managed sessions, skipping send")
+            return
+
         try:
-            await websocket.send_text(json.dumps(message))
+            # Check WebSocket state before sending
+            if websocket.client_state.name == "CONNECTED":
+                await websocket.send_text(json.dumps(message))
+            else:
+                logger.warning(
+                    f"WebSocket state is {websocket.client_state.name}, skipping send"
+                )
+                self.disconnect(websocket)
+        except ConnectionClosedError:
+            logger.info("Connection closed, cleaning up websocket")
+            self.disconnect(websocket)
         except Exception as e:
             logger.error(f"Failed to send message to client: {e}")
             self.disconnect(websocket)
@@ -139,20 +156,28 @@ class WebSocketMessage:
     """Helper class for creating standardized WebSocket messages"""
 
     @staticmethod
-    def player_action_result(
-        narration: str, action: str, user_id: str
+    def initial_state(
+        game_state: Dict[str, Any], chat_history: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Create action result message"""
+        """Create initial state message"""
         return {
-            "type": MessageType.ACTION_RESULT,
+            "type": "initial_state",
             "data": {
-                "narration": narration,
-                "original_action": action,
-                "user_id": user_id,
+                "game_state": game_state,
+                "chat_history": chat_history,
             },
             "timestamp": datetime.now().isoformat(),
         }
-
+        
+    @staticmethod
+    def action_received(action: str) -> Dict[str, Any]:
+        """Create action received acknowledgment"""
+        return {
+            "type": "action_received",
+            "data": {"action": action},
+            "timestamp": datetime.now().isoformat(),
+        }
+        
     @staticmethod
     def chat_message(
         id: str, speaker: str, content: str, timestamp: str
@@ -169,6 +194,23 @@ class WebSocketMessage:
         }
 
     @staticmethod
+    def player_action_result(
+        narration: str, action: str, user_id: str
+    ) -> Dict[str, Any]:
+        """Create action result message"""
+        return {
+            "type": MessageType.ACTION_RESULT,
+            "data": {
+                "narration": narration,
+                "original_action": action,
+                "user_id": user_id,
+            },
+            "timestamp": datetime.now().isoformat(),
+        }
+
+
+
+    @staticmethod
     def error(message: str, error_code: Optional[str] = None) -> Dict[str, Any]:
         """Create error message"""
         return {
@@ -181,3 +223,14 @@ class WebSocketMessage:
     def pong() -> Dict[str, Any]:
         """Create pong response"""
         return {"type": MessageType.PONG, "timestamp": datetime.now().isoformat()}
+
+    @staticmethod
+    def game_state_update(updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Create game state update message"""
+        return {
+            "type": MessageType.GAME_STATE_UPDATE,
+            "data": updates,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+ 

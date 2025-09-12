@@ -2,12 +2,19 @@ from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass, field
 import uuid
 from datetime import datetime, timezone
-from backend.models import ActionResult, DamageType, ActionType, CharacterType, StatusEffect
+from backend.models import (
+    ActionResult,
+    DamageType,
+    ActionType,
+    CharacterType,
+    StatusEffect,
+)
 
 
 @dataclass
 class StatusEffectInstance:
     """Represents an active status effect on a character"""
+
     effect: StatusEffect
     duration: int  # turns remaining, -1 for permanent
     intensity: int = 1  # for effects that can stack or have varying intensity
@@ -18,22 +25,24 @@ class StatusEffectInstance:
 @dataclass
 class Item:
     """Represents an item in inventory or equipment"""
+
+    id: str
     name: str
     item_type: str  # "weapon", "armor", "consumable", "tool", etc.
     description: str = ""
     damage_dice: Optional[str] = None  # "1d8", "2d6", etc.
     armor_class: Optional[int] = None
     # properties: Set[str] = field(default_factory=set)  # "magical", "heavy", "finesse", etc.
-    value: int = 0  # gold value
+    gold_value: int = 0  # gold value
     weight: float = 0.0
     # metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def is_weapon(self) -> bool:
         return self.item_type == "weapon"
-    
+
     def is_armor(self) -> bool:
         return self.item_type == "armor"
-    
+
     def is_consumable(self) -> bool:
         return self.item_type == "consumable"
 
@@ -41,6 +50,7 @@ class Item:
 @dataclass
 class Spell:
     """Represents a spell that can be cast"""
+
     name: str
     level: int
     school: str  # "evocation", "illusion", etc.
@@ -64,34 +74,37 @@ class CharacterState:
     def __init__(
         self,
         name: str,
+        strength: int,
+        dexterity: int,
+        constitution: int,
+        intelligence: int,
+        wisdom: int,
+        charisma: int,
         character_type: CharacterType = CharacterType.NPC,
-        max_hp: int = 10,
-        current_hp: Optional[int] = None,
-        armor_class: int = 10,
-        level: int = 1,
         bio: str = "Walking Corpse",
-        equipped_weapon: Optional[Item] = None, # temporary for cli mode
+        equipped_weapon: Optional[Item] = None,
+        inventory: Optional[List[Item]] = None,
     ):
         # Basic identity
         self.character_id = str(uuid.uuid4())
         self.name = name
         self.character_type = character_type
-        self.level = level
+        self.level = 1
         self.bio = bio
 
         # Core stats
-        self.max_hp = max_hp
-        self.current_hp = current_hp if current_hp is not None else max_hp
+        self.max_hp = 10
+        self.current_hp = 10
         self.temporary_hp = 0
-        self.armor_class = armor_class
+        self.armor_class = 10
 
         # Ability scores (D&D standard)
-        self.strength = 10
-        self.dexterity = 10
-        self.constitution = 10
-        self.intelligence = 10
-        self.wisdom = 10
-        self.charisma = 10
+        self.strength = strength
+        self.dexterity = dexterity
+        self.constitution = constitution
+        self.intelligence = intelligence
+        self.wisdom = wisdom
+        self.charisma = charisma
 
         # Combat stats
         self.initiative_bonus = 0
@@ -101,13 +114,13 @@ class CharacterState:
         # Resources
         self.max_mp = 0  # Spell slots/mana
         self.current_mp = 0
-        self.hit_dice = f"{level}d8"  # For healing during rest
+        self.hit_dice = f"{self.level}d8"  # For healing during rest
 
         # Equipment
-        self.equipped_weapon: Optional[Item] = equipped_weapon # temporary for cli mode change back to none
-        self.equipped_armor: Optional[Item] = None
-        self.equipped_shield: Optional[Item] = None
-        self.inventory: List[Item] = []
+        self.equipped_weapon = equipped_weapon
+        self.equipped_armor = None
+        self.equipped_shield = None
+        self.inventory = inventory or []
         self.gold = 0
 
         # Spells and abilities
@@ -127,7 +140,9 @@ class CharacterState:
 
         # AI behavior (for NPCs)
         self.ai_personality = "neutral"  # "aggressive", "defensive", "cowardly", etc.
-        self.ai_priorities: List[str] = []  # "protect_allies", "target_spellcasters", etc.
+        self.ai_priorities: List[str] = (
+            []
+        )  # "protect_allies", "target_spellcasters", etc.
 
         # Metadata
         self.metadata: Dict[str, Any] = {}
@@ -155,12 +170,14 @@ class CharacterState:
         else:
             health_status = "dead"
 
-        weapon_info = f"wielding a {self.equipped_weapon}" if self.equipped_weapon else "unarmed"
+        weapon_info = (
+            f"wielding a {self.equipped_weapon}" if self.equipped_weapon else "unarmed"
+        )
 
-        return{
+        return {
             "name": self.name,
             "health_status": health_status,
-            "weapon": weapon_info
+            "weapon": weapon_info,
         }
 
     def is_alive(self) -> bool:
@@ -182,7 +199,9 @@ class CharacterState:
     def debug_print(self):
         """Print detailed character state for debugging"""
         print(f"--- {self.name} ---")
-        print(f"HP: {self.current_hp}/{self.max_hp} (Temp: {self.temporary_hp}), AC: {self.armor_class}")
+        print(
+            f"HP: {self.current_hp}/{self.max_hp} (Temp: {self.temporary_hp}), AC: {self.armor_class}"
+        )
         print("-----------------------------------")
 
     # ------------------------------
@@ -247,17 +266,20 @@ class CharacterState:
                 return se
         return None
 
-    def add_status_effect(self, effect: StatusEffect, duration: int, intensity: int = 1, source: str = None):
+    def add_status_effect(
+        self,
+        effect: StatusEffect,
+        duration: int,
+        intensity: int = 1,
+        source: str = None,
+    ):
         """Add a status effect"""
         # Remove existing instance of same effect
         self.remove_status_effect(effect)
 
         # Add new effect
         effect_instance = StatusEffectInstance(
-            effect=effect,
-            duration=duration,
-            intensity=intensity,
-            source=source
+            effect=effect, duration=duration, intensity=intensity, source=source
         )
         self.status_effects.append(effect_instance)
         self.last_updated = datetime.now()
@@ -286,24 +308,31 @@ class CharacterState:
     def is_immobilized(self) -> bool:
         """Check if character cannot move"""
         immobilizing_effects = {
-            StatusEffect.PARALYZED, StatusEffect.STUNNED, StatusEffect.UNCONSCIOUS,
-            StatusEffect.GRAPPLED, StatusEffect.RESTRAINED
+            StatusEffect.PARALYZED,
+            StatusEffect.STUNNED,
+            StatusEffect.UNCONSCIOUS,
+            StatusEffect.GRAPPLED,
+            StatusEffect.RESTRAINED,
         }
         return any(self.has_status(effect) for effect in immobilizing_effects)
 
     def can_act(self) -> bool:
         """Check if character can take actions"""
         incapacitating_effects = {
-            StatusEffect.STUNNED, StatusEffect.UNCONSCIOUS, StatusEffect.INCAPACITATED
+            StatusEffect.STUNNED,
+            StatusEffect.UNCONSCIOUS,
+            StatusEffect.INCAPACITATED,
         }
         return not any(self.has_status(effect) for effect in incapacitating_effects)
 
     def can_cast_spells(self) -> bool:
         """Check if character can cast spells"""
-        return (self.can_act() and 
-                self.current_mp > 0 and 
-                len(self.known_spells) > 0 and
-                not self.has_status(StatusEffect.PARALYZED))
+        return (
+            self.can_act()
+            and self.current_mp > 0
+            and len(self.known_spells) > 0
+            and not self.has_status(StatusEffect.PARALYZED)
+        )
 
     def reset_turn_actions(self):
         """Reset action economy for new turn"""
@@ -347,7 +376,9 @@ class CharacterState:
 
         # Update AC
         if armor.armor_class:
-            self.armor_class = armor.armor_class + self.get_ability_modifier("dexterity")
+            self.armor_class = armor.armor_class + self.get_ability_modifier(
+                "dexterity"
+            )
 
         self.last_updated = datetime.now()
         return True
@@ -407,7 +438,7 @@ class CharacterState:
             "constitution": self.constitution,
             "intelligence": self.intelligence,
             "wisdom": self.wisdom,
-            "charisma": self.charisma
+            "charisma": self.charisma,
         }
 
         score = ability_scores.get(ability.lower(), 10)
@@ -435,7 +466,10 @@ class CharacterState:
     # ------------------------------
     def apply_action_result(self, result: ActionResult):
         """Apply the results of an action to this character"""
-        if result.parsed_action.target != self.name and result.parsed_action.actor != self.name:
+        if (
+            result.parsed_action.target != self.name
+            and result.parsed_action.actor != self.name
+        ):
             return  # This result doesn't affect this character
 
         if result.hit and result.damage_type != DamageType.MISS:
@@ -505,9 +539,23 @@ class CharacterState:
             "current_mp": self.current_mp,
             
             # Equipment
-            "equipped_weapon": self.equipped_weapon.name if self.equipped_weapon else None,
+            "equipped_weapon": (
+                self.equipped_weapon.name if self.equipped_weapon else None
+            ),
             "equipped_armor": self.equipped_armor.name if self.equipped_armor else None,
-            "inventory_count": len(self.inventory),
+            "inventory": [
+                {
+                    "id": item.id.value,
+                    "name": item.name.value,
+                    "item_type": item.item_type.value,
+                    "description": item.description.value,
+                    "damage_dice": item.damage_dice.value,
+                    "armor_class": item.armor_class.value,
+                    "gold_value": item.gold_value.value,
+                    "weight": item.weight.value,
+                }
+                for item in self.inventory
+            ],
             "gold": self.gold,
             
             # Status
@@ -516,7 +564,7 @@ class CharacterState:
                     "effect": se.effect.value,
                     "duration": se.duration,
                     "intensity": se.intensity,
-                    "source": se.source
+                    "source": se.source,
                 }
                 for se in self.status_effects
             ],
@@ -524,51 +572,62 @@ class CharacterState:
             # State
             "is_alive": self.is_alive(),
             "can_act": self.can_act(),
-            "last_updated": self.last_updated.isoformat()
+            "last_updated": self.last_updated.isoformat(),
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'CharacterState':
-        """Create character state from dictionary"""
+    def from_dict(cls, data: Dict[str, Any]) -> "CharacterState":
+        """Restore character to exact saved state"""
+        
+        # (This initializes the object structure)
         character = cls(
             name=data["name"],
+            strength=data["strength"],
+            dexterity=data["dexterity"],
+            constitution=data["constitution"],
+            intelligence=data["intelligence"],
+            wisdom=data["wisdom"],
+            charisma=data["charisma"],
             character_type=CharacterType(data["character_type"]),
-            max_hp=data["max_hp"],
-            current_hp=data["current_hp"],
-            armor_class=data["armor_class"],
-            level=data["level"],
-            bio=data["bio"]
+            bio=data.get("bio", ""),
         )
-
-        # Keys to skip entirely
-        SKIP_KEYS = {"status_effects", "character_type", "is_alive", "can_act"}
-
-        # Keys that should be converted to datetime
-        DATETIME_KEYS = {"last_updated", "session_started"}  # add more if needed
-
-        for key, value in data.items():
-            if key not in SKIP_KEYS and hasattr(character, key):
-                if key in DATETIME_KEYS:
-                    value = (
-                        datetime.fromisoformat(value) if value else datetime.now(timezone.utc)
-                    )
-                setattr(character, key, value)
-
-        # Restore status effects
+        
+        # Override all calculated/default values with exact saved state
+        character.character_id = data.get("character_id", character.character_id)
+        character.level = data["level"]  # Exact saved level
+        
+        # Health - restore EXACT saved values, don't recalculate
+        character.max_hp = data["max_hp"]        # Exact saved max HP
+        character.current_hp = data["current_hp"] # Exact saved current HP
+        character.temporary_hp = data.get("temporary_hp", 0)
+        character.armor_class = data["armor_class"]  # Exact saved AC
+        
+        # Resources - restore exact saved values
+        character.max_mp = data.get("max_mp", 0)
+        character.current_mp = data.get("current_mp", 0)
+        
+        # Equipment - restore exact saved state
+        character.equipped_weapon = data.get("equipped_weapon")
+        character.equipped_armor = data.get("equipped_armor")
+        character.inventory = data.get("inventory", [])
+        character.gold = data.get("gold", 0)
+        
+        # Status effects - restore exact saved effects
+        character.status_effects = []  # Clear any defaults
         for effect_data in data.get("status_effects", []):
             character.add_status_effect(
                 StatusEffect(effect_data["effect"]),
                 effect_data["duration"],
                 effect_data.get("intensity", 1),
-                effect_data.get("source")
+                effect_data.get("source"),
             )
-
-        # # Restore last_updated (default to now if missing)
-        # last_updated_str = data.get("last_updated")
-        # character.last_updated = (
-        #     datetime.fromisoformat(last_updated_str)
-        #     if last_updated_str
-        #     else datetime.now(timezone.utc)
-        # )
-
+        
+        # Restore exact timestamp
+        last_updated_str = data.get("last_updated")
+        character.last_updated = (
+            datetime.fromisoformat(last_updated_str)
+            if last_updated_str
+            else datetime.now(timezone.utc)
+        )
+        
         return character

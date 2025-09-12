@@ -13,7 +13,7 @@ export default async function GameLayout({
   const session = await auth();
   if (!session) redirect("/signin", RedirectType.replace);
   const { slug } = await params;
-console.log(slug)
+
   return (
     <div className="flex flex-col h-screen text-white font-mono">
       {/* Header Bar */}

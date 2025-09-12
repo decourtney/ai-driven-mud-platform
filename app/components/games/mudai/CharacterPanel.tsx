@@ -5,11 +5,12 @@ import {
   Scroll,
   Shield,
   Crown,
+  Sword,
   Hand,
   Shirt,
 } from "lucide-react";
-import { EquipmentItem, Quest } from "@/app/types/game";
-import { PlayerState } from "./GamePage2";
+import { Item, Quest } from "@/app/types/game";
+import { CharacterState } from "@/app/types/game";
 
 const quests: Quest[] = [
   { id: 1, name: "Rescue the Princess", status: "active", progress: "2/3" },
@@ -19,7 +20,7 @@ const quests: Quest[] = [
 export default function CharacterPanel({
   playerState,
 }: {
-  playerState: PlayerState;
+  playerState: CharacterState;
 }) {
   const [activeTab, setActiveTab] = useState("gear");
 
@@ -35,7 +36,7 @@ export default function CharacterPanel({
     slotName,
     icon: Icon,
   }: {
-    item?: EquipmentItem;
+    item?: Item;
     slotName: string;
     icon: ComponentType<{ size: number; className?: string }>;
   }) => (
@@ -47,11 +48,11 @@ export default function CharacterPanel({
             <div className="text-green-400 font-mono text-xs truncate w-full">
               {item.name}
             </div>
-            {item.defense && (
-              <div className="text-gray-400">+{item.defense} DEF</div>
+            {item.armor_class && (
+              <div className="text-gray-400">+{item.armor_class} DEF</div>
             )}
-            {item.damage && (
-              <div className="text-red-400">{item.damage} DMG</div>
+            {item.damage_dice && (
+              <div className="text-red-400">{item.damage_dice} DMG</div>
             )}
           </>
         ) : (
@@ -87,18 +88,48 @@ export default function CharacterPanel({
         return (
           <div className="space-y-6">
             {/* Equipment Grid */}
-            <div className="grid grid-cols-3 gap-3">
-              <div></div>
-              <EquipmentSlot item={undefined} slotName="helm" icon={Crown} />
-              <div></div>
+            <div className="grid grid-cols-5 gap-2 mb-4 md:px-10 auto-rows-fr">
+              {/* Helm */}
+              <div className="bg-gray-800 border border-gray-600 rounded p-2 flex flex-col items-center justify-center row-start-1 row-span-2 col-start-3">
+                <Crown size={16} className="text-gray-400 mb-1" />
+                <div className="text-xs text-gray-500">helm</div>
+              </div>
 
-              <EquipmentSlot item={undefined} slotName="weapon" icon={Shield} />
-              <EquipmentSlot item={undefined} slotName="armor" icon={Shirt} />
-              <EquipmentSlot item={undefined} slotName="shield" icon={Shield} />
+              {/* Weapon */}
+              <div className="bg-gray-800 border border-gray-600 rounded p-2 flex flex-col items-center justify-center row-start-3 row-span-4 col-start-2">
+                <Sword size={16} className="text-gray-400 mb-1" />
+                <div className="text-xs text-gray-500">weapon</div>
+              </div>
 
-              <EquipmentSlot item={undefined} slotName="hands" icon={Hand} />
-              <EquipmentSlot item={undefined} slotName="legs" icon={Shirt} />
-              <div></div>
+              {/* Armor */}
+              <div className="bg-gray-800 border border-gray-600 rounded p-2 flex flex-col items-center justify-center row-start-3 row-span-3 col-start-3">
+                <Shield size={16} className="text-gray-400 mb-1" />
+                <div className="text-xs text-gray-500">armor</div>
+              </div>
+
+              {/* Shield */}
+              <div className="bg-gray-800 border border-gray-600 rounded p-2 flex flex-col items-center justify-center row-start-3 row-span-4 col-start-4">
+                <Shield size={16} className="text-gray-400 mb-1" />
+                <div className="text-xs text-gray-500">shield</div>
+              </div>
+
+              {/* Hands */}
+              <div className="bg-gray-800 border border-gray-600 rounded p-2 flex flex-col items-center justify-center row-start-7 row-span-2 col-start-2">
+                <User size={16} className="text-gray-400 mb-1" />
+                <div className="text-xs text-gray-500">hands</div>
+              </div>
+
+              {/* Legs */}
+              <div className="bg-gray-800 border border-gray-600 rounded p-2 flex flex-col items-center justify-center row-start-6 row-span-3 col-start-3">
+                <Shield size={16} className="text-gray-400 mb-1" />
+                <div className="text-xs text-gray-500">legs</div>
+              </div>
+
+              {/* Feet */}
+              <div className="bg-gray-800 border border-gray-600 rounded p-2 flex flex-col items-center justify-center row-start-7 row-span-2 col-start-4">
+                <User size={16} className="text-gray-400 mb-1" />
+                <div className="text-xs text-gray-500">feet</div>
+              </div>
             </div>
 
             {/* Character Stats */}
@@ -192,11 +223,11 @@ export default function CharacterPanel({
                 <div className="flex justify-between items-center">
                   <span className="text-white font-mono">{item.name}</span>
                   <span className="text-green-400 font-mono">
-                    x{item.quantity}
+                    x (item quantity)
                   </span>
                 </div>
                 <div className="text-xs text-gray-400 capitalize">
-                  {item.type}
+                  {item.item_type}
                 </div>
               </div>
             ))}

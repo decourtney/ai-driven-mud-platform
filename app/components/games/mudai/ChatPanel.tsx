@@ -81,7 +81,7 @@ export default function ChatPanel({
   return (
     <div className="flex flex-col w-full bg-gray-950">
       {/* Game Header */}
-      <div className="bg-gray-800 border-b border-green-500 p-4 flex items-center">
+      <div className=" flex flex-row items-center bg-gray-800 border-b border-green-500 p-4">
         <Terminal className="text-green-400 mr-3" size={24} />
         <div className="flex-1">
           <h1 className="text-green-400 font-mono font-bold text-xl">
@@ -97,12 +97,12 @@ export default function ChatPanel({
           {isConnected ? (
             <div className="flex items-center text-green-400 font-mono text-sm">
               <Wifi size={16} className="mr-2" />
-              Connected
+              <div className="hidden md:block"> Connected</div>
             </div>
           ) : (
             <div className="flex items-center text-red-400 font-mono text-sm">
-              <WifiOff size={16} className="mr-2" />
-              <div className="animate-pulse">Connecting...</div>
+              <WifiOff size={16} className="mr-2 animate-pulse" />
+              <div className="hidden md:block animate-pulse">Connecting...</div>
             </div>
           )}
         </div>
@@ -146,6 +146,20 @@ export default function ChatPanel({
 
       {/* Input Area */}
       <div className="border-t border-green-500 bg-gray-800 p-4">
+        {/* Enhanced Command Hints */}
+        <div className="mb-3 space-y-1">
+          <div className="text-xs font-mono text-gray-500">
+            {isConnected && (
+              <span className="text-green-400 ml-2">Ready for commands</span>
+            )}
+          </div>
+          {!isConnected && (
+            <div className="text-xs font-mono text-red-400">
+              Connection lost - commands will be sent when reconnected
+            </div>
+          )}
+        </div>
+
         <form onSubmit={handleSubmit} className="flex space-x-3">
           <div className="flex-1 relative">
             <input
@@ -178,21 +192,6 @@ export default function ChatPanel({
             {!isConnected ? "WAIT" : "SEND"}
           </button>
         </form>
-
-        {/* Enhanced Command Hints */}
-        <div className="mt-3 space-y-1">
-          <div className="text-xs font-mono text-gray-500">
-            Try: "look around", "attack goblin", "open door", "check inventory"
-            {isConnected && (
-              <span className="text-green-400 ml-2">| Ready for commands</span>
-            )}
-          </div>
-          {!isConnected && (
-            <div className="text-xs font-mono text-red-400">
-              Connection lost - commands will be sent when reconnected
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

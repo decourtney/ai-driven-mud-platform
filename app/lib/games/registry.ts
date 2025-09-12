@@ -13,7 +13,7 @@ const gameRegistry: Record<string, GameComponents> = {
     MainMenu: () => import("@/app/components/games/mudai/MainMenu"),
     CreateCharacter: () =>
       import("@/app/components/games/mudai/CreateCharacter"),
-    GamePage: () => import("@/app/components/games/mudai/GamePage2"),
+    GamePage: () => import("@/app/components/games/mudai/GamePage"),
   },
   // "space-adventure": {
   //   MainMenu: () => import("@/components/games/space-adventure/MainMenu"),
