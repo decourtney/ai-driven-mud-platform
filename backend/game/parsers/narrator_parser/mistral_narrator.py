@@ -216,24 +216,24 @@ class GGUFMistralNarrator(ActionNarrator):
         # Add weapon if present and not already in action description
         if (
             action.weapon
-            and action.action_type == ActionType.ATTACK
+            and action.action_type == ActionType.attack
             and action.weapon not in action_desc
         ):
             action_desc = f"{action_desc} with {action.weapon}"
-        elif action.weapon and action.action_type == ActionType.SPELL:
+        elif action.weapon and action.action_type == ActionType.spell:
             action_desc = f"{action_desc} using {action.weapon}"
 
         # Build the base scenario
         if not hit:
-            if action.action_type == ActionType.SPELL:
+            if action.action_type == ActionType.spell:
                 scenario = f"{actor} tries to cast {action_desc} against {target} but the magic fails."
-            elif action.action_type == ActionType.SOCIAL:
+            elif action.action_type == ActionType.social:
                 scenario = f"{actor} attempts to {action_desc} with {target} but fails to persuade them."
             else:
                 scenario = f"{actor} tries to {action_desc} against {target} but misses completely."
         else:
             if (
-                action.action_type == ActionType.SPELL
+                action.action_type == ActionType.spell
             ):  # Will have to determine if spell type is an attack or not
                 if damage_type == "kill":
                     scenario = f"{actor} unleashes devastating {action_desc} magic that proves fatal to {target}."
@@ -243,14 +243,14 @@ class GGUFMistralNarrator(ActionNarrator):
                     scenario = (
                         f"{actor} successfully casts {action_desc} against {target}."
                     )
-            elif action.action_type == ActionType.SOCIAL:
+            elif action.action_type == ActionType.social:
                 if damage_type == "outstanding_success":
                     scenario = f"{actor} completely wins over {target} with masterful {action_desc}."
                 elif damage_type == "great_success":
                     scenario = f"{actor} effectively convinces {target} through skilled {action_desc}."
                 else:
                     scenario = f"{actor} successfully uses {action_desc} to influence {target}."
-            elif action.action_type == ActionType.ATTACK:
+            elif action.action_type == ActionType.attack:
                 if damage_type == "kill":
                     scenario = f"{actor} delivers a killing blow with {action_desc}, ending {target}'s life."
                 elif damage_type == "critical":
@@ -265,9 +265,9 @@ class GGUFMistralNarrator(ActionNarrator):
         # Add subject context if present
         subject_context = ""
         if action.subject:
-            if action.action_type == ActionType.SOCIAL:
+            if action.action_type == ActionType.social:
                 subject_context = f" The topic is: {action.subject}."
-            elif action.action_type == ActionType.SPELL:
+            elif action.action_type == ActionType.spell:
                 subject_context = f" The spell targets: {action.subject}."
             else:
                 subject_context = f" Context: {action.subject}."

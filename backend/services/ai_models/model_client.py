@@ -16,6 +16,7 @@ from backend.models import (
     GenerateSceneRequest,
     GeneratedNarration,
     ParsedAction,
+    ValidationResult
 )
 
 
@@ -193,7 +194,6 @@ class AsyncModelServiceClient:
     # ==========================================
 
     async def parse_action(self, request: ParseActionRequest) -> ParsedAction:
-        """Async version of parse_action"""
         try:
             response = await self.client.post(
                 f"{self.base_url}/parse_action", json=request.model_dump()
@@ -204,7 +204,6 @@ class AsyncModelServiceClient:
             return ParsedAction(**result_dict)
 
         except httpx.HTTPError as http_err:
-            # This will be triggered if FastAPI raised HTTPException
             try:
                 error_detail = response.json().get("detail", str(http_err))
             except Exception:
@@ -219,7 +218,6 @@ class AsyncModelServiceClient:
     async def generate_action(
         self, request: GenerateActionRequest
     ) -> GeneratedNarration:
-        """Async version of generate_narration"""
         try:
             response = await self.client.post(
                 f"{self.base_url}/generate_action", json=request.model_dump()
@@ -232,7 +230,6 @@ class AsyncModelServiceClient:
             return result
 
         except httpx.HTTPError as http_err:
-            # This will be triggered if FastAPI raised HTTPException
             try:
                 error_detail = response.json().get("detail", str(http_err))
             except Exception:
@@ -245,7 +242,6 @@ class AsyncModelServiceClient:
             return GeneratedNarration(action_type="unknown", details=str(e))
 
     async def generate_scene(self, request: GenerateSceneRequest) -> GeneratedNarration:
-        """Async version of generate_narration"""
         try:
             response = await self.client.post(
                 f"{self.base_url}/generate_scene", json=request.model_dump()
@@ -258,7 +254,29 @@ class AsyncModelServiceClient:
             return result
 
         except httpx.HTTPError as http_err:
-            # This will be triggered if FastAPI raised HTTPException
+            try:
+                error_detail = response.json().get("detail", str(http_err))
+            except Exception:
+                error_detail = str(http_err)
+            print(f"[CLIENT] Generation request failed: {error_detail}")
+            return GeneratedNarration(action_type="unknown", details=error_detail)
+
+        except Exception as e:
+            print(f"[CLIENT] Generation request failed: {e}")
+            return GeneratedNarration(action_type="unknown", details=str(e))
+
+    async def generate_invalid_action(self, request: ValidationResult) -> GeneratedNarration:
+        try:
+            response = await self.client.post(
+                f"{self.base_url}/generate_invalid_action", json=request.model_dump()
+            )
+            response.raise_for_status()
+
+            result_dict = response.json()
+            result = GeneratedNarration(**result_dict)
+
+            return result
+        except httpx.HTTPError as http_err:
             try:
                 error_detail = response.json().get("detail", str(http_err))
             except Exception:

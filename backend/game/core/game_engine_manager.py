@@ -1,7 +1,10 @@
 import uuid
 import asyncio
+import logging
 from typing import Dict, Optional, Any
 from datetime import datetime, timedelta, timezone
+
+logger = logging.getLogger(__name__)
 
 
 class GameEngineManager:
@@ -9,7 +12,6 @@ class GameEngineManager:
     Manage live game engine instances in memory.
     """
     def __init__(self, cleanup_interval: int = 60, on_unregister=None):
-        # engine_id -> {"engine": EngineInstance, "session_id": str, "last_active": datetime}
         self.engines: Dict[str, Dict[str, dict]] = {}
         self.cleanup_interval = cleanup_interval
         self._cleanup_task = None  # Store cleanup loop task
@@ -30,24 +32,40 @@ class GameEngineManager:
                 pass
             self._cleanup_task = None
 
+
     async def cleanup_loop(self):
         while True:
             await asyncio.sleep(self.cleanup_interval)
             now = datetime.now(timezone.utc)
             idle_threshold = timedelta(milliseconds=5000)
             to_delete = []
+
+            # Identify engines to cleanup
             for slug, sessions in self.engines.items():
                 for session_id, entry in sessions.items():
                     if now - entry["last_active"] > idle_threshold:
-                        # fetch the engine's state here
                         game_state: Dict[str, Any] = entry[
                             "engine"
                         ].get_serialized_game_state()
                         to_delete.append((slug, session_id, game_state))
+
+            # Prepare async tasks
+            tasks = []
             for slug, session_id, game_state in to_delete:
                 if self.on_unregister:
-                    await self.on_unregister(session_id, game_state)
-                del self.engines[slug][session_id]
+                    tasks.append(self.on_unregister(session_id, game_state))
+                # Remove engine from memory immediately
+                self.engines[slug].pop(session_id, None)
+                if not self.engines[slug]:
+                    del self.engines[slug]
+
+            # Run saves concurrently
+            if tasks:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for result in results:
+                    if isinstance(result, Exception):
+                        # Log but continue
+                        print(f"[WARNING] Error saving engine state: {result}")
 
     def register_engine(self, engine_instance, session_id: str, slug: str) -> str:
         """Register a new engine instance and return its engine_id."""

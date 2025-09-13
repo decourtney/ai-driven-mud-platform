@@ -1,7 +1,6 @@
 from typing import List, Optional, Tuple, Generator, Dict, Any, Callable
 from abc import ABC, abstractmethod
 from enum import Enum
-
 from backend.models import (
     ParsedAction,
     ActionResult,
@@ -9,8 +8,10 @@ from backend.models import (
     GameCondition,
     ValidationResult,
     CharacterType,
+    ParseActionRequest
 )
 from backend.services.ai_models.model_client import AsyncModelServiceClient
+from backend.game.core.game_session_manager import GameSessionManager
 from backend.game.core.dice_system import BaseDiceRoller
 from backend.game.core.character_state import CharacterState
 from backend.game.core.game_state import GameState
@@ -26,12 +27,12 @@ class BaseGameEngine(ABC):
     def __init__(
         self,
         model_client: AsyncModelServiceClient,
-        save_state_callback: Callable,
+        session_manager: GameSessionManager,
         dice_roller: Optional[BaseDiceRoller] = None,
         **kwargs,
     ):
         self.model_client = model_client
-        self.save_state_callback = save_state_callback
+        self.session_manager = session_manager
 
         # Allow explicit dice roller override
         if dice_roller:
@@ -54,8 +55,7 @@ class BaseGameEngine(ABC):
     def create_game_state(self, player_state: Dict[str, Any]):
         """Create initial GameState with player, NPCs, and scene data"""
 
-        # this feels janky but fuck it for now
-        # If wrapped in `player_state` key from API
+        # If wrapped in `player_state` key from API - I should probably inspect this
         if "player_state" in player_state:
             player_state = player_state["player_state"]
 
@@ -81,11 +81,8 @@ class BaseGameEngine(ABC):
 
         self.game_state = GameState(
             player=player_state_obj,
-            npcs=[],
-            scene=initial_scene,
-            turn_counter=0,
         )
-        print("[DEBUG]Game State Object:",self.game_state)
+        print("[DEBUG]Game State Object:", self.game_state)
         serialized_game_state = self.game_state.to_dict()
 
         return serialized_game_state
@@ -132,11 +129,11 @@ class BaseGameEngine(ABC):
         if not self.game_state:
             raise RuntimeError("Game state not initialized")
 
-        if not self.model_manager.is_narrator_ready():
+        if not self.model_client.is_narrator_ready():
             raise RuntimeError("Narrator not loaded")
 
         # Use the narrator to generate scene description based on current game state
-        scene_description = self.model_manager.generate_scene_narration(
+        scene_description = self.model_client.generate_scene_narration(
             self.game_state.scene, self.game_state.player, self.game_state.npcs
         )
 
@@ -180,7 +177,7 @@ class BaseGameEngine(ABC):
             )
 
         blocked_exits = scene_rules.get("blocked_exits", [])
-        if parsed_action.action_type == ActionType.MOVEMENT:
+        if parsed_action.action_type == ActionType.movement:
             direction = (
                 parsed_action.details.get("direction", "").lower()
                 if parsed_action.details
@@ -209,54 +206,53 @@ class BaseGameEngine(ABC):
     # ----------------------------
     # Player Turn Processing
     # ----------------------------
-    def execute_player_turn(self, user_action: str) -> Tuple[str, GameCondition]:
+
+
+    async def execute_player_turn(self, action: str) -> Tuple[dict, GameCondition]:
         """
-        Execute complete player turn with validation loop.
-        Returns (narration, game_condition)
+        Execute a complete player turn with validation loop.
+        Returns (narration_dict, game_condition)
         """
         invalid_attempts = 0
 
         while invalid_attempts < self.max_invalid_attempts:
             try:
                 # Parse player input
-                parsed_action = self.model_manager.parse_action(user_action)
-
+                parsed_action = await self.model_client.parse_action(
+                    ParseActionRequest(action=action)
+                )
+                print("[DEBUG]Parsed Action:",parsed_action)
                 # Validate action
                 validation_result = self.validate_action(parsed_action)
+                print("[DEBUG]Validation Result:",validation_result)
                 if not validation_result.is_valid:
                     invalid_attempts += 1
                     error_narration = (
-                        self.model_manager.generate_invalid_action_narration(
+                        await self.model_client.generate_invalid_action(
                             validation_result
                         )
                     )
-
-                    if invalid_attempts >= self.max_invalid_attempts:
-                        return (
-                            f"{error_narration}\n\nToo many invalid attempts. Turn skipped.",
-                            GameCondition.CONTINUE,
-                        )
-                    else:
-                        return (
-                            f"{error_narration}\n\nTry again.",
-                            GameCondition.CONTINUE,
-                        )
+                    return {
+                        "type": "error",
+                        "message": error_narration.narration,
+                    }, GameCondition.game_on
 
                 # Execute valid action
-                result = self.process_parsed_action(parsed_action)
-
-                # Check game condition after player action
+                result = await self.process_parsed_action(parsed_action)
                 condition = self.check_game_condition()
-
-                return result.narration, condition
+                return result, condition
 
             except Exception as e:
-                return f"An error occurred: {str(e)}", GameCondition.GAME_OVER
+                # Always return a dict so the caller can handle it consistently
+                return {
+                    "type": "exception",
+                    "message": f"An unexpected error occurred: {str(e)}",
+                }, GameCondition.game_over
 
-        return (
-            "Unable to process action after multiple attempts.",
-            GameCondition.CONTINUE,
-        )
+        return {
+            "type": "error",
+            "message": "Unable to process action after multiple attempts.",
+        }, GameCondition.game_on
 
     # ----------------------------
     # NPC Turn Processing
@@ -274,13 +270,13 @@ class BaseGameEngine(ABC):
                 continue
 
             # AI decides action with validation loop
-            action_result = self._execute_npc_action_with_validation(npc)
+            action_result = self.execute_npc_action_with_validation(npc)
             if action_result:
                 # Check game condition after each action
                 condition = self.check_game_condition()
                 yield action_result.narration, condition
 
-    def _execute_npc_action_with_validation(
+    def execute_npc_action_with_validation(
         self, npc: CharacterState
     ) -> Optional[ActionResult]:
         """Execute NPC action with AI decision making and validation"""
@@ -319,7 +315,7 @@ class BaseGameEngine(ABC):
 
         try:
             # AI decides action with validation
-            action_result = self._execute_npc_action_with_validation(npc)
+            action_result = self.execute_npc_action_with_validation(npc)
             if action_result:
                 # Apply this NPC's action immediately
                 self.update_game_state([action_result])
@@ -341,7 +337,7 @@ class BaseGameEngine(ABC):
             return scene_description, final_condition
 
         except Exception as e:
-            return f"Error updating scene: {str(e)}", GameCondition.GAME_OVER
+            return f"Error updating scene: {str(e)}", GameCondition.game_over
 
     # ----------------------------
     # Abstract AI Decision Making
@@ -357,12 +353,12 @@ class BaseGameEngine(ABC):
     # ----------------------------
     # Action Processing
     # ----------------------------
-    def process_parsed_action(self, parsed_action: ParsedAction) -> ActionResult:
+    async def process_parsed_action(self, parsed_action: ParsedAction) -> ActionResult:
         """
         Process a validated action and return the result.
         Uses standardized dice system with game-specific modifiers and mappings.
         """
-        if not self.model_manager.is_narrator_ready():
+        if not self.model_client.is_narrator_ready():
             raise RuntimeError("Narrator not loaded")
 
         difficulty = self.get_action_difficulty(
@@ -382,6 +378,7 @@ class BaseGameEngine(ABC):
         # Create ActionResult from dice result
         result = ActionResult(
             parsed_action=parsed_action,
+            action_type=parsed_action.action_type,
             hit=dice_result.hit,
             dice_roll=dice_result.total,
             damage_type=self.convert_outcome_to_damage_type(dice_result.outcome_type),
@@ -399,7 +396,7 @@ class BaseGameEngine(ABC):
 
         # Apply result and generate narration
         self.update_game_state([result])
-        result.narration = self.model_manager.generate_action_narration(
+        result.narration = await self.model_client.generate_action_narration(
             parsed_action, dice_result.hit, dice_result.outcome_type
         )
 
@@ -495,8 +492,8 @@ class BaseGameEngine(ABC):
     def is_ready(self) -> bool:
         """Check if all components are ready"""
         return (
-            self.model_manager.is_parser_ready()
-            and self.model_manager.is_narrator_ready()
+            self.model_client.is_parser_ready()
+            and self.model_client.is_narrator_ready()
             and self.game_state is not None
         )
 

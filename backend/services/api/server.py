@@ -4,8 +4,6 @@ Now uses decoupled model service instead of direct model management.
 """
 
 import json
-import uuid
-import jwt
 import logging
 from fastapi import (
     FastAPI,
@@ -48,7 +46,9 @@ logger = logging.getLogger(__name__)
 
 
 class GameAPI:
-    """Main game API server"""
+    """
+    Main game API server
+    """
 
     def __init__(self, model_server_url: str = "http://localhost:8001", lifespan=None):
         self.model_client = AsyncModelServiceClient(model_server_url)
@@ -59,7 +59,10 @@ class GameAPI:
         self.app = self._create_app(lifespan=lifespan)
 
     def _create_app(self, lifespan=None) -> FastAPI:
-        """Create and configure FastAPI application"""
+        """
+        Create and configure FastAPI application
+        """
+        
         app = FastAPI(
             title="D&D Streaming Game API",
             version="2.0.0",
@@ -90,7 +93,10 @@ class GameAPI:
         # Add WebSocket status endpoint for debugging
         @app.get("/ws/status")
         async def websocket_status():
-            """Get WebSocket connection status (for debugging)"""
+            """
+            Get WebSocket connection status (for debugging)
+            """
+            
             total_connections = sum(
                 len(conns) for conns in self.connection_manager.connections.values()
             )
@@ -112,10 +118,11 @@ class GameAPI:
             WebSocket endpoint for real-time game communication.
             Equivalent to the REST process_player_action but with persistent connection.
             """
+            
             await self.connection_manager.connect(websocket, session_id, user_id)
 
             try:
-                # Send initial session data (like current game state)
+                # Send initial session data
                 try:
                     await self.session_manager.get_session(
                         slug=slug, session_id=session_id, user_id=user_id
@@ -152,7 +159,7 @@ class GameAPI:
                             )
 
                     except WebSocketDisconnect:
-                        # Client disconnected normally - break out of the loop
+                        # Client disconnected normally
                         logger.info(
                             f"Client {user_id} disconnected from session {session_id}"
                         )
@@ -166,7 +173,7 @@ class GameAPI:
                 # Handle connection errors
                 logger.error(f"WebSocket connection error: {e}")
             finally:
-                # Always clean up the connection
+                # Clean up the connection
                 self.connection_manager.disconnect(websocket)
 
         # ==========================================
@@ -177,7 +184,10 @@ class GameAPI:
 
         @app.get("/health")
         async def health_check():
-            """Health check endpoint with model service status"""
+            """
+            Health check endpoint with model service status
+            """
+            
             model_status = await self.model_client.get_status()
 
             return {
@@ -202,7 +212,10 @@ class GameAPI:
         async def list_engines(
             slug: str = Path(...),
         ):
-            """List all registered engine instances by game"""
+            """
+            List all registered engine instances by game
+            """
+            
             try:
                 instances = await self.session_manager.list_registered_engines_by_game(
                     slug=slug
@@ -216,7 +229,10 @@ class GameAPI:
 
         @app.get("/sessions")
         async def list_sessions():
-            """List all active sessions (for admin/debugging)"""
+            """
+            List all active sessions (for admin/debugging)
+            """
+            
             return {
                 "total_sessions": len(self.active_sessions),
                 "sessions": [
@@ -236,7 +252,10 @@ class GameAPI:
 
         @app.get("/lobby", response_model=list[GameInfo])
         def list_games():
-            """Get list of available games"""
+            """
+            Get list of available games
+            """
+            
             return [
                 GameInfo(
                     slug=slug,
@@ -256,7 +275,10 @@ class GameAPI:
 
         @app.get("/lobby/{game_slug}")
         def get_game_details(game_slug: str):
-            """Get detailed information about a specific game"""
+            """
+            Get detailed information about a specific game
+            """
+            
             if game_slug not in GAME_REGISTRY:
                 raise HTTPException(status_code=404, detail="Game not found")
 
@@ -284,6 +306,10 @@ class GameAPI:
             slug: str = Path(...),
             user_id: str = Path(...),
         ):
+            """
+            Check for existing session
+            """
+            
             try:
                 session_id = await self.session_manager.query_session_status(
                     user_id=user_id, slug=slug
@@ -300,7 +326,10 @@ class GameAPI:
             user_id: str = Path(...),
             player_state: Dict[str, Any] = Body(...),
         ):
-            """Create a new game session"""
+            """
+            Create a new game session
+            """
+            
             if slug not in GAME_REGISTRY:
                 raise HTTPException(status_code=404, detail="Game not found")
 
@@ -322,7 +351,10 @@ class GameAPI:
             slug: str = Path(...),
             user_id: str = Path(...),
         ):
-            """Delete/end a game session"""
+            """
+            Delete/end a game session
+            """
+            
             try:
                 await self.session_manager.delete_sessions(slug=slug, user_id=user_id)
                 return {"success": True}
@@ -334,63 +366,23 @@ class GameAPI:
                 )
 
         # ==========================================
-        # PLAY SESSION ENDPOINTS
-        # ==========================================
-
-        # @app.get("/play/{slug}/{session_id}/{user_id}")
-        # async def get_session(
-        #     slug: str = Path(...),
-        #     session_id: str = Path(...),
-        #     user_id: str = Path(...),
-        # ):
-        #     """Get session"""
-        #     try:
-        #         session = await self.session_manager.get_session(
-        #             slug=slug, session_id=session_id, user_id=user_id
-        #         )
-        #     except Exception as e:
-        #         raise HTTPException(
-        #             status_code=500, detail=f"Failed to get session: {str(e)}"
-        #         )
-
-        #     return {
-        #         "session_id": session["session_id"],
-        #         "engine_id": session["engine_id"],
-        #         "game_state": session["game_state"],
-        #         "chat_history": session["chat_history"],
-        #     }
-
-        # @app.post("/play/{slug}/{session_id}/action/{user_id}")
-        # async def process_player_action(
-        #     slug: str = Path(...),
-        #     session_id: str = Path(...),
-        #     user_id: str = Path(...),
-        #     action: str = Body(...),
-        # ):
-        #     try:
-
-        #         generated_action = await self.session_manager.parse_action_request(
-        #             session_id=session_id, action=action
-        #         )
-
-        #         return {"narration": generated_action.narration}
-        #     except Exception as e:
-        #         raise HTTPException(
-        #             status_code=500, detail=f"Action processing failed: {str(e)}"
-        #         )
-
-        # ==========================================
         # MODEL SERVICE PROXY ENDPOINTS
         # ==========================================
 
         @app.get("/models/status")
         async def get_model_status():
-            """Get model service status (proxy endpoint)"""
+            """
+            Get model service status (proxy endpoint)
+            """
+            
             return await self.model_client.get_status()
 
         @app.post("/models/load")
         async def load_models():
-            """Load models via model service"""
+            """
+            Load models via model service
+            """
+            
             try:
                 success = await self.model_client.load_all_models()
                 return {"success": success}
@@ -399,7 +391,10 @@ class GameAPI:
 
         @app.post("/models/unload")
         async def unload_models():
-            """Unload models via model service"""
+            """
+            Unload models via model service
+            """
+            
             try:
                 success = await self.model_client.unload_all_models()
                 return {"success": success}
@@ -408,7 +403,10 @@ class GameAPI:
 
         @app.post("/models/reload")
         async def reload_models():
-            """Reload models via model service"""
+            """
+            Reload models via model service
+            """
+            
             try:
                 success = await self.model_client.reload_models()
                 return {"success": success}
@@ -421,7 +419,10 @@ class GameAPI:
 
         @app.post("/test/parse_action")
         async def test_parse_action():
-            """Test action parsing directly"""
+            """
+            Test action parsing directly
+            """
+            
             if not await self.model_client.is_healthy():
                 raise HTTPException(
                     status_code=503, detail="Model service not available"
@@ -443,7 +444,10 @@ class GameAPI:
 
         @app.post("/test/generate_action")
         async def test_generate_action():
-            """Test action narration generation directly"""
+            """
+            Test action narration generation directly
+            """
+            
             if not await self.model_client.is_healthy():
                 raise HTTPException(
                     status_code=503, detail="Model service not available"
@@ -455,7 +459,7 @@ class GameAPI:
                         actor="Player",
                         action="Slap",
                         target="Goblin",
-                        action_type=ActionType.ATTACK,
+                        action_type=ActionType.attack,
                     ),
                     hit=True,
                     damage_type="wound",
@@ -471,7 +475,10 @@ class GameAPI:
 
         @app.post("/test/generate_scene")
         async def test_generate_scene():
-            """Test action narration generation directly"""
+            """
+            Test action narration generation directly
+            """
+            
             if not await self.model_client.is_healthy():
                 raise HTTPException(
                     status_code=503, detail="Model service not available"
@@ -514,6 +521,10 @@ class GameAPI:
 
         return app
 
+    # ==========================================
+    # WEBSOCKET METHODS
+    # ==========================================
+
     async def handle_websocket_message(
         self,
         websocket: WebSocket,
@@ -522,13 +533,14 @@ class GameAPI:
         session_id: str,
         user_id: str,
     ):
-        """Handle incoming WebSocket messages"""
+        """
+        Handle incoming WebSocket messages
+        """
 
         message_type = message.get("type")
         data = message.get("data", {})
 
         if message_type == MessageType.PLAYER_ACTION:
-            # This is the WebSocket equivalent of process_player_action
             await self.handle_player_action(
                 websocket, data.get("action", ""), slug, session_id, user_id
             )
@@ -555,7 +567,10 @@ class GameAPI:
         session_id: str,
         user_id: str,
     ):
-        """Handle player actions via WebSocket"""
+        """
+        Handle player actions via WebSocket
+        """
+
         if not action.strip():
             await self.connection_manager.send_to_client(
                 websocket, WebSocketMessage.error("Empty action provided")
@@ -565,7 +580,6 @@ class GameAPI:
         try:
             logger.info(f"Processing WebSocket action from {user_id}: {action}")
 
-            # Process the action through session manager (now with slug parameter)
             result = await self.session_manager.parse_action_request(
                 session_id=session_id, action=action, slug=slug  # Pass slug here
             )
@@ -586,7 +600,10 @@ class GameAPI:
 def create_server(
     model_server_url: str = "http://localhost:8001", lifespan=None
 ) -> FastAPI:
-    """Factory function to create configured FastAPI server with model service"""
+    """
+    Factory function to create configured FastAPI server with model service
+    """
+
     api = GameAPI(model_server_url=model_server_url, lifespan=lifespan)
     return api.app
 

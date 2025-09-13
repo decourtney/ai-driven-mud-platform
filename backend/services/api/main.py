@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
     try:
         api_server = app.state.game_server
         model_client = api_server.model_client
-        model_client.close()
+        await model_client.close()
         print("[+] Model client closed")
     except Exception as e:
         print(f"[-] Error during model client cleanup: {e}")

@@ -6,78 +6,95 @@
     "history": ""
   },
   "village_arrival": {
+    "id": "village_arrival",
     "title": "The Forgotten Village",
-    "description": "You arrive at a small village that appears empty and unkempt. The cobblestone road is cracked with weeds growing through. An inn/tavern with a faded sign sits on one side, a blacksmith shop with cold forge on the other. More structures are visible further up the shabby road. No people are in sight anywhere.",
-    "environment": {
-      "location": "abandoned village entrance",
-      "lighting": "late afternoon, long shadows",
-      "atmosphere": "eerily quiet, neglected, mysterious",
-      "weather": "light breeze, clear sky",
-      "obstacles": ["cracked cobblestones", "overgrown weeds", "debris"],
-      "exits": [
-        "main road deeper into village",
-        "path back up the hill",
-        "inn entrance",
-        "blacksmith shop entrance"
-      ]
-    },
+    "description": "A shabby village square, eerily quiet.",
+
+    "structures": [
+      {
+        "id": "inn",
+        "name": "Spork Inn",
+        "description": "Ugly shack with a faded sign — could be a fork, could be a spoon."
+      },
+      {
+        "id": "blacksmith_shop",
+        "name": "Rusty Nail",
+        "description": "Run down building with a cold hearth."
+      }
+    ],
+
+    "exits": [
+      {
+        "id": "village_road",
+        "label": "Main road deeper into village",
+        "target_scene": "village_road"
+      },
+      {
+        "id": "hill_path",
+        "label": "Path back up the hill",
+        "target_scene": "hill_path"
+      },
+      {
+        "id": "inn_entrance",
+        "label": "Enter the Spork Inn",
+        "target_scene": "inn",
+        "is_locked": false
+      },
+      {
+        "id": "blacksmith_shop_entrance",
+        "label": "Enter the Rusty Nail",
+        "target_scene": "blacksmith_shop",
+        "is_locked": false
+      }
+    ],
+
+    "notable_npcs": [],
     "npcs": [
       {
-        "name": "Trader Kess",
-        "status": "organizing wagon supplies",
-        "equipment": ["merchant's ledger", "coin pouch", "travel cloak"],
-        "disposition": "business-minded, offers quests for escorts",
-        "description": "Well-dressed merchant preparing for departure"
-      },
-      {
+        "id": "rabid_wolf",
         "name": "Rabid Wolf",
-        "status": "snarling, foam at mouth",
-        "equipment": ["sharp fangs", "matted fur", "diseased claws"],
-        "disposition": "aggressive, attacks on sight",
-        "description": "Disease-maddened wolf with glowing red eyes"
+        "description": "A disease-maddened wolf with glowing red eyes",
+        "status": { "is_alive": true, "is_hostile": true, "health": 8 },
+        "disposition": "aggressive"
       }
     ],
-    "items_of_interest": [
+
+    "items": [
       {
-        "name": "weathered inn sign",
-        "location": "hanging above inn entrance",
-        "description": "faded image of a prancing horse, creaking in the wind"
-      },
-      {
-        "name": "blacksmith's tools",
-        "location": "hanging beside forge entrance",
-        "description": "unused tools covered in dust, deflated bellows"
-      },
-      {
-        "name": "cold forge",
-        "location": "blacksmith shop",
-        "description": "forge is cold and dark, no recent signs of use"
-      },
-      {
-        "name": "overgrown gardens",
-        "location": "beside distant houses",
-        "description": "small plots gone to seed, suggesting recent abandonment"
-      },
-      {
-        "name": "cobblestone street",
-        "description": "worn smooth but cracked, weeds pushing through gaps"
+        "id": "busted_statue",
+        "name": "Ode to ...",
+        "description": "Toppled marble statue of a robed man. Broken and defaced — the plaque only reads 'Ode to'.",
+        "is_interactable": true
       }
     ],
-    "secrets_and_clues": [
+
+    "discoveries": [
       {
+        "id": "no_footprints",
+        "type": "environment",
         "observation": "No recent footprints in the dust on doorsteps",
-        "implication": "village has been empty for some time"
+        "implication": "The village has been empty for some time",
+        "is_discovered": false,
+        "perception_dc": 12
       },
       {
-        "observation": "Shutters hang loose but aren't completely broken",
-        "implication": "abandonment was recent, not decades old"
+        "id": "rusted_dagger",
+        "type": "item",
+        "name": "Rusted Dagger",
+        "description": "An old dagger wedged under a loose cobblestone.",
+        "is_interactable": true,
+        "is_discovered": false,
+        "perception_dc": 14
       },
       {
-        "observation": "Tools and belongings left behind",
-        "implication": "departure may have been sudden or forced"
+        "id": "quest_hint_bandits",
+        "type": "quest_hook",
+        "observation": "Scraps of cloth with a bandit insignia caught on a broken fence.",
+        "quest": "bandit_hideout",
+        "is_discovered": false,
+        "perception_dc": 15
       }
-    ],
-    "history": []
+    ]
   },
   "tavern": {
     "title": "The Rusty Dragon Tavern Brawl",
@@ -94,7 +111,7 @@
         "name": "drunken merchant",
         "status": "angry, intoxicated",
         "equipment": ["purse", "fine clothes"],
-        "disposition": "hostile to elf"
+        "disposition": "is_hostile to elf"
       },
       {
         "name": "hooded elf",
@@ -137,7 +154,7 @@
         "name": "spectral librarian",
         "status": "patrolling, unaware of you yet",
         "equipment": ["ethereal form", "supernatural senses"],
-        "disposition": "hostile to intruders"
+        "disposition": "is_hostile to intruders"
       },
       {
         "name": "unknown scholar",
@@ -184,19 +201,19 @@
         "name": "goblin leader",
         "status": "aggressive, commanding",
         "equipment": ["piecemeal armor", "weapon", "shield"],
-        "disposition": "hostile, wants to rob you"
+        "disposition": "is_hostile, wants to rob you"
       },
       {
         "name": "goblin archer",
         "status": "positioned above, aiming",
         "equipment": ["short bow", "arrows"],
-        "disposition": "hostile, providing ranged support"
+        "disposition": "is_hostile, providing ranged support"
       },
       {
         "name": "two goblin warriors",
         "status": "attacking with melee weapons",
         "equipment": ["rusty scimitars", "crude shields"],
-        "disposition": "hostile, reckless fighters"
+        "disposition": "is_hostile, reckless fighters"
       }
     ],
     "items_and_creatures": [
@@ -237,7 +254,7 @@
         "name": "Lord Blackthorne",
         "status": "accusing, confident",
         "equipment": ["rich clothing", "noble's sword"],
-        "disposition": "hostile, politically powerful"
+        "disposition": "is_hostile, politically powerful"
       },
       {
         "name": "The Queen",
@@ -305,7 +322,7 @@
           "massive size",
           "treasure sense"
         ],
-        "disposition": "will be extremely hostile if awakened"
+        "disposition": "will be extremely is_hostile if awakened"
       }
     ],
     "items_of_interest": [
@@ -399,7 +416,7 @@
         "name": "Bandit Scout",
         "status": "crouched behind rocks, watching road",
         "equipment": ["short bow", "leather armor", "rusty dagger"],
-        "disposition": "hostile, looking for easy targets",
+        "disposition": "is_hostile, looking for easy targets",
         "description": "Dirty outlaw in patched clothing"
       },
       {
@@ -438,7 +455,7 @@
         "name": "Orc Chieftain Grash",
         "status": "commanding war party, battle-ready",
         "equipment": ["spiked armor", "massive war axe", "bone necklace"],
-        "disposition": "extremely hostile, tactical leader",
+        "disposition": "extremely is_hostile, tactical leader",
         "description": "Scarred orc leader with intimidating presence"
       },
       {

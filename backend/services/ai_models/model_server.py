@@ -23,6 +23,7 @@ from backend.models import (
     GenerateSceneRequest,
     GeneratedNarration,
     HealthResponse,
+    ValidationResult
 )
 
 
@@ -204,7 +205,6 @@ class ModelServer:
                     )
 
             try:
-                # Use your existing parser logic
                 result = self.model_manager.parse_action(request.action)
 
                 return ParsedAction(
@@ -222,6 +222,7 @@ class ModelServer:
 
         @app.post("/generate_action", response_model=GeneratedNarration)
         def generate_action_narration(request: GenerateActionRequest):
+            """Generate narrative telling of the players action"""
             if not self.model_manager.is_narrator_ready():
                 # Try to auto-load
                 print("[MODEL] Narrator not ready, attempting to load...")
@@ -246,7 +247,7 @@ class ModelServer:
 
         @app.post("/generate_scene", response_model=GeneratedNarration)
         def generate_scene_narration(request: GenerateSceneRequest):
-            """Generate narration using fine-tuned model"""
+            """Generate narration"""
             if not self.model_manager.is_narrator_ready():
                 # Try to auto-load
                 print("[MODEL] Narrator not ready, attempting to load...")
@@ -256,7 +257,6 @@ class ModelServer:
                     )
 
             try:
-                # Use your existing narrator logic
                 narration = self.model_manager.generate_scene_narration(request)
 
                 return GeneratedNarration(narration=narration)
@@ -264,6 +264,20 @@ class ModelServer:
             except Exception as e:
                 raise HTTPException(
                     status_code=400, detail=f"Generate scene failed: {e}"
+                )
+
+        @app.post("/generate_invalid_action", response_model=GeneratedNarration)
+        def generate_invalid_action(request: ValidationResult):
+            """Generate narration of invalid user action... for flavor?"""
+
+            try:
+                narration = self.model_manager.generate_invalid_action_narration(request)
+
+                return GeneratedNarration(narration=narration)
+
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400, detail=f"Generate invalid action failed: {e}"
                 )
 
         # ==========================================
