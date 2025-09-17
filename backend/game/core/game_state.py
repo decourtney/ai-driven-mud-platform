@@ -2,7 +2,8 @@ import uuid
 import json
 import logging
 from typing import List, Dict, Any, Optional, Set
-from datetime import datetime
+from prisma import Json
+from datetime import datetime, timezone
 from backend.game.core.character_state import CharacterState
 
 logger = logging.getLogger(__name__)
@@ -14,42 +15,35 @@ class GameState:
     Tracks characters, scene, narrative state, and game progression.
     """
 
-    def __init__(
-        self,
-        player: CharacterState,
-    ):
-        self.game_id = str(uuid.uuid4())
-        self.player = player
-        self.npcs: List[CharacterState] = []
-        self.current_scene: Dict[str, Any] = {}
-        self.loaded_scenes: List[Dict[str, Any]] = []
+    def __init__(self, game_id: str):
+        self.id: Optional[str] = None
+        self.game_id = game_id
+        self.current_scene: Dict[str, Any] = None
         self.turn_counter = 0
 
         # Game progression - Not sure about these yet
-        self.objectives: List[str] = []
-        self.completed_objectives: List[str] = []
-        self.story_beats: List[str] = []
+        self.objectives: List[str] = None
+        self.completed_objectives: List[str] = None
+        self.story_beats: List[str] = None
 
         # Combat state
         self.in_combat = False
-        self.initiative_order: List[str] = []  # Character names in initiative order
+        self.initiative_order: List[str] = None  # Character names in initiative order
         self.current_turn_character: Optional[str] = None
 
         # Environment - Dont know if weather and time will factor in - Time could be based on Turn Count
         self.weather = "clear"
         self.time_of_day = "day"
-        self.location_history: List[str] = (
-            []
-        )  # This may be controlled by a Location/Map manager
+        self.location_history: List[str] = None
 
         # Narrative state
-        self.recent_events: List[str] = []  # Last few turns of narrative
+        self.recent_events: List[str] = None  # Last few turns of narrative
         self.important_npcs_met: Set[str] = set()
-        self.items_discovered: List[str] = []
+        self.items_discovered: List[str] = None
 
         # Session metadata
-        self.session_started = datetime.now()
-        self.last_updated = datetime.now()
+        self.session_started = datetime.now(timezone.utc)
+        self.last_updated = datetime.now(timezone.utc)
         self.save_version = "1.0"
 
     # Character management - TODO: Method of getting npc by name will probably not work later
@@ -63,14 +57,14 @@ class GameState:
     def add_npc(self, npc: CharacterState):
         """Add new NPC to the game"""
         self.npcs.append(npc)
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     def remove_npc(self, name: str) -> bool:
         """Remove NPC from game"""
         for i, npc in enumerate(self.npcs):
             if npc.name.lower() == name.lower():
                 self.npcs.pop(i)
-                self.last_updated = datetime.now()
+                self.last_updated = datetime.now(timezone.utc)
                 return True
         return False
 
@@ -97,7 +91,7 @@ class GameState:
         self.current_turn_character = (
             self.initiative_order[0] if self.initiative_order else None
         )
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     def end_combat(self):
         """End combat encounter"""
@@ -109,7 +103,7 @@ class GameState:
         for character in self.get_all_characters():
             character.reset_turn_actions()
 
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     def advance_turn(self):
         """Advance to next character's turn"""
@@ -132,7 +126,7 @@ class GameState:
             for character in self.get_all_characters():
                 character.update_status_effects()
 
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     # Scene management
     def update_scene(self, new_scene_data: Dict[str, Any]):
@@ -146,14 +140,14 @@ class GameState:
         ):
             self.location_history.append(new_location)
 
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     def add_scene_flag(self, flag: str, value: Any):
         """Add a flag to the current scene"""
         if "flags" not in self.scene:
             self.scene["flags"] = {}
         self.scene["flags"][flag] = value
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     def get_scene_flag(self, flag: str, default: Any = None) -> Any:
         """Get a scene flag value"""
@@ -164,14 +158,14 @@ class GameState:
         """Add new objective"""
         if objective not in self.objectives:
             self.objectives.append(objective)
-            self.last_updated = datetime.now()
+            self.last_updated = datetime.now(timezone.utc)
 
     def complete_objective(self, objective: str) -> bool:
         """Mark objective as completed"""
         if objective in self.objectives:
             self.objectives.remove(objective)
             self.completed_objectives.append(objective)
-            self.last_updated = datetime.now()
+            self.last_updated = datetime.now(timezone.utc)
             return True
         return False
 
@@ -183,73 +177,101 @@ class GameState:
     def add_story_beat(self, event: str):
         """Add important story event"""
         self.story_beats.append(event)
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     def add_recent_event(self, event: str, max_recent: int = 10):
         """Add to recent events (for narrative context)"""
         self.recent_events.append(event)
         if len(self.recent_events) > max_recent:
             self.recent_events.pop(0)
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     def meet_npc(self, npc_name: str):
         """Record meeting an important NPC"""
         self.important_npcs_met.add(npc_name)
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
+    # ------------------------------
+    # DB CONVERSION
+    # ------------------------------
+
+    @classmethod
+    def from_record(cls, record):
+        obj = cls(record.game_id)
+        obj.id = record.id
+        obj.current_scene = record.current_scene or {}
+        obj.turn_counter = record.turn_counter
+        obj.objectives = record.objectives or []
+        obj.completed_objectives = record.completed_objectives or []
+        obj.story_beats = record.story_beats or []
+        obj.in_combat = record.in_combat
+        obj.initiative_order = record.initiative_order or []
+        obj.current_turn_character = record.current_turn_character
+        obj.weather = record.weather or "clear"
+        obj.time_of_day = record.time_of_day or "day"
+        obj.location_history = record.location_history or []
+        obj.recent_events = record.recent_events or []
+        obj.important_npcs_met = set(record.important_npcs_met or [])
+        obj.items_discovered = record.items_discovered or []
+        obj.session_started = record.session_started
+        obj.save_version = record.save_version
+        return obj
+
+    def to_db(self, for_create: bool = False):
+        data = {
+            "game_id": self.game_id,
+            "current_scene": Json(self.current_scene or {}),
+            "turn_counter": self.turn_counter,
+            "objectives": Json(self.objectives or []),
+            "completed_objectives": Json(self.completed_objectives or []),
+            "story_beats": Json(self.story_beats or []),
+            "in_combat": self.in_combat,
+            "initiative_order": Json(self.initiative_order or []),
+            "current_turn_character": self.current_turn_character,
+            "weather": self.weather,
+            "time_of_day": self.time_of_day,
+            "location_history": Json(self.location_history or []),
+            "recent_events": Json(self.recent_events or []),
+            "important_npcs_met": Json(list(self.important_npcs_met)),
+            "items_discovered": Json(self.items_discovered or []),
+            "session_started": (
+                self.session_started.isoformat() if self.session_started else None
+            ),
+            "save_version": self.save_version,
+        }
+
+        if not for_create:
+            data["id"] = self.id
+            # optionally include last_updated or other fields for update
+
+        return data
+
+    # ------------------------------
     # Serialization
+    # ------------------------------
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert game state to dictionary for saving"""
         try:
             return {
+                "id": self.id,
                 "game_id": self.game_id,
-                "player": (
-                    self.player.to_dict() if hasattr(self.player, "to_dict") else None
-                ),
-                "npcs": [npc.to_dict() for npc in self.npcs if hasattr(npc, "to_dict")],
-                "current_scene": self.current_scene,
-                "loaded_scenes": (
-                    self.loaded_scenes.copy() if self.loaded_scenes else []
-                ),
                 "turn_counter": self.turn_counter,
-                # Game progression
-                "objectives": self.objectives.copy() if self.objectives else [],
-                "completed_objectives": (
-                    self.completed_objectives.copy()
-                    if self.completed_objectives
-                    else []
-                ),
-                "story_beats": self.story_beats.copy() if self.story_beats else [],
-                # Combat state
                 "in_combat": self.in_combat,
-                "initiative_order": (
-                    self.initiative_order.copy() if self.initiative_order else []
-                ),
-                "current_turn_character": self.current_turn_character,
-                # Environment
                 "weather": self.weather,
                 "time_of_day": self.time_of_day,
-                "location_history": (
-                    self.location_history.copy() if self.location_history else []
-                ),
-                # Narrative
-                "recent_events": (
-                    self.recent_events.copy() if self.recent_events else []
-                ),
-                "important_npcs_met": (
-                    list(self.important_npcs_met) if self.important_npcs_met else []
-                ),
-                "items_discovered": (
-                    self.items_discovered.copy() if self.items_discovered else []
-                ),
-                # Metadata
-                "session_started": (
-                    self.session_started.isoformat() if self.session_started else None
-                ),
-                "last_updated": (
-                    self.last_updated.isoformat() if self.last_updated else None
-                ),
+                "session_started": self.session_started.isoformat(),
+                "last_updated": self.last_updated.isoformat(),
                 "save_version": self.save_version,
+                "current_scene": self.current_scene or Json({}),
+                "objectives": self.objectives or Json([]),
+                "completed_objectives": self.completed_objectives or Json([]),
+                "story_beats": self.story_beats or Json([]),
+                "initiative_order": self.initiative_order or Json([]),
+                "location_history": self.location_history or Json([]),
+                "recent_events": self.recent_events or Json([]),
+                "important_npcs_met": self.important_npcs_met or Json([]),
+                "items_discovered": self.items_discovered or Json([]),
             }
         except Exception as e:
             logging.error(f"Error serializing GameState: {e}")
@@ -259,29 +281,14 @@ class GameState:
     def from_dict(cls, data: Dict[str, Any]) -> "GameState":
         """Load game state from dictionary with robust error handling"""
         try:
-            # Validate required data
-            if not data.get("player"):
-                raise ValueError(
-                    "Player data is required for GameState deserialization"
-                )
-
-            # Restore player with error handling
-            try:
-                player = CharacterState.from_dict(data["player"])
-            except Exception as e:
-                logging.error(f"Error deserializing player: {e}")
-                raise ValueError(f"Failed to deserialize player data: {e}")
-
-            # Create game state instance
-            game_state = cls(player=player)
+            game_state = cls()
 
             # Define field mappings with types and defaults
             field_mappings = {
-                # Basic fields
-                "game_id": (str, str(uuid.uuid4())),
+                "id": (str),
+                "game_id": (str),
                 "turn_counter": (int, 0),
                 "save_version": (str, "1.0"),
-                # Lists
                 "objectives": (list, []),
                 "completed_objectives": (list, []),
                 "story_beats": (list, []),
@@ -289,14 +296,10 @@ class GameState:
                 "location_history": (list, []),
                 "recent_events": (list, []),
                 "items_discovered": (list, []),
-                "loaded_scenes": (list, []),
-                # Strings
                 "weather": (str, "clear"),
                 "time_of_day": (str, "day"),
                 "current_turn_character": (type(None), None),  # Optional string
-                # Booleans
                 "in_combat": (bool, False),
-                # Complex objects
                 "current_scene": (dict, {}),
             }
 
@@ -325,26 +328,10 @@ class GameState:
                     )
                     setattr(game_state, field_name, default_value)
 
-            # Handle NPCs with error recovery
-            try:
-                npcs_data = data.get("npcs", [])
-                game_state.npcs = []
-                for i, npc_data in enumerate(npcs_data):
-                    try:
-                        npc = CharacterState.from_dict(npc_data)
-                        game_state.npcs.append(npc)
-                    except Exception as e:
-                        logging.warning(
-                            f"Failed to deserialize NPC {i}: {e}. Skipping."
-                        )
-            except Exception as e:
-                logging.error(f"Error processing NPCs: {e}")
-                game_state.npcs = []
-
             # Handle datetime fields with fallbacks
             datetime_fields = {
-                "session_started": datetime.now(),
-                "last_updated": datetime.now(),
+                "session_started": datetime.now(timezone.utc),
+                "last_updated": datetime.now(timezone.utc),
             }
 
             for field_name, fallback in datetime_fields.items():
@@ -381,7 +368,7 @@ class GameState:
                 game_state.important_npcs_met = set()
 
             # Update last_updated to reflect loading
-            game_state.last_updated = datetime.now()
+            game_state.last_updated = datetime.now(timezone.utc)
 
             return game_state
 

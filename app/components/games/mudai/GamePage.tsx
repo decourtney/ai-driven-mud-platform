@@ -21,6 +21,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
     sendAction,
     chatHistory,
     gameState,
+    playerState,
     lastError,
     reconnect,
   } = useGameWebSocket({
@@ -57,7 +58,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
     return (
       <div className="flex items-center justify-center flex-1 text-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 mx-auto border-b-2 border-green-500 mb-4"></div>
           <p className="text-green-400 font-mono">
             {!isConnected
               ? "Connecting to game server..."
@@ -113,7 +114,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
           activeTab !== "character" ? "hidden md:flex" : ""
         }`}
       >
-        <CharacterPanel playerState={gameState.player} />
+        <CharacterPanel playerState={playerState} />
       </div>
 
       {/* Chat Interface */}

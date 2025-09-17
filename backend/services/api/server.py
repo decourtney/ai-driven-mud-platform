@@ -30,6 +30,7 @@ from backend.services.api.connection_manager import (
 from backend.game.game_registry import GAME_REGISTRY
 from backend.game.core.game_session_manager import GameSessionManager
 from backend.game.core.character_state import CharacterState
+from backend.game.core.event_bus import EventBus
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.models import (
     GameInfo,
@@ -51,10 +52,13 @@ class GameAPI:
     """
 
     def __init__(self, model_server_url: str = "http://localhost:8001", lifespan=None):
+        self.event_bus = EventBus()
         self.model_client = AsyncModelServiceClient(model_server_url)
         self.connection_manager = ConnectionManager()
         self.session_manager = GameSessionManager(
-            model_client=self.model_client, connection_manager=self.connection_manager
+            model_client=self.model_client,
+            connection_manager=self.connection_manager,
+            event_bus=self.event_bus,
         )
         self.app = self._create_app(lifespan=lifespan)
 
@@ -62,7 +66,7 @@ class GameAPI:
         """
         Create and configure FastAPI application
         """
-        
+
         app = FastAPI(
             title="D&D Streaming Game API",
             version="2.0.0",
@@ -96,7 +100,7 @@ class GameAPI:
             """
             Get WebSocket connection status (for debugging)
             """
-            
+
             total_connections = sum(
                 len(conns) for conns in self.connection_manager.connections.values()
             )
@@ -118,14 +122,14 @@ class GameAPI:
             WebSocket endpoint for real-time game communication.
             Equivalent to the REST process_player_action but with persistent connection.
             """
-            
+
             await self.connection_manager.connect(websocket, session_id, user_id)
 
             try:
                 # Send initial session data
                 try:
                     await self.session_manager.get_session(
-                        slug=slug, session_id=session_id, user_id=user_id
+                        game_id=slug, session_id=session_id, user_id=user_id
                     )
                 except Exception as e:
                     if websocket.client_state == WebSocketState.CONNECTED:
@@ -187,7 +191,7 @@ class GameAPI:
             """
             Health check endpoint with model service status
             """
-            
+
             model_status = await self.model_client.get_status()
 
             return {
@@ -215,10 +219,10 @@ class GameAPI:
             """
             List all registered engine instances by game
             """
-            
+
             try:
                 instances = await self.session_manager.list_registered_engines_by_game(
-                    slug=slug
+                    game_id=slug
                 )
 
                 return instances
@@ -232,7 +236,7 @@ class GameAPI:
             """
             List all active sessions (for admin/debugging)
             """
-            
+
             return {
                 "total_sessions": len(self.active_sessions),
                 "sessions": [
@@ -255,10 +259,10 @@ class GameAPI:
             """
             Get list of available games
             """
-            
+
             return [
                 GameInfo(
-                    slug=slug,
+                    slug=meta["game_id"],
                     engine=meta["engine"],
                     title=meta["title"],
                     description=meta["description"],
@@ -273,18 +277,18 @@ class GameAPI:
                 for slug, meta in GAME_REGISTRY.items()
             ]
 
-        @app.get("/lobby/{game_slug}")
-        def get_game_details(game_slug: str):
+        @app.get("/lobby/{slug}")
+        def get_game_details(game_id: str):
             """
             Get detailed information about a specific game
             """
-            
-            if game_slug not in GAME_REGISTRY:
+
+            if game_id not in GAME_REGISTRY:
                 raise HTTPException(status_code=404, detail="Game not found")
 
-            meta = GAME_REGISTRY[game_slug]
+            meta = GAME_REGISTRY[game_id]
             return GameInfo(
-                slug=game_slug,
+                slug=meta["game_id"],
                 engine=meta["engine"],
                 title=meta["title"],
                 description=meta["description"],
@@ -309,10 +313,10 @@ class GameAPI:
             """
             Check for existing session
             """
-            
+
             try:
                 session_id = await self.session_manager.query_session_status(
-                    user_id=user_id, slug=slug
+                    user_id=user_id, game_id=slug
                 )
                 return {"session_id": session_id}
             except Exception as e:
@@ -324,18 +328,15 @@ class GameAPI:
         async def create_game_session(
             slug: str = Path(...),
             user_id: str = Path(...),
-            player_state: Dict[str, Any] = Body(...),
+            character_config: Dict[str, Any] = Body(...),
         ):
             """
             Create a new game session
             """
-            
-            if slug not in GAME_REGISTRY:
-                raise HTTPException(status_code=404, detail="Game not found")
 
             try:
                 session = await self.session_manager.create_session(
-                    player_state=player_state, slug=slug, user_id=user_id
+                    character_config=character_config, game_id=slug, user_id=user_id
                 )
 
                 return {
@@ -354,9 +355,9 @@ class GameAPI:
             """
             Delete/end a game session
             """
-            
+
             try:
-                await self.session_manager.delete_sessions(slug=slug, user_id=user_id)
+                await self.session_manager.delete_sessions(game_id=slug, user_id=user_id)
                 return {"success": True}
             except ValueError as e:
                 raise HTTPException(status_code=404, detail=str(e))
@@ -374,7 +375,7 @@ class GameAPI:
             """
             Get model service status (proxy endpoint)
             """
-            
+
             return await self.model_client.get_status()
 
         @app.post("/models/load")
@@ -382,7 +383,7 @@ class GameAPI:
             """
             Load models via model service
             """
-            
+
             try:
                 success = await self.model_client.load_all_models()
                 return {"success": success}
@@ -394,7 +395,7 @@ class GameAPI:
             """
             Unload models via model service
             """
-            
+
             try:
                 success = await self.model_client.unload_all_models()
                 return {"success": success}
@@ -406,7 +407,7 @@ class GameAPI:
             """
             Reload models via model service
             """
-            
+
             try:
                 success = await self.model_client.reload_models()
                 return {"success": success}
@@ -422,7 +423,7 @@ class GameAPI:
             """
             Test action parsing directly
             """
-            
+
             if not await self.model_client.is_healthy():
                 raise HTTPException(
                     status_code=503, detail="Model service not available"
@@ -447,7 +448,7 @@ class GameAPI:
             """
             Test action narration generation directly
             """
-            
+
             if not await self.model_client.is_healthy():
                 raise HTTPException(
                     status_code=503, detail="Model service not available"
@@ -478,7 +479,7 @@ class GameAPI:
             """
             Test action narration generation directly
             """
-            
+
             if not await self.model_client.is_healthy():
                 raise HTTPException(
                     status_code=503, detail="Model service not available"

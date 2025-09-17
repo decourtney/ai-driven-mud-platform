@@ -16,7 +16,7 @@ from backend.models import (
     GenerateSceneRequest,
     GeneratedNarration,
     ParsedAction,
-    ValidationResult
+    ValidationResult,
 )
 
 
@@ -196,7 +196,9 @@ class AsyncModelServiceClient:
     async def parse_action(self, request: ParseActionRequest) -> ParsedAction:
         try:
             response = await self.client.post(
-                f"{self.base_url}/parse_action", json=request.model_dump()
+                f"{self.base_url}/parse_action",
+                content=request.model_dump_json(),
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 
@@ -265,7 +267,9 @@ class AsyncModelServiceClient:
             print(f"[CLIENT] Generation request failed: {e}")
             return GeneratedNarration(action_type="unknown", details=str(e))
 
-    async def generate_invalid_action(self, request: ValidationResult) -> GeneratedNarration:
+    async def generate_invalid_action(
+        self, request: ValidationResult
+    ) -> GeneratedNarration:
         try:
             response = await self.client.post(
                 f"{self.base_url}/generate_invalid_action", json=request.model_dump()

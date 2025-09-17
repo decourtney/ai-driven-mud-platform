@@ -76,7 +76,6 @@ class ConnectionManager:
 
             logger.info(f"Client {user_id} disconnected from session {session_id}")
 
-
     async def send_to_client(self, websocket: WebSocket, message: Dict[str, Any]):
         """Send message to a specific client"""
         # Check if websocket is still in our managed connections
@@ -157,18 +156,21 @@ class WebSocketMessage:
 
     @staticmethod
     def initial_state(
-        game_state: Dict[str, Any], chat_history: List[Dict[str, Any]]
+        game_state: Dict[str, Any],
+        player_state: Dict[str, Any],
+        chat_history: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """Create initial state message"""
         return {
             "type": "initial_state",
             "data": {
                 "game_state": game_state,
+                "player_state": player_state,
                 "chat_history": chat_history,
             },
             "timestamp": datetime.now().isoformat(),
         }
-        
+
     @staticmethod
     def action_received(action: str) -> Dict[str, Any]:
         """Create action received acknowledgment"""
@@ -177,7 +179,7 @@ class WebSocketMessage:
             "data": {"action": action},
             "timestamp": datetime.now().isoformat(),
         }
-        
+
     @staticmethod
     def chat_message(
         id: str, speaker: str, content: str, timestamp: str
@@ -208,8 +210,6 @@ class WebSocketMessage:
             "timestamp": datetime.now().isoformat(),
         }
 
-
-
     @staticmethod
     def error(message: str, error_code: Optional[str] = None) -> Dict[str, Any]:
         """Create error message"""
@@ -232,5 +232,3 @@ class WebSocketMessage:
             "data": updates,
             "timestamp": datetime.now().isoformat(),
         }
-
- 

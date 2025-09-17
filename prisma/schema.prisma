@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -24,8 +18,9 @@ model User {
   emailVerified DateTime?
   image         String?
   accounts      Account[]
+  game_session  GameSession[]
+  player_state  PlayerState[]
   sessions      Session[]
-  gameSessions  GameSession[]
 }
 
 model Account {
@@ -41,8 +36,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -52,8 +46,7 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
@@ -64,18 +57,121 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-/// Game-specific table to persist a player’s current playthrough
+/// Game-specific tables
 model GameSession {
-  id         String        @id @default(cuid())
-  user_id    String
-  slug       String
-  game_state Json // game state
-  is_active  Boolean       @default(false)
-  created_at DateTime      @default(now())
-  updated_at DateTime      @updatedAt
-  messages   ChatMessage[]
+  id           String        @id @default(cuid())
+  user_id      String
+  is_active    Boolean       @default(false)
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @updatedAt
+  game_id      String
+  messages     ChatMessage[]
+  user         User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  game_state   GameState?
+  player_state PlayerState[]
+  scene_state  SceneDiff[]
+}
 
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+model GameState {
+  id                     String      @id @default(cuid())
+  game_session_id        String      @unique
+  weather                String?
+  in_combat              Boolean     @default(false)
+  objectives             Json?
+  story_beats            Json?
+  time_of_day            String?
+  save_version           String?
+  turn_counter           Int?
+  current_turn_character Int?
+  current_scene          Json?
+  recent_events          Json?
+  session_started        DateTime?
+  initiative_order       Json?
+  items_discovered       Json?
+  location_history       Json?
+  important_npcs_met     Json?
+  completed_objectives   Json?
+  created_at             DateTime    @default(now())
+  updated_at             DateTime    @updatedAt
+  game_id                String
+  game_session           GameSession @relation(fields: [game_session_id], references: [id], onDelete: Cascade)
+}
+
+model PlayerState {
+  id              String        @id @default(cuid())
+  user_id         String        @unique
+  game_session_id String
+  name            String
+  bio             String?
+  gold            Int           @default(0)
+  level           Int           @default(1)
+  max_hp          Int
+  current_hp      Int
+  max_mp          Int
+  current_mp      Int
+  strength        Int
+  dexterity       Int
+  constitution    Int
+  intelligence    Int
+  wisdom          Int
+  charisma        Int
+  armor_class     Int
+  can_act         Boolean       @default(true)
+  is_alive        Boolean       @default(true)
+  temporary_hp    Int           @default(0)
+  character_type  String
+  equipped_armor  Json?
+  equipped_weapon Json?
+  inventory       Json?
+  status_effects  Json?
+  location        String?
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+  ChatMessage     ChatMessage[]
+  game_session    GameSession   @relation(fields: [game_session_id], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model SceneDiff {
+  id              String      @id @default(cuid())
+  game_session_id String
+  zone            String
+  scene           String
+  diff            Json?
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+  npcs            NpcState[]
+  game_session    GameSession @relation(fields: [game_session_id], references: [id], onDelete: Cascade)
+}
+
+model NpcState {
+  id             String    @id @default(cuid())
+  scene_state_id String
+  npc_id         String
+  name           String?
+  type           String
+  is_alive       Boolean   @default(true)
+  current_hp     Int?
+  max_hp         Int?
+  ai_state       Json?
+  inventory      Json?
+  dialogue_state Json?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  scene_state    SceneDiff @relation(fields: [scene_state_id], references: [id], onDelete: Cascade)
+}
+
+model ChatMessage {
+  id           String      @id @default(cuid())
+  session_id   String
+  speaker      SpeakerType
+  action       ActionType
+  content      String
+  created_at   DateTime    @default(now())
+  player_id    String
+  updated_at   DateTime    @updatedAt
+  player       PlayerState @relation(fields: [player_id], references: [id])
+  game_session GameSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
 }
 
 enum SpeakerType {
@@ -91,17 +187,6 @@ enum ActionType {
   social
   interact
   movement
-  user_prompt // User input
-  narrate // For any narrations not prompted by actions
-}
-
-model ChatMessage {
-  id         String      @id @default(cuid())
-  session_id String
-  speaker    SpeakerType
-  action     ActionType
-  content    String
-  timestamp  DateTime    @default(now())
-
-  gameSession GameSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  user_prompt
+  narrate
 }

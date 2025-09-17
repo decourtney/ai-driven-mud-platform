@@ -20,7 +20,7 @@ const quests: Quest[] = [
 export default function CharacterPanel({
   playerState,
 }: {
-  playerState: CharacterState;
+  playerState: CharacterState | null;
 }) {
   const [activeTab, setActiveTab] = useState("gear");
 
@@ -81,6 +81,17 @@ export default function CharacterPanel({
       />
     </div>
   );
+
+  // Show loading until we have game state
+  if (!playerState) {
+    return (
+      <div className="flex items-center justify-center flex-1 text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 mx-auto border-b-2 border-green-500 mb-4"></div>
+        </div>
+      </div>
+    );
+  }
 
   const TabContent = () => {
     switch (activeTab) {

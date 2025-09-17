@@ -8,13 +8,15 @@ from backend.models import (
     GameCondition,
     ValidationResult,
     CharacterType,
-    ParseActionRequest
+    ParseActionRequest,
 )
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.game.core.game_session_manager import GameSessionManager
 from backend.game.core.dice_system import BaseDiceRoller
 from backend.game.core.character_state import CharacterState
 from backend.game.core.game_state import GameState
+from backend.game.core.scene_manager import SceneManager
+from backend.game.core.event_bus import EventBus
 
 
 class BaseGameEngine(ABC):
@@ -28,11 +30,16 @@ class BaseGameEngine(ABC):
         self,
         model_client: AsyncModelServiceClient,
         session_manager: GameSessionManager,
+        event_bus: EventBus,
         dice_roller: Optional[BaseDiceRoller] = None,
         **kwargs,
     ):
         self.model_client = model_client
         self.session_manager = session_manager
+        self.event_bus = event_bus
+
+        # Subscribe to scene manager events
+        self.event_bus.subscribe("scene_changed", self.on_scene_diff_update)
 
         # Allow explicit dice roller override
         if dice_roller:
@@ -42,6 +49,8 @@ class BaseGameEngine(ABC):
             self.dice_roller = self.get_default_dice_roller()
 
         self.game_state = None
+        self.player_state = None
+        self.scene_manager = None
         self.max_invalid_attempts = kwargs.get("max_invalid_attempts", 3)
 
     @abstractmethod
@@ -52,51 +61,59 @@ class BaseGameEngine(ABC):
     # ----------------------------
     # Game State Management
     # ----------------------------
-    def create_game_state(self, player_state: Dict[str, Any]):
+    def create_initial_states(self, character_config: Dict[str, Any], game_id: str):
         """Create initial GameState with player, NPCs, and scene data"""
 
+        self.game_state = GameState(game_id=game_id)
+        print("[DEBUG]Game State Obj:", self.game_state)
+
         # If wrapped in `player_state` key from API - I should probably inspect this
-        if "player_state" in player_state:
-            player_state = player_state["player_state"]
+        if "character_config" in character_config:
+            character_config = character_config["character_config"]
 
-        print(player_state)
-
-        player_state_obj = CharacterState(
-            name=player_state["name"],
-            strength=player_state["strength"],
-            dexterity=player_state["dexterity"],
-            constitution=player_state["constitution"],
-            intelligence=player_state["intelligence"],
-            wisdom=player_state["wisdom"],
-            charisma=player_state["charisma"],
-            character_type=CharacterType(player_state["character_type"]),
-            bio=player_state["bio"],
+        player_state = CharacterState(
+            name=character_config["name"],
+            strength=character_config["strength"],
+            dexterity=character_config["dexterity"],
+            constitution=character_config["constitution"],
+            intelligence=character_config["intelligence"],
+            wisdom=character_config["wisdom"],
+            charisma=character_config["charisma"],
+            character_type=CharacterType(character_config["character_type"]),
+            bio=character_config["bio"],
         )
-        print("[DEBUG]Player State Object:", player_state_obj)
-        initial_scene = {
-            "id": "intro",
-            "title": "Introduction",
-            "description": "And so it begins...",
-        }
+        print("[DEBUG]Player State Obj:", player_state)
+        self.player_state = player_state
 
-        self.game_state = GameState(
-            player=player_state_obj,
-        )
-        print("[DEBUG]Game State Object:", self.game_state)
-        serialized_game_state = self.game_state.to_dict()
+        scene_manager = SceneManager(game_id=game_id, event_bus=self.event_bus)
+        self.scene_manager = scene_manager
 
-        return serialized_game_state
+        return self.game_state, player_state
 
-    def load_serialized_game_state(self, serialized_game_state):
+    def load_game_state(self, game_state, player_state):
         print("[DEBUG] LOADING GAME STATE INTO ENGINE")
-        self.game_state = GameState.from_dict(serialized_game_state)
+        try:
+            print(game_state)
+            self.game_state = GameState.from_record(game_state)
+            print("[DEBUG] raw game_state record:", game_state)
+        except Exception as e:
+            print("[ERROR] while loading GameState:", e)
+            raise
+
+        try:
+            self.player_state = CharacterState.from_record(player_state)
+            print("[DEBUG] raw player_state record:", player_state)
+        except Exception as e:
+            print("[ERROR] while loading CharacterState:", e)
+            raise
+
         return self.game_state
 
-    def get_serialized_game_state(self) -> dict[str, Any]:
-        print("[DEBUG] SERIALIZING GAME STATE")
-        serialized_game_state = self.game_state.to_dict()
+    def get_serialized_game_state(self) -> Tuple[Dict, Dict]:
         print("[DEBUG] RETURNING SERIALIZED GAME STATE")
-        return serialized_game_state
+        serialized_game_state = self.game_state.to_db()
+        serialized_player_state = self.player_state.to_db()
+        return serialized_game_state, serialized_player_state
 
     def update_game_state(self, results: List[ActionResult]):
         """Apply results of actions to game state"""
@@ -124,12 +141,12 @@ class BaseGameEngine(ABC):
     # ----------------------------
     # Scene Management
     # ----------------------------
-    def present_scene(self) -> str:
+    async def present_scene(self) -> str:
         """Generate and return scene description for player"""
         if not self.game_state:
             raise RuntimeError("Game state not initialized")
 
-        if not self.model_client.is_narrator_ready():
+        if not await self.model_client.is_narrator_ready():
             raise RuntimeError("Narrator not loaded")
 
         # Use the narrator to generate scene description based on current game state
@@ -138,6 +155,12 @@ class BaseGameEngine(ABC):
         )
 
         return scene_description
+
+    async def on_scene_diff_update(self, scene_id: str, diff: Dict[str, Any]):
+        print(f"[EngineManager] Received scene diff for {scene_id}")
+
+        # Engine decides whether to persist immediately or batch
+        await self.session_manager.save_scene_diff(scene_id, diff)
 
     # ----------------------------
     # Abstract Action Validation
@@ -150,15 +173,15 @@ class BaseGameEngine(ABC):
         """
         pass
 
-    @abstractmethod
-    def validate_action_constraints(
-        self, parsed_action: ParsedAction
-    ) -> ValidationResult:
-        """
-        Validate action type specific constraints (weapons, spells, etc.).
-        Game-specific implementation required.
-        """
-        pass
+    # @abstractmethod
+    # def validate_action_constraints(
+    #     self, parsed_action: ParsedAction
+    # ) -> ValidationResult:
+    #     """
+    #     Validate action type specific constraints (weapons, spells, etc.).
+    #     Game-specific implementation required.
+    #     """
+    #     pass
 
     def validate_scene_rules(self, parsed_action: ParsedAction) -> ValidationResult:
         """
@@ -207,7 +230,6 @@ class BaseGameEngine(ABC):
     # Player Turn Processing
     # ----------------------------
 
-
     async def execute_player_turn(self, action: str) -> Tuple[dict, GameCondition]:
         """
         Execute a complete player turn with validation loop.
@@ -219,18 +241,16 @@ class BaseGameEngine(ABC):
             try:
                 # Parse player input
                 parsed_action = await self.model_client.parse_action(
-                    ParseActionRequest(action=action)
+                    ParseActionRequest(action=action, actor_type=CharacterType.player)
                 )
-                print("[DEBUG]Parsed Action:",parsed_action)
+                print("[DEBUG]Parsed Action:", parsed_action)
                 # Validate action
                 validation_result = self.validate_action(parsed_action)
-                print("[DEBUG]Validation Result:",validation_result)
+                print("[DEBUG]Validation Result:", validation_result)
                 if not validation_result.is_valid:
                     invalid_attempts += 1
-                    error_narration = (
-                        await self.model_client.generate_invalid_action(
-                            validation_result
-                        )
+                    error_narration = await self.model_client.generate_invalid_action(
+                        validation_result
                     )
                     return {
                         "type": "error",
@@ -358,7 +378,7 @@ class BaseGameEngine(ABC):
         Process a validated action and return the result.
         Uses standardized dice system with game-specific modifiers and mappings.
         """
-        if not self.model_client.is_narrator_ready():
+        if not await self.model_client.is_narrator_ready():
             raise RuntimeError("Narrator not loaded")
 
         difficulty = self.get_action_difficulty(
@@ -448,6 +468,7 @@ class BaseGameEngine(ABC):
 
     def get_actor_state(self, actor_name: str):
         """Helper to get actor state from game state"""
+        # This wont work well using player name - should use character_type
         if actor_name == "player":
             return self.game_state.player
         else:
@@ -489,11 +510,11 @@ class BaseGameEngine(ABC):
     # ----------------------------
     # Utility Methods
     # ----------------------------
-    def is_ready(self) -> bool:
+    async def is_ready(self) -> bool:
         """Check if all components are ready"""
         return (
             self.model_client.is_parser_ready()
-            and self.model_client.is_narrator_ready()
+            and await self.model_client.is_narrator_ready()
             and self.game_state is not None
         )
 

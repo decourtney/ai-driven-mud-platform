@@ -20,7 +20,7 @@ import {
 import { CharacterAbilities } from "@/app/types/game";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { NewCharacter } from "@/app/types/game";
+import { CharacterConfig } from "@/app/types/game";
 
 interface CreateCharacterProps {
   slug: string;
@@ -37,7 +37,7 @@ type StatName =
 export default function CreateCharacter({ slug }: CreateCharacterProps) {
   const router = useRouter();
 
-  const [playerState, setPlayerState] = useState<NewCharacter>({
+  const [characterConfig, setCharacterConfig] = useState<CharacterConfig>({
     name: "User",
     strength: 15,
     dexterity: 13,
@@ -60,12 +60,12 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
     const totalSpent = getTotalSpentPoints();
     setAvailablePoints(27 - totalSpent);
   }, [
-    playerState.strength,
-    playerState.dexterity,
-    playerState.constitution,
-    playerState.intelligence,
-    playerState.wisdom,
-    playerState.charisma,
+    characterConfig.strength,
+    characterConfig.dexterity,
+    characterConfig.constitution,
+    characterConfig.intelligence,
+    characterConfig.wisdom,
+    characterConfig.charisma,
   ]);
 
   const handleSubmit = async () => {
@@ -73,7 +73,7 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
       const res = await fetch(`/api/play/${slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(playerState),
+        body: JSON.stringify(characterConfig),
       });
 
       if (!res.ok) {
@@ -89,7 +89,7 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
   };
 
   const adjustStat = (statName: StatName, delta: number) => {
-    const currentValue = playerState[statName];
+    const currentValue = characterConfig[statName];
     const newValue = currentValue + delta;
 
     // Check bounds
@@ -102,7 +102,7 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
 
     if (costDiff > availablePoints) return;
 
-    setPlayerState((prev) => ({
+    setCharacterConfig((prev) => ({
       ...prev,
       [statName]: newValue,
     }));
@@ -117,22 +117,22 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
 
   const getTotalSpentPoints = () => {
     const stats = [
-      playerState.strength,
-      playerState.dexterity,
-      playerState.constitution,
-      playerState.intelligence,
-      playerState.wisdom,
-      playerState.charisma,
+      characterConfig.strength,
+      characterConfig.dexterity,
+      characterConfig.constitution,
+      characterConfig.intelligence,
+      characterConfig.wisdom,
+      characterConfig.charisma,
     ];
     return stats.reduce((total, stat) => total + getStatCost(stat), 0);
   };
 
-  const calculateHP = () => 10 + getStatModifier(playerState.constitution);
+  const calculateHP = () => 10 + getStatModifier(characterConfig.constitution);
 
   const getStatModifier = (value: number) => Math.floor((value - 10) / 2);
 
   const isAbilityAvailable = (ability: CharacterAbilities) => {
-    return playerState[ability.req_stat as StatName] >= ability.req_value;
+    return characterConfig[ability.req_stat as StatName] >= ability.req_value;
   };
 
   const toggleAbility = (ability: CharacterAbilities) => {
@@ -239,12 +239,12 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
   ];
 
   const statEntries: [StatName, number][] = [
-    ["strength", playerState.strength],
-    ["dexterity", playerState.dexterity],
-    ["constitution", playerState.constitution],
-    ["intelligence", playerState.intelligence],
-    ["wisdom", playerState.wisdom],
-    ["charisma", playerState.charisma],
+    ["strength", characterConfig.strength],
+    ["dexterity", characterConfig.dexterity],
+    ["constitution", characterConfig.constitution],
+    ["intelligence", characterConfig.intelligence],
+    ["wisdom", characterConfig.wisdom],
+    ["charisma", characterConfig.charisma],
   ];
 
   return (
@@ -271,9 +271,9 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
               <label className="block text-sm text-green-400 mb-1">Name</label>
               <input
                 type="text"
-                value={playerState.name}
+                value={characterConfig.name}
                 onChange={(e) =>
-                  setPlayerState((prev) => ({ ...prev, name: e.target.value }))
+                  setCharacterConfig((prev) => ({ ...prev, name: e.target.value }))
                 }
                 className="w-full bg-black/60 backdrop-blur-sm border border-green-500 px-3 py-2 text-green-400 focus:outline-none focus:border-green-300"
                 placeholder="Character name..."
@@ -284,9 +284,9 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
             <div className="mb-4">
               <label className="block text-sm text-green-400 mb-1">Bio</label>
               <textarea
-                value={playerState.bio}
+                value={characterConfig.bio}
                 onChange={(e) =>
-                  setPlayerState((prev) => ({ ...prev, bio: e.target.value }))
+                  setCharacterConfig((prev) => ({ ...prev, bio: e.target.value }))
                 }
                 className="w-full bg-black/60 backdrop-blur-sm border border-green-500 px-3 py-2 text-green-400 focus:outline-none focus:border-green-300 resize-none text-sm"
                 placeholder="Character background..."
@@ -294,7 +294,7 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
                 maxLength={200}
               />
               <div className="text-xs text-gray-500 text-right">
-                {playerState.bio.length}/200
+                {characterConfig.bio.length}/200
               </div>
             </div>
           </div>
@@ -327,7 +327,7 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
 
           <button
             onClick={handleSubmit}
-            disabled={!playerState.name.trim() || availablePoints !== 0}
+            disabled={!characterConfig.name.trim() || availablePoints !== 0}
             className="w-full mt-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-bold py-3 transition-colors"
           >
             CREATE CHARACTER
@@ -551,7 +551,7 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
 
           <button
             onClick={handleSubmit}
-            disabled={!playerState.name.trim() || availablePoints !== 0}
+            disabled={!characterConfig.name.trim() || availablePoints !== 0}
             className="w-full mt-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-bold py-3 transition-colors"
           >
             CREATE CHARACTER

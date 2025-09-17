@@ -74,6 +74,7 @@ class GameDifficulty(str, Enum):
 
 class ParsedAction(BaseModel):
     actor: str
+    actor_type: CharacterType
     action: str
     target: Optional[str] = None
     action_type: ActionType
@@ -108,6 +109,7 @@ class GameContext(BaseModel):
 # API models
 class ParseActionRequest(BaseModel):
     action: str
+    actor_type: CharacterType
 
 
 class GenerateActionRequest(BaseModel):

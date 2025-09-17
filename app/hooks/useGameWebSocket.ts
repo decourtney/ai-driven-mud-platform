@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { ChatMessage, GameMessage, GameState } from "../types/game";
+import {
+  CharacterState,
+  ChatMessage,
+  GameMessage,
+  GameState,
+} from "../types/game";
 import { useSession } from "next-auth/react";
 
 interface UseGameWebSocketProps {
@@ -17,6 +22,7 @@ interface UseGameWebSocketReturn {
   sendAction: (action: string) => void;
   chatHistory: ChatMessage[];
   gameState: GameState | null;
+  playerState: CharacterState | null;
   lastError: string | null;
   reconnect: () => void;
 }
@@ -39,6 +45,7 @@ export const useGameWebSocket = ({
   const [isConnected, setIsConnected] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [playerState, setPlayerState] = useState<CharacterState | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
 
   const MAX_RECONNECT_ATTEMPTS = 5;
@@ -169,6 +176,7 @@ export const useGameWebSocket = ({
             break;
           case "initial_state":
             setGameState(message.data.game_state);
+            setPlayerState(message.data.player_state);
             setChatHistory(message.data.chat_history || []);
             break;
           case "chat_message":
@@ -266,6 +274,7 @@ export const useGameWebSocket = ({
     sendAction,
     chatHistory,
     gameState,
+    playerState,
     lastError,
     reconnect,
   };

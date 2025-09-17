@@ -1,6 +1,6 @@
 GAME_REGISTRY = {
     "mudai": {
-        "slug": "mudai",
+        "game_id": "mudai",
         "engine": "DnDGameEngine",
         "title": "MudAI",
         "description": "Embark on an epic text-based adventure powered by artificial intelligence. Every choice matters, every story is unique. Experience classic MUD gameplay enhanced with modern AI storytelling.",
@@ -18,7 +18,7 @@ GAME_REGISTRY = {
         "tags": ["featured", "fantasy", "text-based"]
     },
     "cyberquest": {
-        "slug": "cyberquest",
+        "game_id": "cyberquest",
         "engine": "DnDGameEngine",  # Placeholder until a sci-fi engine exists
         "title": "CyberQuest",
         "description": "Hack, infiltrate, and survive in a neon-drenched cyberpunk city. Your choices determine the fate of factions, corporations, and yourself.",
@@ -36,7 +36,7 @@ GAME_REGISTRY = {
         "tags": ["upcoming", "sci-fi", "cyberpunk", "text-based"]
     },
     "shadows_of_the_deep": {
-        "slug": "shadows_of_the_deep",
+        "game_id": "shadows_of_the_deep",
         "engine": "DnDGameEngine",  # Placeholder until a horror engine exists
         "title": "Shadows of the Deep",
         "description": "Descend into the abyss and uncover horrors older than mankind. Survival depends on your wits and your sanity.",

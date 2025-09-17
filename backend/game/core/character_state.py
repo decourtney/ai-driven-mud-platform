@@ -1,5 +1,6 @@
 import uuid
 import logging
+from prisma import Json
 from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -89,11 +90,13 @@ class CharacterState:
         self.location = None
 
         # Basic identity
-        self.character_id = str(uuid.uuid4())
+        self.id: Optional[str] = None
         self.name = name
         self.character_type = character_type
         self.level = 1
         self.bio = bio
+        self.is_alive = True
+        self.can_act = False
 
         # Core stats
         self.max_hp = 10
@@ -147,9 +150,6 @@ class CharacterState:
             []
         )  # "protect_allies", "target_spellcasters", etc.
 
-        # Metadata
-        self.last_updated = datetime.now()
-
     # For debugging changes made to character state
     # def __setattr__(self, key, value):
     #     print(f"[DEBUG] Setting {key} = {value} ({type(value)})")
@@ -182,13 +182,14 @@ class CharacterState:
             "weapon": weapon_info,
         }
 
-    def is_alive(self) -> bool:
+    def check_is_alive(self) -> bool:
         """Check if character is alive"""
-        return self.current_hp > 0
+        self.is_alive = self.current_hp > 0
+        return self.is_alive
 
     def is_conscious(self) -> bool:
         """Check if character is conscious"""
-        return self.is_alive() and not self.has_status(StatusEffect.UNCONSCIOUS)
+        return self.check_is_alive() and not self.has_status(StatusEffect.UNCONSCIOUS)
 
     def is_enemy(self) -> bool:
         """Check if this character is an enemy"""
@@ -225,7 +226,7 @@ class CharacterState:
         if actual_damage > 0:
             self.current_hp = max(0, self.current_hp - actual_damage)
 
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
         # Check for unconsciousness
         # if self.current_hp <= 0 and not self.has_status(StatusEffect.UNCONSCIOUS):
@@ -235,7 +236,7 @@ class CharacterState:
 
     def heal(self, amount: int) -> int:
         """Heal character and return actual healing done"""
-        if amount <= 0 or not self.is_alive():
+        if amount <= 0 or not self.check_is_alive():
             return 0
 
         old_hp = self.current_hp
@@ -246,13 +247,13 @@ class CharacterState:
         if self.current_hp > 0:
             self.remove_status_effect(StatusEffect.UNCONSCIOUS)
 
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
         return actual_healing
 
     def add_temporary_hp(self, amount: int):
         """Add temporary hit points (don't stack, take higher value)"""
         self.temporary_hp = max(self.temporary_hp, amount)
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     # ------------------------------
     # Status effect management
@@ -284,12 +285,12 @@ class CharacterState:
             effect=effect, duration=duration, intensity=intensity, source=source
         )
         self.status_effects.append(effect_instance)
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     def remove_status_effect(self, effect: StatusEffect):
         """Remove a status effect"""
         self.status_effects = [se for se in self.status_effects if se.effect != effect]
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     def update_status_effects(self):
         """Update status effect durations (call at end of turn)"""
@@ -318,14 +319,17 @@ class CharacterState:
         }
         return any(self.has_status(effect) for effect in immobilizing_effects)
 
-    def can_act(self) -> bool:
-        """Check if character can take actions"""
+    def update_can_act(self) -> bool:
+        """Update whether character can take actions and store in attribute."""
         incapacitating_effects = {
             StatusEffect.STUNNED,
             StatusEffect.UNCONSCIOUS,
             StatusEffect.INCAPACITATED,
         }
-        return not any(self.has_status(effect) for effect in incapacitating_effects)
+        self.can_act = not any(
+            self.has_status(effect) for effect in incapacitating_effects
+        )
+        return self.can_act
 
     def can_cast_spells(self) -> bool:
         """Check if character can cast spells"""
@@ -360,7 +364,7 @@ class CharacterState:
         if weapon in self.inventory:
             self.inventory.remove(weapon)
 
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
         return True
 
     def equip_armor(self, armor: Item) -> bool:
@@ -382,20 +386,20 @@ class CharacterState:
                 "dexterity"
             )
 
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
         return True
 
     def add_item(self, item: Item):
         """Add item to inventory"""
         self.inventory.append(item)
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     def remove_item(self, item_name: str) -> Optional[Item]:
         """Remove item from inventory by name"""
         for item in self.inventory:
             if item.name.lower() == item_name.lower():
                 self.inventory.remove(item)
-                self.last_updated = datetime.now()
+                self.last_updated = datetime.now(timezone.utc)
                 return item
         return None
 
@@ -406,7 +410,7 @@ class CharacterState:
         """Learn a new spell"""
         if spell not in self.known_spells:
             self.known_spells.append(spell)
-            self.last_updated = datetime.now()
+            self.last_updated = datetime.now(timezone.utc)
 
     def can_cast_spell(self, spell: Spell) -> bool:
         """Check if character can cast a specific spell"""
@@ -426,7 +430,7 @@ class CharacterState:
         self.spell_slots[spell.level] -= 1
         self.current_mp = max(0, self.current_mp - 1)
 
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
         return True
 
     # ------------------------------
@@ -461,7 +465,7 @@ class CharacterState:
         elif ability.lower() == "charisma":
             self.charisma = value
 
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     # ------------------------------
     # Action result processing
@@ -487,7 +491,7 @@ class CharacterState:
         if self.current_hp <= 0 and result.damage_type != DamageType.kill:
             result.damage_type = DamageType.kill
 
-        self.last_updated = datetime.now()
+        self.last_updated = datetime.now(timezone.utc)
 
     def _calculate_damage_from_result(self, result: ActionResult) -> int:
         """Calculate damage from action result"""
@@ -511,16 +515,93 @@ class CharacterState:
                 self.add_status_effect(StatusEffect.CURSED, 3, source="fireball")
 
     # ------------------------------
+    # DB CONVERSION
+    # ------------------------------
+
+
+    @classmethod
+    def from_record(cls, record) -> "CharacterState":
+        obj = cls(
+            name=record.name,
+            strength=record.strength,
+            dexterity=record.dexterity,
+            constitution=record.constitution,
+            intelligence=record.intelligence,
+            wisdom=record.wisdom,
+            charisma=record.charisma,
+            character_type=CharacterType(record.character_type),
+            bio=record.bio or "Walking Corpse",
+        )
+
+        obj.id = record.id
+        obj.level = record.level
+        obj.gold = record.gold
+
+        obj.max_hp = record.max_hp
+        obj.current_hp = record.current_hp
+        obj.temporary_hp = record.temporary_hp
+        obj.armor_class = record.armor_class
+
+        obj.max_mp = record.max_mp
+        obj.current_mp = record.current_mp
+
+        # Update status dynamically if needed
+        obj.is_alive
+        obj.can_act
+
+        obj.location = record.location
+
+        # Initialize JSON fields
+        obj.equipped_armor = record.equipped_armor or None
+        obj.equipped_weapon = record.equipped_weapon or None
+        obj.inventory = record.inventory or []
+        obj.status_effects = record.status_effects or []
+
+        return obj
+
+    def to_db(self, for_create: bool = False) -> dict:
+        data = {
+            "name": self.name,
+            "strength": self.strength,
+            "dexterity": self.dexterity,
+            "constitution": self.constitution,
+            "intelligence": self.intelligence,
+            "wisdom": self.wisdom,
+            "charisma": self.charisma,
+            "level": self.level,
+            "gold": self.gold,
+            "max_hp": self.max_hp,
+            "current_hp": self.current_hp,
+            "temporary_hp": self.temporary_hp,
+            "armor_class": self.armor_class,
+            "max_mp": self.max_mp,
+            "current_mp": self.current_mp,
+            "is_alive": self.is_alive,
+            "can_act": self.can_act,
+            "character_type": self.character_type.value,
+            "bio": self.bio,
+            "location": self.location,
+            "inventory": Json(self.inventory or []),
+            "equipped_weapon": Json(self.equipped_weapon or {}),
+            "equipped_armor": Json(self.equipped_armor or {}),
+            "status_effects": Json(self.status_effects or []),
+        }
+
+        if not for_create:
+            data["id"] = self.id
+            # optionally include last_updated or other fields for update
+
+        return data
+
+    # ------------------------------
     # Serialization
     # ------------------------------
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert character state to dictionary with robust error handling"""
         try:
             return {
-                # Location
                 "location": getattr(self, "location", ""),
-                # Basic identity
-                "character_id": getattr(self, "character_id", ""),
                 "name": self.name,
                 "character_type": (
                     self.character_type.value
@@ -529,38 +610,25 @@ class CharacterState:
                 ),
                 "level": getattr(self, "level", 1),
                 "bio": self.bio,
-                # Health
                 "max_hp": getattr(self, "max_hp", 100),
                 "current_hp": getattr(self, "current_hp", 100),
                 "temporary_hp": getattr(self, "temporary_hp", 0),
                 "armor_class": getattr(self, "armor_class", 10),
-                # Ability scores
                 "strength": self.strength,
                 "dexterity": self.dexterity,
                 "constitution": self.constitution,
                 "intelligence": self.intelligence,
                 "wisdom": self.wisdom,
                 "charisma": self.charisma,
-                # Resources
                 "max_mp": getattr(self, "max_mp", 50),
                 "current_mp": getattr(self, "current_mp", 50),
-                # Equipment - Safe handling of items
                 "equipped_weapon": self._serialize_item(self.equipped_weapon),
-                "equipped_armor": self._serialize_item(
-                    getattr(self, "equipped_armor", None)
-                ),
+                "equipped_armor": self._serialize_item(getattr(self, "equipped_armor")),
                 "inventory": self._serialize_inventory(),
                 "gold": getattr(self, "gold", 0),
-                # Status
                 "status_effects": self._serialize_status_effects(),
-                # State - Safe method calls
                 "is_alive": self._safe_is_alive(),
                 "can_act": self._safe_can_act(),
-                "last_updated": (
-                    self.last_updated.isoformat()
-                    if hasattr(self, "last_updated") and self.last_updated
-                    else datetime.now(timezone.utc).isoformat()
-                ),
             }
         except Exception as e:
             logging.error(
@@ -571,7 +639,7 @@ class CharacterState:
     def _serialize_item(self, item) -> Optional[Dict[str, Any]]:
         """Safely serialize an item"""
         if not item:
-            return None
+            return Json({})
 
         try:
             # Handle different item structures
@@ -583,7 +651,6 @@ class CharacterState:
 
                 # Add common item fields if they exist
                 for field in [
-                    "id",
                     "item_type",
                     "description",
                     "damage_dice",
@@ -606,7 +673,7 @@ class CharacterState:
     def _serialize_inventory(self) -> List[Dict[str, Any]]:
         """Safely serialize inventory"""
         if not hasattr(self, "inventory") or not self.inventory:
-            return []
+            return Json([])
 
         serialized_items = []
         for item in self.inventory:
@@ -623,7 +690,7 @@ class CharacterState:
     def _serialize_status_effects(self) -> List[Dict[str, Any]]:
         """Safely serialize status effects"""
         if not hasattr(self, "status_effects") or not self.status_effects:
-            return []
+            return Json([])
 
         serialized_effects = []
         for se in self.status_effects:
@@ -650,8 +717,8 @@ class CharacterState:
     def _safe_is_alive(self) -> bool:
         """Safely check if character is alive"""
         try:
-            if hasattr(self, "is_alive") and callable(self.is_alive):
-                return self.is_alive()
+            if hasattr(self, "is_alive") and callable(self.check_is_alive):
+                return self.check_is_alive()
             # Fallback logic
             current_hp = getattr(self, "current_hp", 100)
             return current_hp > 0
@@ -675,6 +742,7 @@ class CharacterState:
             # Validate required fields
             required_fields = [
                 "name",
+                "id",
                 "strength",
                 "dexterity",
                 "constitution",
@@ -739,7 +807,6 @@ class CharacterState:
             # Restore simple attributes with type checking
             simple_field_types = {
                 "location": str,
-                "character_id": str,
                 "level": int,
                 "max_hp": int,
                 "current_hp": int,
@@ -856,42 +923,42 @@ class CharacterState:
         pass
 
 
-# Mock classes for testing - replace with your actual classes
-class StatusEffect:
-    def __init__(self, effect):
-        self.effect = effect
-        self.duration = 0
-        self.intensity = 1
-        self.source = ""
+# # Mock classes for testing - replace with your actual classes
+# class StatusEffect:
+#     def __init__(self, effect):
+#         self.effect = effect
+#         self.duration = 0
+#         self.intensity = 1
+#         self.source = ""
 
 
-class Item:
-    def __init__(self, name="Unknown Item"):
-        self.name = name
-        self.id = name
-        self.item_type = "misc"
-        self.description = ""
-        self.damage_dice = ""
-        self.armor_class = 0
-        self.gold_value = 0
-        self.weight = 0
+# class Item:
+#     def __init__(self, name="Unknown Item"):
+#         self.name = name
+#         self.id = name
+#         self.item_type = "misc"
+#         self.description = ""
+#         self.damage_dice = ""
+#         self.armor_class = 0
+#         self.gold_value = 0
+#         self.weight = 0
 
-    def to_dict(self):
-        return {
-            "name": self.name,
-            "id": self.id,
-            "item_type": self.item_type,
-            "description": self.description,
-            "damage_dice": self.damage_dice,
-            "armor_class": self.armor_class,
-            "gold_value": self.gold_value,
-            "weight": self.weight,
-        }
+#     def to_dict(self):
+#         return {
+#             "name": self.name,
+#             "id": self.id,
+#             "item_type": self.item_type,
+#             "description": self.description,
+#             "damage_dice": self.damage_dice,
+#             "armor_class": self.armor_class,
+#             "gold_value": self.gold_value,
+#             "weight": self.weight,
+#         }
 
-    @classmethod
-    def from_dict(cls, data):
-        item = cls(data.get("name", "Unknown"))
-        for key, value in data.items():
-            if hasattr(item, key):
-                setattr(item, key, value)
-        return item
+#     @classmethod
+#     def from_dict(cls, data):
+#         item = cls(data.get("name", "Unknown"))
+#         for key, value in data.items():
+#             if hasattr(item, key):
+#                 setattr(item, key, value)
+#         return item

@@ -11,7 +11,7 @@ import psutil
 import GPUtil
 import uvicorn
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, List
 
@@ -23,7 +23,7 @@ from backend.models import (
     GenerateSceneRequest,
     GeneratedNarration,
     HealthResponse,
-    ValidationResult
+    ValidationResult,
 )
 
 
@@ -194,8 +194,9 @@ class ModelServer:
         # ==========================================
 
         @app.post("/parse_action", response_model=ParsedAction)
-        def parse_action(request: ParseActionRequest):
+        def parse_action(request: ParseActionRequest = Body(...)):
             """Parse player action using CodeLlama"""
+            
             if not self.model_manager.is_parser_ready():
                 # Try to auto-load
                 print("[MODEL] Parser not ready, attempting to load...")
@@ -203,19 +204,8 @@ class ModelServer:
                     raise HTTPException(
                         status_code=503, detail="Parser model not available"
                     )
-
             try:
-                result = self.model_manager.parse_action(request.action)
-
-                return ParsedAction(
-                    actor=result.actor,
-                    action=result.action,
-                    target=result.target,
-                    action_type=result.action_type,
-                    weapon=result.weapon,
-                    subject=result.subject,
-                    details=result.details,
-                )
+                return self.model_manager.parse_action(request)
 
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Parse failed: {e}")
@@ -271,7 +261,9 @@ class ModelServer:
             """Generate narration of invalid user action... for flavor?"""
 
             try:
-                narration = self.model_manager.generate_invalid_action_narration(request)
+                narration = self.model_manager.generate_invalid_action_narration(
+                    request
+                )
 
                 return GeneratedNarration(narration=narration)
 

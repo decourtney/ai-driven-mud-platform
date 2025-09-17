@@ -66,7 +66,7 @@ export interface CharacterState {
   last_updated: string;
 }
 
-export interface NewCharacter {
+export interface CharacterConfig {
   name: string;
   strength: number;
   dexterity: number;
