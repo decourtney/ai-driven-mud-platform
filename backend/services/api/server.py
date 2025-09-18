@@ -582,7 +582,7 @@ class GameAPI:
             logger.info(f"Processing WebSocket action from {user_id}: {action}")
 
             result = await self.session_manager.parse_action_request(
-                session_id=session_id, action=action, slug=slug  # Pass slug here
+                session_id=session_id, action=action, game_id=slug, user_id=user_id 
             )
 
         except Exception as e:

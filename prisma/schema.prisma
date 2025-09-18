@@ -132,18 +132,6 @@ model PlayerState {
   user            User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
-model SceneDiff {
-  id              String      @id @default(cuid())
-  game_session_id String
-  zone            String
-  scene           String
-  diff            Json?
-  created_at      DateTime    @default(now())
-  updated_at      DateTime    @updatedAt
-  npcs            NpcState[]
-  game_session    GameSession @relation(fields: [game_session_id], references: [id], onDelete: Cascade)
-}
-
 model NpcState {
   id             String    @id @default(cuid())
   scene_state_id String
@@ -161,6 +149,18 @@ model NpcState {
   scene_state    SceneDiff @relation(fields: [scene_state_id], references: [id], onDelete: Cascade)
 }
 
+model SceneDiff {
+  id              String      @id @default(cuid())
+  game_session_id String
+  zone            String
+  scene           String
+  diff            Json?
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+  npcs            NpcState[]
+  game_session    GameSession @relation(fields: [game_session_id], references: [id], onDelete: Cascade)
+}
+
 model ChatMessage {
   id           String      @id @default(cuid())
   session_id   String
@@ -168,9 +168,9 @@ model ChatMessage {
   action       ActionType
   content      String
   created_at   DateTime    @default(now())
-  player_id    String
+  player_id    String?
   updated_at   DateTime    @updatedAt
-  player       PlayerState @relation(fields: [player_id], references: [id])
+  player       PlayerState? @relation(fields: [player_id], references: [id])
   game_session GameSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
 }
 

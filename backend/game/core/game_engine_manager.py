@@ -44,6 +44,7 @@ class GameEngineManager:
             for game_id, sessions in self.engines.items():
                 for session_id, entry in sessions.items():
                     if now - entry["last_active"] > idle_threshold:
+                        print("[DEBUG]Purging old engine instances")
                         game_state, player_state = entry[
                             "engine"
                         ].get_serialized_game_state()
@@ -75,25 +76,52 @@ class GameEngineManager:
                         # Log but continue
                         print(f"[WARNING] Error saving engine state: {result}")
 
-    def register_engine(self, engine_instance, session_id: str, game_id: str) -> str:
-        """Register a new engine instance and return its engine_id."""
+
+    def get_registered_engine(
+        self, game_id: str, session_id: str
+    ) -> Optional[tuple[str, object]]:
+        game_engines = self.engines.get(game_id)
+        if not game_engines:
+            return None
+
+        entry = game_engines.get(session_id)
+        if not entry:
+            return None
+
+        engine_id = entry.get("engine_id")
+        engine = entry.get("engine")
+
+        if not engine_id or not engine:
+            # just return None, don't modify dicts
+            return None
+
+        # Refresh last_active timestamp
+        entry["last_active"] = datetime.now(timezone.utc)
+
+        return engine_id, engine
+
+    def register_engine(
+        self, engine_instance: object, session_id: str, game_id: str
+    ) -> str:
+        if not game_id or not session_id:
+            raise ValueError("game_id and session_id are required to register an engine")
+
+        if engine_instance is None:
+            raise ValueError("engine_instance cannot be None")
+
         engine_id = str(uuid.uuid4())
+
         if game_id not in self.engines:
             self.engines[game_id] = {}
+
+        # Overwrite old session entry if it exists
         self.engines[game_id][session_id] = {
             "engine": engine_instance,
             "engine_id": engine_id,
             "last_active": datetime.now(timezone.utc),
         }
+
         return engine_id
-
-    def get_registered_engine(self, game_id: str, session_id: str):
-        entry = self.engines.get(game_id, {}).get(session_id)
-        if not entry:
-            return None
-
-        entry["last_active"] = datetime.now(timezone.utc)
-        return entry["engine_id"], entry["engine"]
 
     async def unregister_engine(
         self, game_id: str, session_id: str, is_save: bool = True
@@ -102,18 +130,26 @@ class GameEngineManager:
         if not entry:
             return None
 
+        engine = entry["engine"]
         engine_state = None
+
         if is_save:
-            game_state, player_state = entry["engine"].get_serialized_game_state()
+            try:
+                game_state, player_state = engine.get_serialized_game_state()
+                await self.save_session(
+                    session_id=session_id,
+                    game_state=game_state,
+                    player_state=player_state,
+                )
+            except Exception:
+                import traceback
 
-        await self.save_session(
-            session_id=session_id,
-            game_state=game_state,
-            player_state=player_state,
-        )
+                print(f"[ERROR] Failed to save session {session_id} during unregister")
+                traceback.print_exc()
 
-        if not self.engines[game_id]:
-            del self.engines[game_id]
+        # clean up if no sessions left for this game_id
+        if not self.engines.get(game_id):
+            self.engines.pop(game_id, None)
 
         return engine_state
 

@@ -93,16 +93,15 @@ class BaseGameEngine(ABC):
     def load_game_state(self, game_state, player_state):
         print("[DEBUG] LOADING GAME STATE INTO ENGINE")
         try:
-            print(game_state)
             self.game_state = GameState.from_record(game_state)
-            print("[DEBUG] raw game_state record:", game_state)
+            # print("[DEBUG] raw game_state record:", game_state)
         except Exception as e:
             print("[ERROR] while loading GameState:", e)
             raise
 
         try:
             self.player_state = CharacterState.from_record(player_state)
-            print("[DEBUG] raw player_state record:", player_state)
+            # print("[DEBUG] raw player_state record:", player_state)
         except Exception as e:
             print("[ERROR] while loading CharacterState:", e)
             raise

@@ -246,7 +246,9 @@ class AsyncModelServiceClient:
     async def generate_scene(self, request: GenerateSceneRequest) -> GeneratedNarration:
         try:
             response = await self.client.post(
-                f"{self.base_url}/generate_scene", json=request.model_dump()
+                f"{self.base_url}/generate_scene",
+                content=request.model_dump_json(),
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 

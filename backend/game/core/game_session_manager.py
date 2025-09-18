@@ -91,7 +91,7 @@ class GameSessionManager:
                 "is_active": True,
             }
         )
-        print("[DEBUG]Game Session Record", gamesession_record)
+        # print("[DEBUG]Game Session Record", gamesession_record)
 
         gamestate_record = await prisma.gamestate.create(
             data={
@@ -99,7 +99,7 @@ class GameSessionManager:
                 **game_state.to_db(for_create=True),
             }
         )
-        print("[DEBUG]Game State Record", gamestate_record)
+        # print("[DEBUG]Game State Record", gamestate_record)
 
         playerstate_record = await prisma.playerstate.create(
             data={
@@ -108,7 +108,7 @@ class GameSessionManager:
                 **player_state.to_db(for_create=True),
             }
         )
-        print("[DEBUG]Player State Record", playerstate_record)
+        # print("[DEBUG]Player State Record", playerstate_record)
 
         # Register engine instance in memory
         engine_id = self.engine_manager.register_engine(
@@ -123,16 +123,17 @@ class GameSessionManager:
         sessions = await prisma.gamesession.find_many(
             where={"user_id": user_id, "game_id": game_id}
         )
-        print("[DEBUG]Session to delete:", sessions)
-        deleted = await prisma.gamesession.delete_many(
-            where={"user_id": user_id, "game_id": game_id}
-        )
-        print("[DEBUG]Session deleted:", deleted)
 
         for session in sessions:
             await self.engine_manager.unregister_engine(
                 game_id=game_id, session_id=session.id, is_save=False
             )
+
+        # print("[DEBUG]Session to delete:", sessions)
+        deleted = await prisma.gamesession.delete_many(
+            where={"user_id": user_id, "game_id": game_id}
+        )
+        print("[DEBUG]Session deleted:", deleted)
 
         return
 
@@ -148,32 +149,36 @@ class GameSessionManager:
                 detail=f"Model server not available at {self.model_client.base_url}",
             )
 
-        gamesession_record = await prisma.gamesession.find_unique(
-            where={"id": session_id}
-        )
-        if not gamesession_record:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Couldn't locate session {session_id}",
-            )
+        # gamesession_record = await prisma.gamesession.find_unique(
+        #     where={"id": session_id}
+        # )
+        # if not gamesession_record:
+        #     raise HTTPException(
+        #         status_code=404,
+        #         detail=f"Couldn't locate session {session_id}",
+        #     )
 
-        gamestate_record = await prisma.gamestate.find_first(
-            where={"game_session_id": gamesession_record.id}
-        )
-        if not gamestate_record:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Couldn't locate gamestate for session {gamesession_record.id}",
-            )
+        # gamestate_record = await prisma.gamestate.find_first(
+        #     where={"game_session_id": gamesession_record.id}
+        # )
+        # if not gamestate_record:
+        #     raise HTTPException(
+        #         status_code=404,
+        #         detail=f"Couldn't locate gamestate for session {gamesession_record.id}",
+        #     )
 
-        playerstate_record = await prisma.playerstate.find_first(
-            where={"game_session_id": gamesession_record.id, "user_id": user_id}
+        # playerstate_record = await prisma.playerstate.find_first(
+        #     where={"game_session_id": gamesession_record.id, "user_id": user_id}
+        # )
+        # if not playerstate_record:
+        #     raise HTTPException(
+        #         status_code=404,
+        #         detail=f"Couldn't locate playerstate for session {gamesession_record.id} | user {user_id}",
+        #     )
+
+        gamesession_record, gamestate_record, playerstate_record = (
+            await self.get_game_states_from_db(session_id=session_id, user_id=user_id)
         )
-        if not playerstate_record:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Couldn't locate playerstate for session {gamesession_record.id} | user {user_id}",
-            )
 
         # Get chat history
         chatmessage_records = await prisma.chatmessage.find_many(
@@ -182,14 +187,9 @@ class GameSessionManager:
         chat_history = [self.serialize_chat_message(msg) for msg in chatmessage_records]
         needs_initial_narration = len(chat_history) == 0
 
-        # Check for and retreive engine instance
-        engine_id, engine = await self.ensure_engine_exists(
-            game_id, gamesession_record.id
-        )
-
-        engine.load_game_state(
-            game_state=gamestate_record,
-            player_state=playerstate_record,
+        # Make sure engine is loaded with game states
+        await self.ensure_engine_exists(
+            game_id, gamesession_record.id, user_id
         )
 
         # Send initial state to WebSocket clients
@@ -241,14 +241,18 @@ class GameSessionManager:
         )
         return
 
-    async def parse_action_request(self, session_id: str, action: str, game_id: str):
+    async def parse_action_request(
+        self, session_id: str, action: str, game_id: str, user_id: str
+    ):
         """
         Process player action and send results via WebSocket
         """
 
         try:
             # Ensure engine is loaded and get it directly
-            engine_id, engine = await self.ensure_engine_exists(game_id, session_id)
+            engine_id, engine = await self.ensure_engine_exists(
+                game_id, session_id, user_id
+            )
             logger.info(f"Engine {engine_id} ready for session {session_id}")
 
             # Send immediate acknowledgment
@@ -257,6 +261,10 @@ class GameSessionManager:
                     session_id, WebSocketMessage.action_received(action=action)
                 )
 
+            playerstate_record = await prisma.playerstate.find_first(
+                where={"user_id": user_id, "game_session_id": session_id}
+            )
+
             # Save the action as a chatmessage
             action_record = await prisma.chatmessage.create(
                 {
@@ -264,6 +272,7 @@ class GameSessionManager:
                     "speaker": "player",
                     "action": "user_prompt",
                     "content": action,
+                    "player_id": playerstate_record.id,
                 },
             )
 
@@ -307,6 +316,7 @@ class GameSessionManager:
                     "speaker": "narrator",
                     "action": result.action_type.value,  # assuming result has these attributes
                     "content": result.narration,
+                    "player_id": playerstate_record.id,
                 }
             )
 
@@ -374,7 +384,7 @@ class GameSessionManager:
         return engine
 
     async def ensure_engine_exists(
-        self, game_id: str, session_id: str
+        self, game_id: str, session_id: str, user_id: str
     ) -> Tuple[str, Any]:
         """
         Ensure an engine exists for the session, creating one if needed.
@@ -390,21 +400,22 @@ class GameSessionManager:
         # No engine exists (expired or first time), create new one
         logger.info(f"Creating new engine for session {session_id}")
 
-        # Update session as active
-        gamesession_record = await prisma.gamesession.update(
-            where={"id": session_id}, data={"is_active": True}
+        # Get states and update session as active
+        gamesession_record, gamestate_record, playerstate_record = (
+            await self.get_game_states_from_db(session_id=session_id, user_id=user_id)
         )
-        if not gamesession_record:
-            raise HTTPException(
-                status_code=404, detail=f"Session {session_id} not found"
-            )
 
         # Create and initialize engine
         engine_instance = self.engine_factory(game_id=game_id)
 
+        engine_instance.load_game_state(
+            game_state=gamestate_record,
+            player_state=playerstate_record,
+        )
+
         # Register the new engine
         engine_id = self.engine_manager.register_engine(
-            engine_instance,
+            engine_instance=engine_instance,
             session_id=session_id,
             game_id=game_id,
         )
@@ -441,8 +452,38 @@ class GameSessionManager:
             "speaker": msg.speaker,
             "action": msg.action,
             "content": msg.content,
-            "timestamp": msg.created_at.isoformat() if msg.timestamp else None,
+            "timestamp": msg.updated_at.isoformat() if msg.updated_at else None,
         }
+
+    async def get_game_states_from_db(self, session_id, user_id):
+        gamesession_record = await prisma.gamesession.update(
+            where={"id": session_id}, data={"is_active": True}
+        )
+        if not gamesession_record:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Couldn't locate session {session_id}",
+            )
+
+        gamestate_record = await prisma.gamestate.find_first(
+            where={"game_session_id": gamesession_record.id}
+        )
+        if not gamestate_record:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Couldn't locate gamestate for session {gamesession_record.id}",
+            )
+
+        playerstate_record = await prisma.playerstate.find_first(
+            where={"game_session_id": gamesession_record.id, "user_id": user_id}
+        )
+        if not playerstate_record:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Couldn't locate playerstate for session {gamesession_record.id} | user {user_id}",
+            )
+
+        return gamesession_record, gamestate_record, playerstate_record
 
     async def generate_initial_narration_for_session(
         self, session_id: str, game_id: str
@@ -453,11 +494,15 @@ class GameSessionManager:
 
         try:
             # Get session data
-            gamesession_record = await prisma.gamesession.find_unique(
-                where={"id": session_id}
-            )
+            # gamesession_record = await prisma.gamesession.find_unique(
+            #     where={"id": session_id}
+            # )
 
-            if not gamesession_record:
+            playerstate_record = await prisma.playerstate.find_first(
+                where={"game_session_id": session_id}
+            )
+            print(playerstate_record.model_dump())
+            if not playerstate_record:
                 return
 
             # Load scene configuration
@@ -466,32 +511,32 @@ class GameSessionManager:
             ) as file:
                 scene_conf = json.load(file)
 
-            # Create system message first
-            system_message = await prisma.chatmessage.create(
-                data={
-                    "session_id": session_id,
-                    "speaker": "system",
-                    "action": "narrate",
-                    "content": scene_conf["session_start"]["description"],
-                }
-            )
+            # # Create system message first
+            # system_message = await prisma.chatmessage.create(
+            #     data={
+            #         "session_id": session_id,
+            #         "speaker": "system",
+            #         "action": "narrate",
+            #         "content": scene_conf["session_start"]["description"],
+            #     }
+            # )
 
-            # Send system message via WebSocket immediately
-            if hasattr(self, "connection_manager"):
-                await self.connection_manager.send_to_session(
-                    session_id,
-                    WebSocketMessage.chat_message(
-                        id=system_message.id,
-                        speaker=system_message.speaker,
-                        content=system_message.content,
-                        timestamp=system_message.updated_at.isoformat(),
-                    ),
-                )
+            # # Send system message via WebSocket immediately
+            # if hasattr(self, "connection_manager"):
+            #     await self.connection_manager.send_to_session(
+            #         session_id,
+            #         WebSocketMessage.chat_message(
+            #             id=system_message.id,
+            #             speaker=system_message.speaker,
+            #             content=system_message.content,
+            #             timestamp=system_message.updated_at.isoformat(),
+            #         ),
+            #     )
 
             # Generate AI narration
             scene_request = GenerateSceneRequest(
                 scene=scene_conf["village_arrival"],
-                player=gamesession_record.game_state["player"],
+                player=playerstate_record.model_dump(),
             )
 
             initial_narration = await self.model_client.generate_scene(scene_request)

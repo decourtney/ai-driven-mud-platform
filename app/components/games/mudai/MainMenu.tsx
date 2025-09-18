@@ -65,7 +65,7 @@ export default function MainMenu({ slug }: MainMenuProps) {
 
   const handleDelete = async () => {
     try {
-      const res = await fetch(`/api/play/${slug}/`, {
+      const res = await fetch(`/api/play/${slug}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
       });
