@@ -11,7 +11,7 @@ from typing import Dict, Optional
 import gc
 
 from backend.game.core.interfaces import ActionParser
-from backend.models import ParsedAction, ActionType
+from backend.models import ParsedAction, ActionType, ParseActionRequest
 from .fallback_parser import FallbackParser
 
 
@@ -91,68 +91,97 @@ class CodeLlamaParser(ActionParser):
         """Check if parser is ready to use"""
         return self._is_loaded and self.model is not None
 
-    def parse_action(self, action: str) -> ParsedAction:
+    def parse_action(self, request: ParseActionRequest) -> ParsedAction:
         """Parse natural language input into structured action"""
+        print("[DEBUG] Starting parse_action with request:", request)
+
         if not self.is_loaded():
             print("[-] CodeLlama not loaded, using fallback parser")
-            return self.fallback_parser.parse_action(action)
+            fallback_result = self.fallback_parser.parse_action(request.action)
+            # Handle fallback result and add actor_type
+            if isinstance(fallback_result, dict):
+                fallback_result["actor_type"] = request.actor_type
+                return ParsedAction(**fallback_result)
+            else:
+                result_dict = fallback_result.model_dump()
+                result_dict["actor_type"] = request.actor_type
+                return ParsedAction(**result_dict)
 
         try:
-            return self._parse_with_llama(action)
+            print("[DEBUG] CodeLlama is loaded, proceeding with parsing")
+
+            # Prepare input
+            cleaned_input = request.action.strip()
+            cleaned_input = re.sub(r"\bInput:\s*", "", cleaned_input)
+            prompt = self.create_prompt(cleaned_input)
+            print(f"[DEBUG] Cleaned input: '{cleaned_input}'")
+
+            # Tokenize and generate
+            inputs = self.tokenizer(
+                prompt, return_tensors="pt", max_length=1024, truncation=True, padding=True
+            )
+
+            # Move ALL inputs to the same device as model
+            if self.device == "cuda":
+                inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+            print("[DEBUG] About to generate with model")
+            with torch.no_grad():
+                try:
+                    outputs = self.model.generate(
+                        **inputs,
+                        max_new_tokens=80,
+                        do_sample=False,
+                        pad_token_id=self.tokenizer.eos_token_id,
+                        eos_token_id=self.tokenizer.eos_token_id,
+                        tokenizer=self.tokenizer,
+                        stop_strings=["\n\nInput:", "Input:", "\n\n", "Output:", "\nInput"],
+                    )
+                except:
+                    print("[DEBUG] Using fallback generation (no stop_strings)")
+                    outputs = self.model.generate(
+                        **inputs,
+                        max_new_tokens=80,
+                        do_sample=False,
+                        pad_token_id=self.tokenizer.eos_token_id,
+                        eos_token_id=self.tokenizer.eos_token_id,
+                    )
+
+            # Decode response
+            response = self.tokenizer.decode(
+                outputs[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True
+            ).strip()
+            print(f"[DEBUG] Model response: '{response}'")
+
+            # Parse the response
+            print("[DEBUG] About to call parse_llama_response")
+            parsed_result = self.parse_llama_response(response, cleaned_input)
+            print("[DEBUG] Parse result:", parsed_result)
+            print("[DEBUG] Type of parse result:", type(parsed_result))
+
+            # Add actor_type
+            parsed_result["actor_type"] = request.actor_type
+            print("[DEBUG] Result dict with actor_type:", parsed_result)
+
+            # Create and return ParsedAction
+            final_result = ParsedAction(**parsed_result)
+            print("[DEBUG] Final ParsedAction created:", final_result)
+            return final_result
+
         except Exception as e:
             print(f"[-] CodeLlama parsing failed: {e}, using fallback")
-            return self.fallback_parser.parse_action(action)
+            fallback_result = self.fallback_parser.parse_action(request.action)
 
-    def _parse_with_llama(self, action: str) -> ParsedAction:
-        """Internal method to parse using CodeLlama"""
-        cleaned_input = action.strip()
-        cleaned_input = re.sub(r'\bInput:\s*', '', cleaned_input)
+            # Handle fallback result and add actor_type
+            if isinstance(fallback_result, dict):
+                fallback_result["actor_type"] = request.actor_type
+                return ParsedAction(**fallback_result)
+            else:
+                result_dict = fallback_result.model_dump()
+                result_dict["actor_type"] = request.actor_type
+                return ParsedAction(**result_dict)
 
-        prompt = self._create_prompt(cleaned_input)
-
-        # Tokenize and generate
-        inputs = self.tokenizer(
-            prompt,
-            return_tensors="pt",
-            max_length=1024,
-            truncation=True,
-            padding=True
-        )
-
-        # Move ALL inputs to the same device as model
-        if self.device == "cuda":
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-
-        with torch.no_grad():
-            try:
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=80,
-                    do_sample=False,
-                    pad_token_id=self.tokenizer.eos_token_id,
-                    eos_token_id=self.tokenizer.eos_token_id,
-                    tokenizer=self.tokenizer,
-                    stop_strings=["\n\nInput:", "Input:", "\n\n", "Output:", "\nInput"]
-                )
-            except:
-                # Fallback without stop_strings if not supported
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=80,
-                    do_sample=False,
-                    pad_token_id=self.tokenizer.eos_token_id,
-                    eos_token_id=self.tokenizer.eos_token_id
-                )
-
-        # Decode response
-        response = self.tokenizer.decode(
-            outputs[0][inputs['input_ids'].shape[1]:], 
-            skip_special_tokens=True
-        ).strip()
-
-        return self._parse_llama_response(response, cleaned_input)
-
-    def _create_prompt(self, action: str) -> str:
+    def create_prompt(self, action: str) -> str:
         """Create a well-structured prompt for CodeLlama"""
         system_prompt = """
             You are a D&D text action parser.
@@ -207,24 +236,26 @@ class CodeLlamaParser(ActionParser):
         Input: "{action}"
         Output: """
 
-    def _parse_llama_response(self, response: str, original_input: str) -> ParsedAction:
+
+    def parse_llama_response(
+        self, response: str, original_input: str
+    ) -> dict:  # Return dict, not ParsedAction
         """Parse the CodeLlama model's JSON response"""
         # Clean up response
         response = response.strip()
-
         # Remove trailing text
-        stop_patterns = [r'\n\nInput:', r'\nInput:', r'\n\n', r'Output:', r'\nExample:']
+        stop_patterns = [r"\n\nInput:", r"\nInput:", r"\n\n", r"Output:", r"\nExample:"]
         for pattern in stop_patterns:
             match = re.search(pattern, response)
             if match:
-                response = response[:match.start()]
+                response = response[: match.start()]
                 break
 
         # Extract JSON
         json_patterns = [
             r'\{[^{}]*"actor"[^{}]*\}',
             r'\{[^{}]*"action"[^{}]*\}',
-            r'\{.*?\}',
+            r"\{.*?\}",
         ]
 
         json_str = None
@@ -238,30 +269,40 @@ class CodeLlamaParser(ActionParser):
             try:
                 # Fix common JSON issues
                 json_str = json_str.replace("'", '"')
-                json_str = re.sub(r',\s*}', '}', json_str)
-
+                json_str = re.sub(r",\s*}", "}", json_str)
                 parsed_json = json.loads(json_str)
 
-                # Validate and convert to ParsedAction
-                return ParsedAction(
-                    actor=parsed_json.get("actor", "player"),
-                    action=parsed_json.get("action", "unknown action"),
-                    target=parsed_json.get("target"),
-                    action_type=ActionType(self._normalize_action_type(parsed_json.get("action_type", "skill_check"))),
-                    weapon=parsed_json.get("weapon"),
-                    subject=parsed_json.get("subject"),
-                    details=parsed_json.get("details"),
-                )
-
+                # Return dict instead of ParsedAction
+                return {
+                    "actor": parsed_json.get("actor", "player"),
+                    "action": parsed_json.get("action", "unknown action"),
+                    "target": parsed_json.get("target"),
+                    "action_type": self._normalize_action_type(
+                        parsed_json.get("action_type", "interact")
+                    ),
+                    "weapon": parsed_json.get("weapon"),
+                    "subject": parsed_json.get("subject"),
+                    "details": parsed_json.get("details"),
+                    # Don't include actor_type here - it will be added in parse_action
+                }
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"[-] JSON parsing failed: {e}")
 
-        # Fall back to fallback parser
+        # Fall back to fallback parser result
         print(f"[-] CodeLlama response invalid, using fallback for: '{original_input}'")
-        return self.fallback_parser.parse_action(original_input)
+        fallback_result = self.fallback_parser.parse_action(original_input)
+
+        # Convert fallback result to dict
+        if isinstance(fallback_result, dict):
+            return fallback_result
+        else:
+            return fallback_result.model_dump()
 
     def _normalize_action_type(self, action_type: str) -> str:
         """Normalize action type to valid ActionType values"""
+        if action_type is None:
+            return "interact"
+
         action_type = action_type.lower()
 
         if action_type in [e.value for e in ActionType]:
@@ -271,8 +312,6 @@ class CodeLlamaParser(ActionParser):
         type_mappings = {
             "combat": "attack",
             "magic": "spell", 
-            "skill": "skill_check",
-            "check": "skill_check",
             "talk": "social",
             "conversation": "social",
             "move": "movement",
@@ -280,4 +319,4 @@ class CodeLlamaParser(ActionParser):
             "object": "interact"
         }
 
-        return type_mappings.get(action_type, "skill_check")
+        return type_mappings.get(action_type, "interact")

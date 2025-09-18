@@ -12,6 +12,8 @@ from backend.models import (
 from backend.game.core.character_state import CharacterState
 from backend.game.core.game_state import GameState
 from backend.game.core.dice_system import DiceRollerFactory, BaseDiceRoller
+from backend.game.core.game_session_manager import GameSessionManager
+from backend.game.core.event_bus import EventBus
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 
 
@@ -24,96 +26,155 @@ class DnDGameEngine(BaseGameEngine):
     def __init__(
         self,
         model_client: AsyncModelServiceClient,
-        save_state_callback: Callable,
+        session_manager: GameSessionManager,
+        event_bus: EventBus,
         **kwargs,
     ):
         super().__init__(
-            model_client=model_client, save_state_callback=save_state_callback, **kwargs
+            model_client=model_client,
+            session_manager=session_manager,
+            event_bus=event_bus,
+            **kwargs,
         )
 
     def get_default_dice_roller(self) -> BaseDiceRoller:
         return DiceRollerFactory.create_roller("dnd")
 
+    # def validate_action(self, parsed_action: ParsedAction) -> ValidationResult:
+    #     """Validate action against D&D rules and current game state"""
+    #     if not self.game_state:
+    #         return ValidationResult(is_valid=False, reason="Game state not initialized")
+
+    #     # Check if actor exists and is alive
+    #     if parsed_action.actor == "player":
+    #         if not self.game_state.player.is_alive():
+    #             return ValidationResult(
+    #                 is_valid=False, reason=f"{parsed_action.actor} is dead."
+    #             )
+    #     else:
+    #         npc = self.game_state.get_npc_by_name(parsed_action.actor)
+    #         if npc and not npc.is_alive():
+    #             return ValidationResult(
+    #                 is_valid=False, reason=f"{parsed_action.actor} is dead."
+    #             )
+
+    #     # Validate target exists if specified
+    #     if parsed_action.target:
+    #         if (
+    #             parsed_action.target == self.game_state.player.name
+    #             or parsed_action.target == "player"
+    #             or parsed_action.target == "self"
+    #         ):
+    #             if not self.game_state.player.is_alive():
+    #                 return ValidationResult(
+    #                     is_valid=False, reason="Cannot target defeated player"
+    #                 )
+    #         else:
+    #             target_npc = self.game_state.get_npc_by_name(parsed_action.target)
+    #             if target_npc and not target_npc.is_alive():
+    #                 return ValidationResult(
+    #                     is_valid=False,
+    #                     reason=f"{parsed_action.target} is dead",
+    #                 )
+
+    #     # Validate action type constraints
+    #     validation_result = self.validate_action_constraints(parsed_action)
+    #     if not validation_result.is_valid:
+    #         return validation_result
+
+    #     # Validate against scene rules
+    #     scene_validation = self.validate_scene_rules(parsed_action)
+    #     if not scene_validation.is_valid:
+    #         return scene_validation
+
+    #     return ValidationResult(is_valid=True)
+
     def validate_action(self, parsed_action: ParsedAction) -> ValidationResult:
         """Validate action against D&D rules and current game state"""
         if not self.game_state:
-            return ValidationResult(False, "Game state not initialized")
+            return ValidationResult(is_valid=False, reason="Game state not initialized")
 
-        # Check if actor exists and is alive
+            # Check if actor exists and is alive
         if parsed_action.actor == "player":
             if not self.game_state.player.is_alive():
-                return ValidationResult(False, "Player is defeated and cannot act")
+                return ValidationResult(
+                    is_valid=False, reason=f"{parsed_action.actor} is dead."
+                )
         else:
             npc = self.game_state.get_npc_by_name(parsed_action.actor)
-            if not npc or not npc.is_alive():
+            if npc and not npc.is_alive():
                 return ValidationResult(
-                    False, f"NPC {parsed_action.actor} is not available"
+                    is_valid=False, reason=f"{parsed_action.actor} is dead."
                 )
 
-        # Validate target exists if specified
-        if parsed_action.target:
-            if (
-                parsed_action.target == self.game_state.player.name
-                or parsed_action.target == "player"
-            ):
-                if not self.game_state.player.is_alive():
-                    return ValidationResult(False, "Cannot target defeated player")
-            elif parsed_action.target != "self":
-                target_npc = self.game_state.get_npc_by_name(parsed_action.target)
-                if not target_npc:
-                    return ValidationResult(
-                        False, f"Target {parsed_action.target} not found"
-                    )
+        method_name = f"validate_{parsed_action.action_type.value}_constraints"
+        validator = getattr(self, method_name, None)
 
-        # Validate action type constraints
-        validation_result = self.validate_action_constraints(parsed_action)
-        if not validation_result.is_valid:
-            return validation_result
+        if validator is None:
+            return ValidationResult(
+                is_valid=False,
+                reason=f"No validator for {parsed_action.action_type.value}",
+            )
 
-        # Validate against scene rules
-        scene_validation = self.validate_scene_rules(parsed_action)
-        if not scene_validation.is_valid:
-            return scene_validation
+        return validator()
 
-        return ValidationResult(True)
+    def validate_attack_constraints(self):
+        return ValidationResult(is_valid=True)
 
-    def validate_action_constraints(
-        self, parsed_action: ParsedAction
-    ) -> ValidationResult:
-        """Validate D&D-specific action constraints"""
-        actor_state = (
-            self.game_state.player
-            if parsed_action.actor == "player"
-            else self.game_state.get_npc_by_name(parsed_action.actor)
-        )
+    def validate_spell_constraints(self):
+        return ValidationResult(is_valid=True)
 
-        if parsed_action.action_type == ActionType.ATTACK:
-            if not actor_state.equipped_weapon and not actor_state.has_natural_weapons:
-                return ValidationResult(
-                    False,
-                    "No weapon equipped or natural weapons available",
-                    "equip a weapon or use an unarmed attack",
-                )
+    def validate_social_constraints(self):
+        return ValidationResult(is_valid=True)
 
-        elif parsed_action.action_type == ActionType.SPELL:
-            if not actor_state.can_cast_spells():
-                return ValidationResult(
-                    False, "Cannot cast spells", "try a different action type"
-                )
-            if actor_state.current_mp <= 0:
-                return ValidationResult(
-                    False,
-                    "Not enough mana to cast spells",
-                    "rest to recover mana or use a different action",
-                )
+    def validate_movement_constraints(self):
+        return ValidationResult(is_valid=True)
 
-        elif parsed_action.action_type == ActionType.MOVEMENT:
-            if actor_state.is_immobilized():
-                return ValidationResult(
-                    False, "Cannot move while immobilized", "try to break free first"
-                )
+    def validate_interact_constraints(self):
+        return ValidationResult(is_valid=True)
 
-        return ValidationResult(True)
+    # def validate_action_constraints(
+    #     self, parsed_action: ParsedAction
+    # ) -> ValidationResult:
+    #     """Validate D&D-specific action constraints"""
+    #     actor_state = (
+    #         self.game_state.player
+    #         if parsed_action.actor == "player"
+    #         or parsed_action.actor == self.game_state.player.name
+    #         else self.game_state.get_npc_by_name(parsed_action.actor)
+    #     )
+
+    #     if parsed_action.action_type == ActionType.attack:
+    #         if not actor_state.equipped_weapon and not actor_state.has_natural_weapons:
+    #             return ValidationResult(
+    #                 is_valid=False,
+    #                 reason="No weapon equipped or natural weapons available",
+    #                 suggested_action="equip a weapon or use an unarmed attack",
+    #             )
+
+    #     elif parsed_action.action_type == ActionType.spell:
+    #         if not actor_state.can_cast_spells():
+    #             return ValidationResult(
+    #                 is_valid=False,
+    #                 reason="Cannot cast spells",
+    #                 suggested_action="try a different action type",
+    #             )
+    #         if actor_state.current_mp <= 0:
+    #             return ValidationResult(
+    #                 is_valid=False,
+    #                 reason="Not enough mana to cast spells",
+    #                 suggested_action="rest to recover mana or use a different action",
+    #             )
+
+    #     elif parsed_action.action_type == ActionType.movement:
+    #         if actor_state.is_immobilized():
+    #             return ValidationResult(
+    #                 is_valid=False,
+    #                 reason="Cannot move while immobilized",
+    #                 suggested_action="try to break free first",
+    #             )
+
+    #     return ValidationResult(is_valid=True)
 
     def validate_scene_rules(self, parsed_action: ParsedAction) -> ValidationResult:
         """Validate against D&D scene-specific rules"""
@@ -127,37 +188,39 @@ class DnDGameEngine(BaseGameEngine):
         # D&D specific scene rules
         if (
             scene_rules.get("no_magic", False)
-            and parsed_action.action_type == ActionType.SPELL
+            and parsed_action.action_type == ActionType.spell
         ):
             return ValidationResult(
-                False,
-                "Magic is suppressed in this area",
-                "try a physical attack instead",
+                is_valid=False,
+                reason="Magic is suppressed in this area",
+                suggested_action="try a physical attack instead",
             )
 
         if (
             scene_rules.get("stealth_required", False)
-            and parsed_action.action_type == ActionType.ATTACK
+            and parsed_action.action_type == ActionType.attack
         ):
             if not self.game_state.player.has_status("stealth"):
                 return ValidationResult(
-                    False, "You must remain stealthy here", "try to hide first"
+                    is_valid=False,
+                    reason="You must remain stealthy here",
+                    suggested_action="try to hide first",
                 )
 
-        return ValidationResult(True)
+        return ValidationResult(is_valid=True)
 
     def check_game_condition(self) -> GameCondition:
         """Check D&D win/lose conditions"""
         if not self.game_state:
-            return GameCondition.GAME_OVER
+            return GameCondition.game_over
 
         # Check player defeat
         if not self.game_state.player.is_alive():
-            return GameCondition.PLAYER_DEFEAT
+            return GameCondition.player_defeat
 
         # D&D-specific victory conditions could be added here
         # For now, just continue the game
-        return GameCondition.CONTINUE
+        return GameCondition.game_on
 
     def ai_decide_npc_action(self, npc: CharacterState) -> ParsedAction:
         """D&D-specific AI decision making for NPCs"""
@@ -167,7 +230,7 @@ class DnDGameEngine(BaseGameEngine):
                 actor=npc.name,
                 action="attacks",
                 target=self.game_state.player.name,
-                action_type=ActionType.ATTACK,
+                action_type=ActionType.attack,
                 weapon=npc.equipped_weapon,
                 subject=None,
                 details=None,
@@ -177,7 +240,7 @@ class DnDGameEngine(BaseGameEngine):
                 actor=npc.name,
                 action="waits",
                 target=None,
-                action_type=ActionType.INTERACT,
+                action_type=ActionType.interact,
                 weapon=None,
                 subject=None,
                 details=None,
@@ -187,20 +250,20 @@ class DnDGameEngine(BaseGameEngine):
         """D&D-specific action modifiers"""
         modifiers = super().get_action_modifiers(parsed_action)
 
-        actor_state = self.get_actor_state(parsed_action.actor)
+        # actor_state = self.get_actor_state(parsed_action.actor)
 
         # D&D advantage/disadvantage
-        if parsed_action.action_type == ActionType.ATTACK:
-            if hasattr(actor_state, "has_status"):
-                if actor_state.has_status("flanking"):
-                    modifiers["advantage"] = True
-                elif actor_state.has_status("prone"):
-                    modifiers["disadvantage"] = True
+        # if parsed_action.action_type == ActionType.attack:
+        #     if hasattr(actor_state, "has_status"):
+        #         if actor_state.has_status("flanking"):
+        #             modifiers["advantage"] = True
+        #         elif actor_state.has_status("prone"):
+        #             modifiers["disadvantage"] = True
 
         # Spell attack bonuses
-        elif parsed_action.action_type == ActionType.SPELL:
-            if hasattr(actor_state, "spell_attack_bonus"):
-                modifiers["modifier"] = actor_state.spell_attack_bonus
+        # elif parsed_action.action_type == ActionType.spell:
+        #     if hasattr(actor_state, "spell_attack_bonus"):
+        #         modifiers["modifier"] = actor_state.spell_attack_bonus
 
         return modifiers
 
@@ -212,16 +275,16 @@ class DnDGameEngine(BaseGameEngine):
 
         # Fallback mapping for common outcomes
         mapping = {
-            "critical": "CRITICAL",
-            "outstanding_success": "OUTSTANDING_SUCCESS",
-            "great_success": "GREAT_SUCCESS",
-            "success": "SUCCESS",
-            "wound": "WOUND",
-            "miss": "MISS",
-            "failure": "FAILURE",
+            "critical": "critical",
+            "outstanding_success": "outstanding_success",
+            "great_success": "great_success",
+            "success": "success",
+            "wound": "wound",
+            "miss": "miss",
+            "failure": "failure",
         }
 
-        damage_type_name = mapping.get(outcome.lower(), "SUCCESS")
+        damage_type_name = mapping.get(outcome.lower(), "success")
         return getattr(DamageType, damage_type_name)
 
     def get_action_difficulty(
@@ -229,25 +292,12 @@ class DnDGameEngine(BaseGameEngine):
     ) -> int:
         """D&D difficulty/DC values by action type with context modifiers"""
         difficulty_map = {
-            ActionType.ATTACK: 14,  # AC
-            ActionType.SPELL: 13,  # Spell save DC
-            ActionType.SKILL_CHECK: 12,  # Skill check DC
-            ActionType.SOCIAL: 11,  # Persuasion/Deception DC
-            ActionType.MOVEMENT: 8,  # Movement check DC
-            ActionType.INTERACT: 10,  # Investigation/Perception DC
+            ActionType.attack: 14,  # AC
+            ActionType.spell: 13,  # Spell save DC
+            ActionType.social: 11,  # Persuasion/Deception DC
+            ActionType.movement: 8,  # Movement check DC
+            ActionType.interact: 10,  # Investigation/Perception DC
         }
         base = difficulty_map.get(action_type, 12)
-
-        # Apply D&D-specific context modifiers
-        if context:
-            # Scene difficulty modifiers
-            scene_modifier = context.scene.get("difficulty_modifier", 0)
-            base += scene_modifier
-
-            # Environmental modifiers
-            if context.scene.get("darkness", False):
-                base += 2  # Disadvantage equivalent
-            if context.scene.get("difficult_terrain", False):
-                base += 1
 
         return base

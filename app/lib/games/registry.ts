@@ -10,9 +10,10 @@ interface GameComponents {
 
 const gameRegistry: Record<string, GameComponents> = {
   mudai: {
-    MainMenu: () => import("@/components/games/mudai/MainMenu"),
-    CreateCharacter: () => import("@/components/games/mudai/CreateCharacter"),
-    GamePage: () => import("@/components/games/mudai/GamePage"),
+    MainMenu: () => import("@/app/components/games/mudai/MainMenu"),
+    CreateCharacter: () =>
+      import("@/app/components/games/mudai/CreateCharacter"),
+    GamePage: () => import("@/app/components/games/mudai/GamePage"),
   },
   // "space-adventure": {
   //   MainMenu: () => import("@/components/games/space-adventure/MainMenu"),

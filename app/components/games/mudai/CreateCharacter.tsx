@@ -2,14 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  Dice1,
   Plus,
   Minus,
   User,
-  Scroll,
   Sword,
   Shield,
-  Zap,
   Eye,
   Heart,
   Brain,
@@ -20,36 +17,37 @@ import {
   ChevronUp,
   ChevronDown,
 } from "lucide-react";
-import {
-  CharacterAbilities,
-  CharacterAttributes,
-  CharacterState,
-} from "@/app/types/game";
-import { useParams, useRouter } from "next/navigation";
+import { CharacterAbilities } from "@/app/types/game";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { CharacterConfig } from "@/app/types/game";
 
 interface CreateCharacterProps {
   slug: string;
 }
 
+type StatName =
+  | "strength"
+  | "dexterity"
+  | "constitution"
+  | "intelligence"
+  | "wisdom"
+  | "charisma";
+
 export default function CreateCharacter({ slug }: CreateCharacterProps) {
   const router = useRouter();
-  const [playerState, setPlayerState] = useState<CharacterState>({
+
+  const [characterConfig, setCharacterConfig] = useState<CharacterConfig>({
     name: "User",
+    strength: 15,
+    dexterity: 13,
+    constitution: 14,
+    intelligence: 10,
+    wisdom: 10,
+    charisma: 10,
     character_type: "player",
-    max_hp: 10,
-    current_hp: 10,
-    armor_class: 10,
-    level: 1,
     bio: "",
-    stats: {
-      strength: 15,
-      dexterity: 13,
-      constitution: 14,
-      intelligence: 10,
-      wisdom: 10,
-      charisma: 10,
-    },
+    inventory: [],
   });
 
   const [selectedAbilities, setSelectedAbilities] = useState<
@@ -57,16 +55,25 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
   >([]);
   const [availablePoints, setAvailablePoints] = useState(27);
 
+  // Recalculate available points when stats change
   useEffect(() => {
-    setAvailablePoints(27 - getTotalSpentPoints());
-  }, [playerState.stats]);
+    const totalSpent = getTotalSpentPoints();
+    setAvailablePoints(27 - totalSpent);
+  }, [
+    characterConfig.strength,
+    characterConfig.dexterity,
+    characterConfig.constitution,
+    characterConfig.intelligence,
+    characterConfig.wisdom,
+    characterConfig.charisma,
+  ]);
 
   const handleSubmit = async () => {
     try {
       const res = await fetch(`/api/play/${slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(playerState),
+        body: JSON.stringify(characterConfig),
       });
 
       if (!res.ok) {
@@ -75,39 +82,30 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
       }
 
       const data = await res.json();
-      localStorage.setItem(`${slug}Session`, JSON.stringify(data));
-
-      router.replace(`/play/${slug}/${data.session_id}`);
+      router.push(`/play/${slug}/${data.session_id}`);
     } catch (err: any) {
       toast.error(err.message || "Something went wrong");
     }
   };
 
-  const adjustStat = (statName: keyof CharacterAttributes, delta: number) => {
-    if (!playerState) return;
-
-    const currentValue = playerState.stats[statName];
+  const adjustStat = (statName: StatName, delta: number) => {
+    const currentValue = characterConfig[statName];
     const newValue = currentValue + delta;
 
+    // Check bounds
     if (newValue < 8 || newValue > 15) return;
 
+    // Check if we have enough points
     const currentCost = getStatCost(currentValue);
     const newCost = getStatCost(newValue);
     const costDiff = newCost - currentCost;
 
     if (costDiff > availablePoints) return;
 
-    setPlayerState((prev) =>
-      prev
-        ? {
-            ...prev,
-            stats: {
-              ...prev.stats,
-              [statName]: newValue,
-            },
-          }
-        : prev
-    );
+    setCharacterConfig((prev) => ({
+      ...prev,
+      [statName]: newValue,
+    }));
   };
 
   const getStatCost = (value: number) => {
@@ -118,49 +116,43 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
   };
 
   const getTotalSpentPoints = () => {
-    return Object.values(playerState.stats).reduce(
-      (total, stat) => total + getStatCost(stat),
-      0
-    );
+    const stats = [
+      characterConfig.strength,
+      characterConfig.dexterity,
+      characterConfig.constitution,
+      characterConfig.intelligence,
+      characterConfig.wisdom,
+      characterConfig.charisma,
+    ];
+    return stats.reduce((total, stat) => total + getStatCost(stat), 0);
   };
 
-  const calculateHP = () =>
-    10 + getStatModifier(playerState.stats.constitution);
+  const calculateHP = () => 10 + getStatModifier(characterConfig.constitution);
 
   const getStatModifier = (value: number) => Math.floor((value - 10) / 2);
 
   const isAbilityAvailable = (ability: CharacterAbilities) => {
-    return (
-      playerState.stats[ability.req_stat as keyof CharacterAttributes] >=
-      ability.req_value
-    );
+    return characterConfig[ability.req_stat as StatName] >= ability.req_value;
   };
 
-  const toggleAbility = (abilityId: CharacterAbilities) => {
-    if (selectedAbilities.some((a) => a.id === abilityId.id)) {
-      setSelectedAbilities((prev) => prev.filter((a) => a.id !== abilityId.id));
+  const toggleAbility = (ability: CharacterAbilities) => {
+    if (selectedAbilities.some((a) => a.id === ability.id)) {
+      setSelectedAbilities((prev) => prev.filter((a) => a.id !== ability.id));
     } else if (selectedAbilities.length < 3) {
-      setSelectedAbilities((prev) => [...prev, abilityId]);
+      setSelectedAbilities((prev) => [...prev, ability]);
     }
   };
 
-  const getStatIcon = (statName: string) => {
-    switch (statName) {
-      case "strength":
-        return <BicepsFlexed size={14} className="text-red-400" />;
-      case "dexterity":
-        return <Target size={14} className="text-green-400" />;
-      case "constitution":
-        return <Heart size={14} className="text-pink-400" />;
-      case "intelligence":
-        return <Brain size={14} className="text-blue-400" />;
-      case "wisdom":
-        return <Eye size={14} className="text-purple-400" />;
-      case "charisma":
-        return <Users size={14} className="text-yellow-400" />;
-      default:
-        return null;
-    }
+  const getStatIcon = (statName: StatName) => {
+    const iconMap = {
+      strength: <BicepsFlexed size={14} className="text-red-400" />,
+      dexterity: <Target size={14} className="text-green-400" />,
+      constitution: <Heart size={14} className="text-pink-400" />,
+      intelligence: <Brain size={14} className="text-blue-400" />,
+      wisdom: <Eye size={14} className="text-purple-400" />,
+      charisma: <Users size={14} className="text-yellow-400" />,
+    };
+    return iconMap[statName];
   };
 
   const availableAbilities: CharacterAbilities[] = [
@@ -246,34 +238,42 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
     },
   ];
 
+  const statEntries: [StatName, number][] = [
+    ["strength", characterConfig.strength],
+    ["dexterity", characterConfig.dexterity],
+    ["constitution", characterConfig.constitution],
+    ["intelligence", characterConfig.intelligence],
+    ["wisdom", characterConfig.wisdom],
+    ["charisma", characterConfig.charisma],
+  ];
+
   return (
-    <div className="flex flex-col md:flex-row flex-1 max-w-7xl mx-auto text-white font-mono bg-blue-300">
+    <div className="flex flex-col md:flex-row flex-1 max-w-7xl mx-auto text-white font-mono">
       <div className="absolute backdrop-blur-xs inset-0 w-full h-full bg-black/30 -z-10"></div>
-      {/* Left Panel - Character Panel */}
+
+      {/* Left Panel - Character Image & Details */}
       <div className="flex flex-col w-full md:w-xl bg-gray-900 md:border-r md:border-l border-green-500">
         <div className="relative flex-1 w-full min-h-dvh md:min-h-auto">
           <img
             src="/images/fighter.jpeg"
-            alt="Picture of a fighter in armor wielding sword and shield"
+            alt="Fighter in armor with sword and shield"
             className="absolute w-full h-full object-cover"
             style={{
               filter: "contrast(1.1) brightness(0.4) sepia(0.7) saturate(0.8)",
             }}
           />
 
-          {/* Overlay gradient */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
 
-          {/* Bottom inputs */}
-          <div className="absolute bottom-0 w-full p-4 z-10">
-            {/* Name */}
+          {/* Character Details Form */}
+          <div className="absolute bottom-0 w-full p-4 z-0">
             <div className="mb-3">
               <label className="block text-sm text-green-400 mb-1">Name</label>
               <input
                 type="text"
-                value={playerState.name}
+                value={characterConfig.name}
                 onChange={(e) =>
-                  setPlayerState((prev) => ({ ...prev, name: e.target.value }))
+                  setCharacterConfig((prev) => ({ ...prev, name: e.target.value }))
                 }
                 className="w-full bg-black/60 backdrop-blur-sm border border-green-500 px-3 py-2 text-green-400 focus:outline-none focus:border-green-300"
                 placeholder="Character name..."
@@ -281,13 +281,12 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
               />
             </div>
 
-            {/* Bio */}
             <div className="mb-4">
               <label className="block text-sm text-green-400 mb-1">Bio</label>
               <textarea
-                value={playerState.bio}
+                value={characterConfig.bio}
                 onChange={(e) =>
-                  setPlayerState((prev) => ({ ...prev, bio: e.target.value }))
+                  setCharacterConfig((prev) => ({ ...prev, bio: e.target.value }))
                 }
                 className="w-full bg-black/60 backdrop-blur-sm border border-green-500 px-3 py-2 text-green-400 focus:outline-none focus:border-green-300 resize-none text-sm"
                 placeholder="Character background..."
@@ -295,13 +294,13 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
                 maxLength={200}
               />
               <div className="text-xs text-gray-500 text-right">
-                {playerState.bio.length}/200
+                {characterConfig.bio.length}/200
               </div>
             </div>
           </div>
         </div>
 
-        {/* Character Stats Summary */}
+        {/* Character Stats Summary - Desktop */}
         <div className="p-4 bg-gray-800 hidden md:block border-t border-green-500">
           <div className="text-sm space-y-1">
             <div className="flex justify-between">
@@ -317,9 +316,9 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
             <div className="flex justify-between">
               <span className="text-gray-400">Points Left:</span>
               <span
-                className={`${
+                className={
                   availablePoints >= 0 ? "text-green-400" : "text-red-400"
-                }`}
+                }
               >
                 {availablePoints}
               </span>
@@ -328,7 +327,7 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
 
           <button
             onClick={handleSubmit}
-            disabled={!playerState.name.trim() || availablePoints > 0}
+            disabled={!characterConfig.name.trim() || availablePoints !== 0}
             className="w-full mt-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-bold py-3 transition-colors"
           >
             CREATE CHARACTER
@@ -337,14 +336,14 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
       </div>
 
       {/* Right Panel - Stats & Abilities */}
-      <div className="flex flex-col">
-        {/* Gear Section */}
-        <div className="bg-gray-900 border-b border-green-500 p-4 flex-1">
+      <div className="flex flex-col md:border-r border-green-500">
+        {/* Starting Gear Section */}
+        <div className="flex-1 bg-gray-900 border-b border-green-500 p-4">
           <h3 className="text-green-400 font-mono font-bold mb-4">
             STARTING GEAR
           </h3>
 
-          {/* Equipment Grid */}
+          {/* Equipment Preview Grid */}
           <div className="grid grid-cols-5 gap-2 mb-4 md:px-10 auto-rows-fr">
             {/* Helm */}
             <div className="bg-gray-800 border border-gray-600 rounded p-2 flex flex-col items-center justify-center row-start-1 row-span-2 col-start-3">
@@ -389,18 +388,17 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
             </div>
           </div>
 
-          {/* Starting inventory items */}
+          {/* Starting inventory preview */}
           <div className="w-80 grid grid-cols-4 gap-2 mb-4 mx-auto auto-rows-[4rem]">
-            <div className="bg-gray-800 border border-gray-600 "></div>
-            <div className="bg-gray-800 border border-gray-600 "></div>
-            <div className="bg-gray-800 border border-gray-600 "></div>
-            <div className="bg-gray-800 border border-gray-600 "></div>
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-gray-800 border border-gray-600"></div>
+            ))}
           </div>
         </div>
 
-        {/* Attributes Section - Compact */}
+        {/* Attributes Section */}
         <div className="bg-gray-900 border-b border-green-500 p-4">
-          <div className="items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3">
             <h3 className="text-md font-bold text-green-400">ATTRIBUTES</h3>
             <div className="text-xs text-gray-400">
               Points Remaining: {availablePoints}
@@ -408,7 +406,7 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
           </div>
 
           <div className="grid grid-cols-6 gap-2">
-            {Object.entries(playerState.stats).map(([statName, value]) => {
+            {statEntries.map(([statName, value]) => {
               const modifier = getStatModifier(value);
               const modifierText =
                 modifier >= 0 ? `+${modifier}` : `${modifier}`;
@@ -422,43 +420,37 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
                   key={statName}
                   className="bg-gray-800 border border-gray-600 rounded p-2 relative"
                 >
-                  {/* Increase button - top half */}
-                  <div
-                    onClick={() =>
-                      canIncrease &&
-                      adjustStat(statName as keyof CharacterAttributes, 1)
-                    }
-                    className={`absolute inset-x-0 top-0 h-1/2 cursor-pointer transition-colors ${
-                      canIncrease ? "hover:bg-gray-700" : "cursor-not-allowed"
+                  {/* Increase button */}
+                  <button
+                    onClick={() => canIncrease && adjustStat(statName, 1)}
+                    disabled={!canIncrease}
+                    className={`absolute inset-x-0 top-0 h-1/2 transition-colors ${
+                      canIncrease
+                        ? "hover:bg-gray-700 cursor-pointer"
+                        : "cursor-not-allowed"
                     } flex items-center justify-center`}
                   >
                     {canIncrease && (
-                      <ChevronUp
-                        size={12}
-                        className="text-gray-400 opacity-0 hover:opacity-100 transition-opacity"
-                      />
+                      <ChevronUp size={12} className="text-gray-400" />
                     )}
-                  </div>
+                  </button>
 
-                  {/* Decrease button - bottom half */}
-                  <div
-                    onClick={() =>
-                      canDecrease &&
-                      adjustStat(statName as keyof CharacterAttributes, -1)
-                    }
-                    className={`absolute inset-x-0 bottom-0 h-1/2 cursor-pointer transition-colors ${
-                      canDecrease ? "hover:bg-gray-700" : "cursor-not-allowed"
+                  {/* Decrease button */}
+                  <button
+                    onClick={() => canDecrease && adjustStat(statName, -1)}
+                    disabled={!canDecrease}
+                    className={`absolute inset-x-0 bottom-0 h-1/2 transition-colors ${
+                      canDecrease
+                        ? "hover:bg-gray-700 cursor-pointer"
+                        : "cursor-not-allowed"
                     } flex items-center justify-center`}
                   >
                     {canDecrease && (
-                      <ChevronDown
-                        size={12}
-                        className="text-gray-400 opacity-0 hover:opacity-100 transition-opacity"
-                      />
+                      <ChevronDown size={12} className="text-gray-400" />
                     )}
-                  </div>
+                  </button>
 
-                  {/* Content */}
+                  {/* Stat display */}
                   <div className="text-center relative z-10 pointer-events-none">
                     <div className="flex items-center justify-center gap-1 mb-1">
                       {getStatIcon(statName)}
@@ -477,7 +469,7 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
           </div>
         </div>
 
-        {/* Abilities Section - Compact */}
+        {/* Abilities Section */}
         <div className="bg-gray-900 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-md font-bold text-green-400">
@@ -496,17 +488,18 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
               );
 
               return (
-                <div
+                <button
                   key={ability.id}
                   onClick={() => available && toggleAbility(ability)}
-                  className={`relative p-2 rounded border cursor-pointer transition-all text-center ${
+                  disabled={!available}
+                  className={`relative p-2 rounded border transition-all text-center ${
                     available
                       ? selected
                         ? "border-green-500 bg-green-900/30"
                         : "border-gray-600 hover:border-green-400 bg-gray-800"
                       : "border-gray-700 bg-gray-800/50 cursor-not-allowed opacity-50"
                   }`}
-                  title={`${ability.name} - ${ability.requirement}`}
+                  title={`${ability.name} - ${ability.requirement}\n${ability.description}`}
                 >
                   {selected && (
                     <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
@@ -525,13 +518,13 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
                   <div className="text-xs text-gray-500">
                     {ability.requirement}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
         </div>
 
-        {/* Character Stats Summary */}
+        {/* Character Stats Summary - Mobile */}
         <div className="p-4 bg-gray-800 md:hidden border-t border-green-500">
           <div className="text-sm space-y-1">
             <div className="flex justify-between">
@@ -547,9 +540,9 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
             <div className="flex justify-between">
               <span className="text-gray-400">Points Left:</span>
               <span
-                className={`${
+                className={
                   availablePoints >= 0 ? "text-green-400" : "text-red-400"
-                }`}
+                }
               >
                 {availablePoints}
               </span>
@@ -558,7 +551,7 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
 
           <button
             onClick={handleSubmit}
-            disabled={!playerState.name.trim() || availablePoints > 0}
+            disabled={!characterConfig.name.trim() || availablePoints !== 0}
             className="w-full mt-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-black font-bold py-3 transition-colors"
           >
             CREATE CHARACTER

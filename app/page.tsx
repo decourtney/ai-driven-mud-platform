@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { Play } from "lucide-react";
 import { auth } from "@/auth";
-import Navbar from "@/components/NavBar";
+import Navbar from "@/app/components/NavBar";
 
 export default async function LandingPage() {
   const session = await auth();

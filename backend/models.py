@@ -9,70 +9,55 @@ from typing import Optional, List, Dict, Any
 from enum import Enum
 
 
-class ValidationResult:
-    """Result of action validation"""
-
-    def __init__(
-        self,
-        is_valid: bool,
-        reason: Optional[str] = None,
-        suggested_action: Optional[str] = None,
-    ):
-        self.is_valid = is_valid
-        self.reason = reason
-        self.suggested_action = suggested_action
-
-
 class CharacterType(Enum):
-    PLAYER = "player"
-    NPC = "npc"
-    ENEMY = "enemy"  # Hostile NPC
-    ALLY = "ally"
+    player = "player"
+    npc = "npc"
+    enemy = "enemy"  # Hostile NPC
+    ally = "ally"
 
 
 class StatusEffect(Enum):
-    POISONED = "poisoned"
-    PARALYZED = "paralyzed"
-    STUNNED = "stunned"
-    BLESSED = "blessed"
-    CURSED = "cursed"
-    INVISIBLE = "invisible"
-    HASTE = "haste"
-    SLOW = "slow"
-    CHARMED = "charmed"
-    FRIGHTENED = "frightened"
-    PRONE = "prone"
-    GRAPPLED = "grappled"
-    RESTRAINED = "restrained"
-    INCAPACITATED = "incapacitated"
-    UNCONSCIOUS = "unconscious"
+    poisoned = "poisoned"
+    paralyzed = "paralyzed"
+    stunned = "stunned"
+    blessed = "blessed"
+    cursed = "cursed"
+    invisible = "invisible"
+    haste = "haste"
+    slow = "slow"
+    charmed = "charmed"
+    frightened = "frightened"
+    prone = "prone"
+    grappled = "grappled"
+    restrained = "restrained"
+    incapaciatated = "incapacitated"
+    unconscious = "unconscious"
 
 
 class GameCondition(Enum):
-    CONTINUE = "continue"
-    PLAYER_WIN = "player_win"
-    PLAYER_DEFEAT = "player_defeat"
-    GAME_OVER = "game_over"
+    game_on = "game_on"
+    player_win = "player_win"
+    player_defeat = "player_defeat"
+    game_over = "game_over"
 
 
 class ActionType(str, Enum):
-    ATTACK = "attack"
-    SPELL = "spell"
-    SKILL_CHECK = "skill_check"
-    SOCIAL = "social"
-    MOVEMENT = "movement"
-    INTERACT = "interact"
+    attack = "attack"
+    spell = "spell"
+    social = "social"
+    movement = "movement"
+    interact = "interact"
 
 
 class DamageType(str, Enum):
-    MISS = "miss"
-    FAILURE = "failure"
-    WOUND = "wound"
-    CRITICAL = "critical"
-    KILL = "kill"
-    SUCCESS = "success"
-    GREAT_SUCCESS = "great_success"
-    OUTSTANDING_SUCCESS = "outstanding_success"
+    miss = "miss"
+    failure = "failure"
+    wound = "wound"
+    critical = "critical"
+    kill = "kill"
+    success = "success"
+    great_success = "great_success"
+    outstanding_success = "outstanding_success"
 
 
 class GameStatus(str, Enum):
@@ -89,6 +74,7 @@ class GameDifficulty(str, Enum):
 
 class ParsedAction(BaseModel):
     actor: str
+    actor_type: CharacterType
     action: str
     target: Optional[str] = None
     action_type: ActionType
@@ -99,6 +85,7 @@ class ParsedAction(BaseModel):
 
 class ActionResult(BaseModel):
     parsed_action: ParsedAction
+    action_type: ActionType
     hit: bool
     dice_roll: int
     damage_type: DamageType
@@ -106,9 +93,13 @@ class ActionResult(BaseModel):
     difficulty: Optional[int] = None
 
 
-class GameContext(BaseModel):
-    """Context information for the game session"""
+class ValidationResult(BaseModel):
+    is_valid: bool
+    reason: Optional[str] = None
+    suggested_action: Optional[str] = None
 
+
+class GameContext(BaseModel):
     scene_description: Optional[str] = None
     active_characters: List[str] = []
     environment: Optional[str] = None
@@ -118,16 +109,7 @@ class GameContext(BaseModel):
 # API models
 class ParseActionRequest(BaseModel):
     action: str
-
-
-class ParseActionResponse(BaseModel):
-    actor: str
-    action: str
-    target: Optional[str] = None
-    action_type: ActionType
-    weapon: Optional[str] = None
-    subject: Optional[str] = None
-    details: Optional[str] = None
+    actor_type: CharacterType
 
 
 class GenerateActionRequest(BaseModel):
@@ -139,7 +121,6 @@ class GenerateActionRequest(BaseModel):
 class GenerateSceneRequest(BaseModel):
     scene: Dict[str, Any]
     player: Dict[str, Any]
-    npcs: List[Dict[str, Any]]
 
 
 class GeneratedNarration(BaseModel):

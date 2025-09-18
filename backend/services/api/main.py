@@ -4,17 +4,17 @@ Main entry point for the D&D Streaming Game Engine server.
 Now uses decoupled model service for AI inference.
 """
 
-import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from backend.services.api.server import create_server
+from backend.config import settings
 
 # ==========================================
 # Configuration
 # ==========================================
-MODEL_SERVER_URL = os.getenv("MODEL_SERVER_URL", "http://localhost:8001")
-WAIT_FOR_MODELS = os.getenv("WAIT_FOR_MODELS", "true").lower() == "true"
-AUTO_LOAD_MODELS = os.getenv("AUTO_LOAD_MODELS", "false").lower() == "true"
+# MODEL_SERVER_URL = os.getenv("MODEL_SERVER_URL", "http://localhost:8001")
+# WAIT_FOR_MODELS = os.getenv("WAIT_FOR_MODELS", "true").lower() == "true"
+# AUTO_LOAD_MODELS = os.getenv("AUTO_LOAD_MODELS", "false").lower() == "true"
 
 
 # ==========================================
@@ -36,22 +36,23 @@ async def lifespan(app: FastAPI):
         await connect_db()
     except Exception as e:
         print(f"[-] Failed to connect to database: {e}")
-        # You might want to raise here if DB is critical
 
-    # Then handle model service
-    print(f"[+] Model service URL: {MODEL_SERVER_URL}")
+    # Model service info
+    print(f"[+] Model service URL: {settings.model_server_url}")
+    api_server = app.state.game_server
+    model_client = api_server.model_client
 
     try:
         # Access the API server instance
         api_server = app.state.game_server
         model_client = api_server.model_client
 
-        if WAIT_FOR_MODELS:
+        if settings.wait_for_models:
             print("[+] Waiting for model service to be available...")
             if await model_client.wait_for_service(timeout=60.0):
                 print("[+] ✅ Model service is available!")
 
-                if AUTO_LOAD_MODELS:
+                if settings.auto_load_models:
                     print("[+] Auto-loading models...")
                     if await model_client.load_all_models():
                         print("[+] ✅ Models loaded successfully!")
@@ -95,7 +96,7 @@ async def lifespan(app: FastAPI):
     try:
         api_server = app.state.game_server
         model_client = api_server.model_client
-        model_client.close()
+        await model_client.close()
         print("[+] Model client closed")
     except Exception as e:
         print(f"[-] Error during model client cleanup: {e}")
@@ -112,12 +113,14 @@ async def lifespan(app: FastAPI):
 # ==========================================
 # Create FastAPI app with model service
 # ==========================================
-app: FastAPI = create_server(model_server_url=MODEL_SERVER_URL, lifespan=lifespan)
+app: FastAPI = create_server(
+    model_server_url=settings.model_server_url, lifespan=lifespan
+)
 
 # ==========================================
 # Development endpoints
 # ==========================================
-if os.getenv("DEV_MODE", "false").lower() == "true":
+if settings.dev_mode == "true":
 
     @app.get("/dev/model-status")
     def dev_model_status():
@@ -127,7 +130,7 @@ if os.getenv("DEV_MODE", "false").lower() == "true":
             model_client = api_server.model_client
 
             return {
-                "model_servER_url": MODEL_SERVER_URL,
+                "model_server_url": settings.model_server_url,
                 "service_healthy": model_client.is_healthy(),
                 "models_loaded": model_client.are_models_loaded(),
                 "parser_ready": model_client.is_parser_ready(),
@@ -173,9 +176,9 @@ if __name__ == "__main__":
 🎮 D&D Game API Server
 =======================
 Configuration:
-- Model Server: {MODEL_SERVER_URL}
-- Wait for models: {WAIT_FOR_MODELS}
-- Auto-load models: {AUTO_LOAD_MODELS}
+- Model Server: {settings.model_server_url}
+- Wait for models: {settings.wait_for_models}
+- Auto-load models: {settings.auto_load_models}
 
 Environment Variables:
 - MODEL_SERVER_URL=http://localhost:8001

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import axios from "axios";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000";
 

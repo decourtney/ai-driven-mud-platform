@@ -40,18 +40,18 @@ export default function MainMenu({ slug }: MainMenuProps) {
 
   const handleContinue = async () => {
     try {
-      const res = await fetch(`/api/play/${slug}/${sessionId}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
+      // const res = await fetch(`/api/play/${slug}/${sessionId}`, {
+      //   method: "GET",
+      //   headers: { "Content-Type": "application/json" },
+      // });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText);
-      }
+      // if (!res.ok) {
+      //   const errorText = await res.text();
+      //   throw new Error(errorText);
+      // }
 
-      const data = await res.json();
-      localStorage.setItem(`${slug}Session`, JSON.stringify(data));
+      // const data = await res.json();
+      // localStorage.setItem(`${slug}Session`, JSON.stringify(data));
 
       router.push(`${slug}/${sessionId}`);
     } catch (err: any) {
@@ -65,7 +65,7 @@ export default function MainMenu({ slug }: MainMenuProps) {
 
   const handleDelete = async () => {
     try {
-      const res = await fetch(`/api/play/${slug}/`, {
+      const res = await fetch(`/api/play/${slug}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
       });
