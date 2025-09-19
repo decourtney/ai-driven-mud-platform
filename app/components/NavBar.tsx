@@ -101,7 +101,6 @@ export default function Navbar({ variant = "solid", user }: NavbarProps) {
                       className="w-full h-full"
                       width={40}
                       height={40}
-                      unoptimized
                     />
                   ) : (
                     <User
@@ -125,7 +124,6 @@ export default function Navbar({ variant = "solid", user }: NavbarProps) {
                               className="w-full h-full object-cover"
                               width={40}
                               height={40}
-                              unoptimized
                             />
                           ) : (
                             <UserCircle size={24} className="text-green-400" />

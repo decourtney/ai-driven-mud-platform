@@ -203,13 +203,13 @@ class GameSessionManager:
                 ),
             )
 
-        # Handle initial narration for new sessions
-        if needs_initial_narration:
-            asyncio.create_task(
-                self.generate_initial_narration_for_session(
-                    session_id=gamesession_record.id, game_id=game_id
-                )
-            )
+        # # Handle initial narration for new sessions
+        # if needs_initial_narration:
+        #     asyncio.create_task(
+        #         self.generate_initial_narration_for_session(
+        #             session_id=gamesession_record.id, game_id=game_id
+        #         )
+        #     )
 
         return
 

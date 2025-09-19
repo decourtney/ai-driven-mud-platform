@@ -1,4 +1,6 @@
+import asyncio
 from typing import List, Optional, Tuple, Generator, Dict, Any, Callable
+from pathlib import Path
 from abc import ABC, abstractmethod
 from enum import Enum
 from backend.models import (
@@ -31,12 +33,19 @@ class BaseGameEngine(ABC):
         model_client: AsyncModelServiceClient,
         session_manager: GameSessionManager,
         event_bus: EventBus,
+        game_id: str,
+        scenemanager_root_path: Optional[Path] = None,
         dice_roller: Optional[BaseDiceRoller] = None,
         **kwargs,
     ):
         self.model_client = model_client
         self.session_manager = session_manager
         self.event_bus = event_bus
+        self.scene_manager = (
+            SceneManager(scenemanager_root_path, event_bus)
+            if scenemanager_root_path
+            else None
+        )
 
         # Subscribe to scene manager events
         self.event_bus.subscribe("scene_changed", self.on_scene_diff_update)
@@ -50,7 +59,6 @@ class BaseGameEngine(ABC):
 
         self.game_state = None
         self.player_state = None
-        self.scene_manager = None
         self.max_invalid_attempts = kwargs.get("max_invalid_attempts", 3)
 
     @abstractmethod
@@ -85,9 +93,6 @@ class BaseGameEngine(ABC):
         print("[DEBUG]Player State Obj:", player_state)
         self.player_state = player_state
 
-        scene_manager = SceneManager(game_id=game_id, event_bus=self.event_bus)
-        self.scene_manager = scene_manager
-
         return self.game_state, player_state
 
     def load_game_state(self, game_state, player_state):
@@ -105,6 +110,8 @@ class BaseGameEngine(ABC):
         except Exception as e:
             print("[ERROR] while loading CharacterState:", e)
             raise
+
+        asyncio.create_task(self.scene_manager.load_zone(self.game_state.current_zone))
 
         return self.game_state
 
@@ -140,6 +147,10 @@ class BaseGameEngine(ABC):
     # ----------------------------
     # Scene Management
     # ----------------------------
+
+    async def load_zone(self):
+        pass
+
     async def present_scene(self) -> str:
         """Generate and return scene description for player"""
         if not self.game_state:

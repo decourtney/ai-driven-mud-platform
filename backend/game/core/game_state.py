@@ -18,7 +18,8 @@ class GameState:
     def __init__(self, game_id: str):
         self.id: Optional[str] = None
         self.game_id = game_id
-        self.current_scene: Dict[str, Any] = None
+        self.current_zone = "start"
+        self.current_scene = "start"
         self.turn_counter = 0
 
         # Game progression - Not sure about these yet
@@ -199,7 +200,8 @@ class GameState:
     def from_record(cls, record):
         obj = cls(record.game_id)
         obj.id = record.id
-        obj.current_scene = record.current_scene or {}
+        obj.current_scene = record.current_zone or 'start'
+        obj.current_scene = record.current_scene or "start"
         obj.turn_counter = record.turn_counter
         obj.objectives = record.objectives or []
         obj.completed_objectives = record.completed_objectives or []
@@ -220,7 +222,8 @@ class GameState:
     def to_db(self, for_create: bool = False):
         data = {
             "game_id": self.game_id,
-            "current_scene": Json(self.current_scene or {}),
+            "current_zone": self.current_zone,
+            "current_scene": self.current_scene,
             "turn_counter": self.turn_counter,
             "objectives": Json(self.objectives or []),
             "completed_objectives": Json(self.completed_objectives or []),

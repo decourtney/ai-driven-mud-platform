@@ -44,7 +44,7 @@ class GameEngineManager:
             for game_id, sessions in self.engines.items():
                 for session_id, entry in sessions.items():
                     if now - entry["last_active"] > idle_threshold:
-                        print("[DEBUG]Purging old engine instances")
+                        print("[DEBUG] PURGING STALE ENGINE INSTANCES")
                         game_state, player_state = entry[
                             "engine"
                         ].get_serialized_game_state()

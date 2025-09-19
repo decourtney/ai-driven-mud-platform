@@ -1,6 +1,6 @@
 # Example D&D-specific implementation
 from typing import Optional, Callable
-
+from pathlib import Path
 from backend.game.core.base_game_engine import BaseGameEngine
 from backend.models import (
     ParsedAction,
@@ -13,6 +13,7 @@ from backend.game.core.character_state import CharacterState
 from backend.game.core.game_state import GameState
 from backend.game.core.dice_system import DiceRollerFactory, BaseDiceRoller
 from backend.game.core.game_session_manager import GameSessionManager
+from backend.game.core.scene_manager import SceneManager
 from backend.game.core.event_bus import EventBus
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 
@@ -28,12 +29,17 @@ class DnDGameEngine(BaseGameEngine):
         model_client: AsyncModelServiceClient,
         session_manager: GameSessionManager,
         event_bus: EventBus,
+        game_id: str,
         **kwargs,
     ):
+        scenemanager_root_path = Path(__file__).parent / "scenes" / game_id
+
         super().__init__(
             model_client=model_client,
             session_manager=session_manager,
             event_bus=event_bus,
+            game_id=game_id,
+            scenemanager_root_path=scenemanager_root_path,
             **kwargs,
         )
 

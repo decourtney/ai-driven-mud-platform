@@ -1,0 +1,105 @@
+{
+  "start": {
+    "id": "start",
+    "title": "Welcome",
+    "description": "Welcome to MudAI! Type your actions to interact with the world.",
+    "exits": [
+      {
+        "id": "village_arrival",
+        "label": "Village Arrival",
+        "target_scene": "village_arrival"
+      }
+    ]
+  },
+  "village_arrival": {
+    "id": "village_arrival",
+    "title": "The Forgotten Village",
+    "description": "A shabby village square, eerily quiet.",
+
+    "exits": [
+      {
+        "id": "village_road",
+        "label": "Main road deeper into village",
+        "target_scene": "village_road"
+      },
+      {
+        "id": "hill_path",
+        "label": "Path back up the hill",
+        "target_scene": "hill_path"
+      },
+      {
+        "id": "inn_entrance",
+        "label": "Enter the Spork Inn",
+        "target_scene": "inn",
+        "is_locked": false
+      },
+      {
+        "id": "blacksmith_shop_entrance",
+        "label": "Enter the Rusty Nail",
+        "target_scene": "blacksmith_shop",
+        "is_locked": false
+      }
+    ],
+
+    "structures": [
+      {
+        "id": "inn",
+        "name": "Spork Inn",
+        "description": "Ugly shack with a faded sign — could be a fork, could be a spoon."
+      },
+      {
+        "id": "blacksmith_shop",
+        "name": "Rusty Nail",
+        "description": "Run down building with a cold hearth."
+      }
+    ],
+
+    "notable_npcs": [],
+    "npcs": [
+      {
+        "id": "rabid_wolf",
+        "name": "Rabid Wolf",
+        "description": "A disease-maddened wolf with glowing red eyes",
+        "status": { "is_alive": true, "is_hostile": true, "health": 8 },
+        "disposition": "aggressive"
+      }
+    ],
+
+    "items": [
+      {
+        "id": "busted_statue",
+        "name": "Ode to ...",
+        "description": "Toppled marble statue of a robed man. Broken and defaced — the plaque only reads 'Ode to'.",
+        "is_interactable": true
+      }
+    ],
+
+    "discoveries": [
+      {
+        "id": "no_footprints",
+        "type": "environment",
+        "observation": "No recent footprints in the dust on doorsteps",
+        "implication": "The village has been empty for some time",
+        "is_discovered": false,
+        "perception_dc": 12
+      },
+      {
+        "id": "rusted_dagger",
+        "type": "item",
+        "name": "Rusted Dagger",
+        "description": "An old dagger wedged under a loose cobblestone.",
+        "is_interactable": true,
+        "is_discovered": false,
+        "perception_dc": 14
+      },
+      {
+        "id": "quest_hint_bandits",
+        "type": "quest_hook",
+        "observation": "Scraps of cloth with a bandit insignia caught on a broken fence.",
+        "quest": "bandit_hideout",
+        "is_discovered": false,
+        "perception_dc": 15
+      }
+    ]
+  }
+}

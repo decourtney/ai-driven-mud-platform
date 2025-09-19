@@ -13,7 +13,8 @@ class Exit:
     id: str
     label: str
     target_scene: str
-    zone: str
+    is_locked: Optional[bool] = None
+    zone: Optional[str] = None
 
 
 @dataclass
@@ -35,9 +36,10 @@ class SceneDiff:
 # SceneManager
 # -------------------------
 class SceneManager:
-    def __init__(self, game_id: str, event_bus: EventBus):
+
+    def __init__(self, scenemanager_root_path: Path, event_bus: EventBus):
         self.event_bus = event_bus
-        self.base_path = Path(game_id)
+        self.scenemanager_root_path = scenemanager_root_path
         self.loaded_zone: Optional[str] = None
         self.loaded_scenes: Dict[str, Scene] = {}  # currently loaded zone
         self.scene_diffs: Dict[str, SceneDiff] = {}  # track diffs per scene
@@ -45,13 +47,13 @@ class SceneManager:
     # -------------------------
     # zone loading/unloading
     # -------------------------
-    def load_zone(self, zone_name: str):
+    async def load_zone(self, zone_name: str):
         if self.loaded_zone == zone_name:
             return  # already loaded
 
         self._unload_current_zone()  # unload previous
 
-        file_path = self.base_path / f"{zone_name}.json"
+        file_path = self.scenemanager_root_path / f"{zone_name}.json"
         if not file_path.exists():
             raise FileNotFoundError(f"Zone {zone_name} not found at {file_path}")
 
@@ -59,19 +61,27 @@ class SceneManager:
             data = json.load(f)
 
         self.loaded_scenes = {}
-        for scene_data in data.get("scenes", []):
+        for scene_id, scene_data in data.items():
+            # Build exits
             exits = [Exit(**exit_data) for exit_data in scene_data.get("exits", [])]
+
+            # Build Scene object
             scene = Scene(
                 id=scene_data["id"],
                 title=scene_data.get("title", ""),
                 description=scene_data.get("description", ""),
                 exits=exits,
-                objects=scene_data.get("objects", {}),
+                objects={
+                    "structures": scene_data.get("structures", []),
+                    "npcs": scene_data.get("npcs", []),
+                    "items": scene_data.get("items", []),
+                    "discoveries": scene_data.get("discoveries", []),
+                },
             )
-            self.loaded_scenes[scene.id] = scene
 
-        self.loaded_zone = zone_name
-        print(f"[SceneManager] Loaded zone: {zone_name}")
+            # Store it keyed by scene_id
+            self.loaded_scenes[scene_id] = scene
+        print("[DEBUG] LOADED ZONE AND SCENES")
 
     def _unload_current_zone(self):
         if self.loaded_zone and self.persist_callback:
