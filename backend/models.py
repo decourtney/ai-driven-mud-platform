@@ -112,6 +112,7 @@ class GameContext(BaseModel):
 # -------------------------
 
 
+@dataclass
 class Exit:
     id: str
     label: str
@@ -120,25 +121,20 @@ class Exit:
     zone: Optional[str] = None
 
 
-class Scene:
-    id: str
-    title: str
-    description: str
-    exits: list[Exit] = field(default_factory=list)
-    objects: dict = field(default_factory=dict)
-
-
+@dataclass
 class SceneDiff:
     scene_id: str
     changes: dict = field(default_factory=dict)
 
 
+@dataclass
 class Structure:
     id: str
     name: str
     description: str
 
 
+@dataclass
 class Status:
     is_alive: bool = True
     is_hostile: bool = False
@@ -151,6 +147,7 @@ class Disposition(Enum):
     aggresive = "aggresive"
 
 
+@dataclass
 class NotableNPC:
     id: str
     name: str
@@ -159,6 +156,7 @@ class NotableNPC:
     disposition: Disposition
 
 
+@dataclass
 class NPC:
     id: str
     name: str
@@ -167,6 +165,7 @@ class NPC:
     disposition: Disposition
 
 
+@dataclass
 class Item:
     id: str
     name: str
@@ -175,15 +174,29 @@ class Item:
     is_loot: bool = False
 
 
+@dataclass
 class Discovery:
     id: str
     type: str
     observation: str
+    perception_dc: int
+    implication: Optional[str] = None
+    quest: Optional[str] = None
     is_interactable: bool = False
     is_discovered: bool = False
-    perception_dc: int
-    implication: Optional[str]
-    quest: Optional[str]
+
+
+@dataclass
+class Scene:
+    id: str
+    title: str
+    description: str
+    exits: list[Exit] = field(default_factory=list)
+    structures: list[Structure] = field(default_factory=list)
+    notable_npcs: list[NotableNPC] = field(default_factory=list)
+    npcs: list[NPC] = field(default_factory=list)
+    items: list[Item] = field(default_factory=list)
+    discoveries: list[Discovery] = field(default_factory=list)
 
 
 # -------------------------

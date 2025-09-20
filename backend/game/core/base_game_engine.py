@@ -69,7 +69,9 @@ class BaseGameEngine(ABC):
     # ----------------------------
     # Game State Management
     # ----------------------------
-    def create_initial_states(self, character_config: Dict[str, Any], game_id: str):
+    async def create_initial_states(
+        self, character_config: Dict[str, Any], game_id: str
+    ):
         """Create initial GameState with player, NPCs, and scene data"""
 
         self.game_state = GameState(game_id=game_id)
@@ -93,31 +95,39 @@ class BaseGameEngine(ABC):
         print("[DEBUG]Player State Obj:", player_state)
         self.player_state = player_state
 
-        asyncio.create_task(
-            self.load_scene(
-                scene_id=self.player_state.current_scene,
-                zone=self.player_state.current_zone,
-            )
+        # asyncio.create_task(
+        #     self.load_scene(
+        #         scene_id=self.player_state.current_scene,
+        #         zone=self.player_state.current_zone,
+        #     )
+        # )
+
+        await self.load_scene(
+            scene_id=self.player_state.current_scene,
+            zone=self.player_state.current_zone,
         )
 
-        next_scene = self.scene_manager.move_to_scene(
-            current_scene=self.game_state.loaded_scene["id"],
-            exit_id=self.game_state.loaded_scene["exits"],
-        )
+        self.session_manager.send_state_update(self.game_state, self.player_state)
 
-        return self.game_state, player_state
+        print("loaded scene in create method", self.game_state.loaded_scene)
+        # next_scene = self.scene_manager.move_to_scene(
+        #     current_scene=self.game_state.loaded_scene["id"],
+        #     exit_id=self.game_state.loaded_scene["exits"],
+        # )
+
+        return self.game_state, self.player_state
 
     def load_game_state(self, game_state, player_state):
         print("[DEBUG] LOADING GAME STATE INTO ENGINE")
         try:
-            self.game_state = GameState.from_record(game_state)
+            self.game_state = GameState.from_db(game_state)
             # print("[DEBUG] raw game_state record:", game_state)
         except Exception as e:
             print("[ERROR] while loading GameState:", e)
             raise
 
         try:
-            self.player_state = CharacterState.from_record(player_state)
+            self.player_state = CharacterState.from_db(player_state)
             # print("[DEBUG] raw player_state record:", player_state)
         except Exception as e:
             print("[ERROR] while loading CharacterState:", e)
@@ -127,6 +137,12 @@ class BaseGameEngine(ABC):
             self.load_scene(
                 scene_id=self.player_state.current_scene,
                 zone=self.player_state.current_zone,
+            )
+        )
+
+        asyncio.create_task(
+            self.session_manager.send_state_update_to_session(
+                self.game_state.to_dict(), self.player_state.to_dict()
             )
         )
 
@@ -177,7 +193,8 @@ class BaseGameEngine(ABC):
             scene_id=scene_id, zone=zone
         )
         self.player_state.current_scene = self.game_state.loaded_scene.id
-        print("[DEBUG] CURRENT LOADED SCENE:", self.game_state.loaded_scene)
+        print("[DEBUG] CURRENT LOADED SCENE:", self.game_state.loaded_scene.id)
+        return
 
     async def present_scene(self) -> str:
         """Generate and return scene description for player"""

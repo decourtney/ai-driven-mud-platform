@@ -4,7 +4,16 @@ from pathlib import Path
 from typing import Dict, Optional, Callable, Any
 from dataclasses import dataclass, field
 from backend.game.core.event_bus import EventBus
-from backend.models import Scene, SceneDiff, Exit
+from backend.models import (
+    Scene,
+    SceneDiff,
+    Exit,
+    Structure,
+    NotableNPC,
+    NPC,
+    Item,
+    Discovery,
+)
 
 
 # -------------------------
@@ -43,15 +52,19 @@ class SceneManager:
 
             # Build Scene object
             scene = Scene(
-                id=data["id"],
-                title=data["title"],
-                description=data["description"],
-                exits=[Exit(**exit_data) for exit_data in data["exits"]],
-                structures=[Structure(**s) for s in data.get("structures", [])],
-                notable_npcs=[NotableNPC(**nnpc) for nnpc in data.get("notable_npcs", [])],
-                npcs=[NPC(**npc) for npc in data.get("npcs", [])],
-                items=[Item(**item) for item in data.get("items", [])],
-                discoveries=[Discovery(**d) for d in data.get("discoveries", [])],
+                id=scene_data["id"],
+                title=scene_data["title"],
+                description=scene_data["description"],
+                exits=[Exit(**exit) for exit in scene_data["exits"]],
+                structures=[
+                    Structure(**struct) for struct in scene_data.get("structures", [])
+                ],
+                notable_npcs=[
+                    NotableNPC(**nnpc) for nnpc in scene_data.get("notable_npcs", [])
+                ],
+                npcs=[NPC(**npc) for npc in scene_data.get("npcs", [])],
+                items=[Item(**item) for item in scene_data.get("items", [])],
+                discoveries=[Discovery(**disc) for disc in scene_data.get("discoveries", [])],
             )
 
             # Store it keyed by scene_id
@@ -81,7 +94,7 @@ class SceneManager:
         return self.loaded_scenes[scene_id]
 
     def move_to_scene(self, current_scene: Scene, exit_id: str) -> Scene:
-        print("[DEBUG] Move to scene from",current_scene)
+        print("[DEBUG] Move to scene from", current_scene)
         print("[DEBUG] Exit id", exit_id)
         exit_ = next((e for e in current_scene.exits if e.id == exit_id), None)
         if not exit_:

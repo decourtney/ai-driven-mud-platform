@@ -43,9 +43,11 @@ export const useGameWebSocket = ({
   const connectingRef = useRef(false);
 
   const [isConnected, setIsConnected] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [playerState, setPlayerState] = useState<CharacterState | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([] as ChatMessage[]);
+  const [gameState, setGameState] = useState<GameState>({} as GameState);
+  const [playerState, setPlayerState] = useState<CharacterState>(
+    {} as CharacterState
+  );
   const [lastError, setLastError] = useState<string | null>(null);
 
   const MAX_RECONNECT_ATTEMPTS = 5;
@@ -175,19 +177,29 @@ export const useGameWebSocket = ({
           case "connection_confirmed":
             break;
           case "initial_state":
-            setGameState(message.data.game_state);
-            setPlayerState(message.data.player_state);
-            setChatHistory(message.data.chat_history || []);
+            setGameState((prev) => ({ ...prev, ...message.data.game_state }));
+            setPlayerState((prev) => ({
+              ...prev,
+              ...message.data.player_state,
+            }));
+            setChatHistory((prev) => [...prev, message.data.chat_history]);
             break;
           case "chat_message":
             setChatHistory((prev) => [...prev, message.data]);
             break;
-          case "game_state_update":
-            setGameState((prev) => ({ ...prev, ...message.data }));
+          case "session_state_update":
+            setGameState((prev) => ({ ...prev, ...message.data.game_state }));
+            setPlayerState((prev) => ({
+              ...prev,
+              ...message.data.player_state,
+            }));
             break;
           case "action_result":
             setChatHistory((prev) => [...prev, message.data.narration]);
-            setPlayerState(message.data.player_state)
+            setPlayerState((prev) => ({
+              ...prev,
+              ...message.data.player_state,
+            }));
             break;
           case "error":
             setLastError(message.data.message);

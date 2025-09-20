@@ -145,7 +145,7 @@ class MessageType:
 
     # Server -> Client
     action_result = "action_result"
-    game_state_update = "game_state_update"
+    session_state_update = "session_state_update"
     chat_message = "chat_message"
     error = "error"
     pong = "pong"
@@ -232,10 +232,11 @@ class WebSocketMessage:
         return {"type": MessageType.pong, "timestamp": datetime.now().isoformat()}
 
     @staticmethod
-    def game_state_update(updates: Dict[str, Any]) -> Dict[str, Any]:
+    def session_state_update(
+        game_state: Dict[str, Any], player_state: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Create game state update message"""
         return {
-            "type": MessageType.game_state_update,
-            "data": updates,
-            "timestamp": datetime.now().isoformat(),
+            "type": MessageType.session_state_update,
+            "data": {"game_state": game_state, "player_state": player_state},
         }

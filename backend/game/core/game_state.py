@@ -198,7 +198,7 @@ class GameState:
     # ------------------------------
 
     @classmethod
-    def from_record(cls, record):
+    def from_db(cls, record):
         obj = cls(record.game_id)
         obj.id = record.id
         # obj.current_zone = record.current_zone or "start"
@@ -249,6 +249,29 @@ class GameState:
             # optionally include last_updated or other fields for update
 
         return data
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "game_id": self.game_id,
+            "turn_counter": self.turn_counter,
+            "objectives": self.objectives or [],
+            "completed_objectives": self.completed_objectives or [],
+            "story_beats": self.story_beats or [],
+            "in_combat": self.in_combat,
+            "initiative_order": self.initiative_order or [],
+            "current_turn_character": self.current_turn_character,
+            "weather": self.weather,
+            "time_of_day": self.time_of_day,
+            "location_history": self.location_history or [],
+            "recent_events": self.recent_events or [],
+            "important_npcs_met": list(self.important_npcs_met),
+            "items_discovered": self.items_discovered or [],
+            "session_started": (
+                self.session_started.isoformat() if self.session_started else None
+            ),
+            "save_version": self.save_version,
+        }
 
     # ------------------------------
     # Serialization

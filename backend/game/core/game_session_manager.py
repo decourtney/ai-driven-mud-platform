@@ -78,7 +78,7 @@ class GameSessionManager:
         engine_instance = self.engine_factory(game_id=game_id)
 
         # Initialize game state with new player state into engine instance
-        game_state, player_state = engine_instance.create_initial_states(
+        game_state, player_state = await engine_instance.create_initial_states(
             character_config, game_id=game_id
         )
         print("[DEBUG]Player State Dict:", player_state)
@@ -161,9 +161,7 @@ class GameSessionManager:
         needs_initial_narration = len(chat_history) == 0
 
         # Make sure engine is loaded with game states
-        await self.ensure_engine_exists(
-            game_id, gamesession_record.id, user_id
-        )
+        await self.ensure_engine_exists(game_id, gamesession_record.id, user_id)
 
         # Send initial state to WebSocket clients
         if hasattr(self, "connection_manager"):
@@ -261,7 +259,9 @@ class GameSessionManager:
                     ),
                 )
 
-            narrated_action, player_state, game_condition = await engine.execute_player_turn(action)
+            narrated_action, player_state, game_condition = (
+                await engine.execute_player_turn(action)
+            )
 
             # Check if narrated_action is an error or exception
             if isinstance(narrated_action, dict) and narrated_action.get("type") in {
@@ -329,8 +329,30 @@ class GameSessionManager:
                 )
             return {"success": False, "error": str(e)}
 
-    def send_messages_to_client(self, gamestate_id, ):
-        pass
+    async def send_state_update_to_session(
+        self, game_state: Dict[str, Any], player_state: Dict[str, Any]
+    ):
+
+        session = await prisma.gamesession.find_first(
+            where={"game_state": {"id": game_state["id"]}}
+        )
+
+        if not session:
+            raise RuntimeError(f"No session found for GameState {game_state["id"]}")
+
+        print("[DEBUG] SESSION ID TO SEND UPDATE:", game_state)
+
+        if hasattr(self, "connection_manager"):
+            await self.connection_manager.send_to_session(
+                session.id,
+                WebSocketMessage.session_state_update(game_state, player_state),
+            )
+        return
+
+    async def send_message_to_session(self, session_id: str, message: Dict[str, Any]):
+        if hasattr(self, "connection_manager"):
+            await self.connection_manager.send_to_session(session_id, message)
+        return
 
     # ==========================================
     # ENGINE METHODS

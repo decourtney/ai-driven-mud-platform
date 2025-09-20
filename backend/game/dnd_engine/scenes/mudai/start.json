@@ -85,15 +85,6 @@
         "perception_dc": 12
       },
       {
-        "id": "rusted_dagger",
-        "type": "item",
-        "name": "Rusted Dagger",
-        "description": "An old dagger wedged under a loose cobblestone.",
-        "is_interactable": true,
-        "is_discovered": false,
-        "perception_dc": 14
-      },
-      {
         "id": "quest_hint_bandits",
         "type": "quest_hook",
         "observation": "Scraps of cloth with a bandit insignia caught on a broken fence.",

@@ -51,7 +51,8 @@ export default function GamePage({ slug, id }: GamePageProps) {
     }
   }, [lastError]);
 
-  console.log("[DEBUG]GameState on GamePage:", gameState);
+  // console.log("[DEBUG]GameState on GamePage:", gameState);
+  // console.log("[DEBUG]PlayerState on GamePage:", playerState);
 
   // Show loading until we have game state
   if (!gameState || !isConnected) {

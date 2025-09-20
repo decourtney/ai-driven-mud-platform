@@ -520,7 +520,7 @@ class CharacterState:
     # ------------------------------
 
     @classmethod
-    def from_record(cls, record) -> "CharacterState":
+    def from_db(cls, record) -> "CharacterState":
         obj = cls(
             name=record.name,
             strength=record.strength,
@@ -595,285 +595,315 @@ class CharacterState:
 
         return data
 
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "strength": self.strength,
+            "dexterity": self.dexterity,
+            "constitution": self.constitution,
+            "intelligence": self.intelligence,
+            "wisdom": self.wisdom,
+            "charisma": self.charisma,
+            "level": self.level,
+            "gold": self.gold,
+            "max_hp": self.max_hp,
+            "current_hp": self.current_hp,
+            "temporary_hp": self.temporary_hp,
+            "armor_class": self.armor_class,
+            "max_mp": self.max_mp,
+            "current_mp": self.current_mp,
+            "is_alive": self.is_alive,
+            "can_act": self.can_act,
+            "character_type": self.character_type.value,
+            "bio": self.bio,
+            "current_zone": self.current_zone,
+            "current_scene": self.current_scene,
+            "inventory": self.inventory or [],
+            "equipped_weapon": self.equipped_weapon or {},
+            "equipped_armor": self.equipped_armor or {},
+            "status_effects": self.status_effects or [],
+        }
+
     # ------------------------------
     # Serialization
     # ------------------------------
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert character state to dictionary with robust error handling"""
-        try:
-            return {
-                "current_zone": getattr(self, "current_zone", ""),
-                "current_scene": getattr(self, "current_scene", ""),
-                "name": self.name,
-                "character_type": (
-                    self.character_type.value
-                    if self.character_type and hasattr(self.character_type, "value")
-                    else str(self.character_type) if self.character_type else "NPC"
-                ),
-                "level": getattr(self, "level", 1),
-                "bio": self.bio,
-                "max_hp": getattr(self, "max_hp", 100),
-                "current_hp": getattr(self, "current_hp", 100),
-                "temporary_hp": getattr(self, "temporary_hp", 0),
-                "armor_class": getattr(self, "armor_class", 10),
-                "strength": self.strength,
-                "dexterity": self.dexterity,
-                "constitution": self.constitution,
-                "intelligence": self.intelligence,
-                "wisdom": self.wisdom,
-                "charisma": self.charisma,
-                "max_mp": getattr(self, "max_mp", 50),
-                "current_mp": getattr(self, "current_mp", 50),
-                "equipped_weapon": self._serialize_item(self.equipped_weapon),
-                "equipped_armor": self._serialize_item(getattr(self, "equipped_armor")),
-                "inventory": self._serialize_inventory(),
-                "gold": getattr(self, "gold", 0),
-                "status_effects": self._serialize_status_effects(),
-                "is_alive": self._safe_is_alive(),
-                "can_act": self._safe_can_act(),
-            }
-        except Exception as e:
-            logging.error(
-                f"Error serializing CharacterState {getattr(self, 'name', 'Unknown')}: {e}"
-            )
-            raise
+    # def to_dict(self) -> Dict[str, Any]:
+    #     """Convert character state to dictionary with robust error handling"""
+    #     try:
+    #         return {
+    #             "current_zone": getattr(self, "current_zone", ""),
+    #             "current_scene": getattr(self, "current_scene", ""),
+    #             "name": self.name,
+    #             "character_type": (
+    #                 self.character_type.value
+    #                 if self.character_type and hasattr(self.character_type, "value")
+    #                 else str(self.character_type) if self.character_type else "NPC"
+    #             ),
+    #             "level": getattr(self, "level", 1),
+    #             "bio": self.bio,
+    #             "max_hp": getattr(self, "max_hp", 100),
+    #             "current_hp": getattr(self, "current_hp", 100),
+    #             "temporary_hp": getattr(self, "temporary_hp", 0),
+    #             "armor_class": getattr(self, "armor_class", 10),
+    #             "strength": self.strength,
+    #             "dexterity": self.dexterity,
+    #             "constitution": self.constitution,
+    #             "intelligence": self.intelligence,
+    #             "wisdom": self.wisdom,
+    #             "charisma": self.charisma,
+    #             "max_mp": getattr(self, "max_mp", 50),
+    #             "current_mp": getattr(self, "current_mp", 50),
+    #             "equipped_weapon": self._serialize_item(self.equipped_weapon),
+    #             "equipped_armor": self._serialize_item(getattr(self, "equipped_armor")),
+    #             "inventory": self._serialize_inventory(),
+    #             "gold": getattr(self, "gold", 0),
+    #             "status_effects": self._serialize_status_effects(),
+    #             "is_alive": self._safe_is_alive(),
+    #             "can_act": self._safe_can_act(),
+    #         }
+    #     except Exception as e:
+    #         logging.error(
+    #             f"Error serializing CharacterState {getattr(self, 'name', 'Unknown')}: {e}"
+    #         )
+    #         raise
 
-    def _serialize_item(self, item) -> Optional[Dict[str, Any]]:
-        """Safely serialize an item"""
-        if not item:
-            return Json({})
+    # def _serialize_item(self, item) -> Optional[Dict[str, Any]]:
+    #     """Safely serialize an item"""
+    #     if not item:
+    #         return Json({})
 
-        try:
-            # Handle different item structures
-            if hasattr(item, "to_dict"):
-                return item.to_dict()
-            elif hasattr(item, "name"):
-                # Basic item serialization
-                result = {"name": self._get_value(item.name)}
+    #     try:
+    #         # Handle different item structures
+    #         if hasattr(item, "to_dict"):
+    #             return item.to_dict()
+    #         elif hasattr(item, "name"):
+    #             # Basic item serialization
+    #             result = {"name": self._get_value(item.name)}
 
-                # Add common item fields if they exist
-                for field in [
-                    "item_type",
-                    "description",
-                    "damage_dice",
-                    "armor_class",
-                    "gold_value",
-                    "weight",
-                ]:
-                    if hasattr(item, field):
-                        result[field] = self._get_value(getattr(item, field))
+    #             # Add common item fields if they exist
+    #             for field in [
+    #                 "item_type",
+    #                 "description",
+    #                 "damage_dice",
+    #                 "armor_class",
+    #                 "gold_value",
+    #                 "weight",
+    #             ]:
+    #                 if hasattr(item, field):
+    #                     result[field] = self._get_value(getattr(item, field))
 
-                return result
-            else:
-                # Fallback: treat as string
-                return {"name": str(item)}
+    #             return result
+    #         else:
+    #             # Fallback: treat as string
+    #             return {"name": str(item)}
 
-        except Exception as e:
-            logging.warning(f"Error serializing item: {e}")
-            return {"name": str(item) if item else "Unknown Item"}
+    #     except Exception as e:
+    #         logging.warning(f"Error serializing item: {e}")
+    #         return {"name": str(item) if item else "Unknown Item"}
 
-    def _serialize_inventory(self) -> List[Dict[str, Any]]:
-        """Safely serialize inventory"""
-        if not hasattr(self, "inventory") or not self.inventory:
-            return Json([])
+    # def _serialize_inventory(self) -> List[Dict[str, Any]]:
+    #     """Safely serialize inventory"""
+    #     if not hasattr(self, "inventory") or not self.inventory:
+    #         return Json([])
 
-        serialized_items = []
-        for item in self.inventory:
-            try:
-                serialized_item = self._serialize_item(item)
-                if serialized_item:
-                    serialized_items.append(serialized_item)
-            except Exception as e:
-                logging.warning(f"Skipping problematic inventory item: {e}")
-                continue
+    #     serialized_items = []
+    #     for item in self.inventory:
+    #         try:
+    #             serialized_item = self._serialize_item(item)
+    #             if serialized_item:
+    #                 serialized_items.append(serialized_item)
+    #         except Exception as e:
+    #             logging.warning(f"Skipping problematic inventory item: {e}")
+    #             continue
 
-        return serialized_items
+    #     return serialized_items
 
-    def _serialize_status_effects(self) -> List[Dict[str, Any]]:
-        """Safely serialize status effects"""
-        if not hasattr(self, "status_effects") or not self.status_effects:
-            return Json([])
+    # def _serialize_status_effects(self) -> List[Dict[str, Any]]:
+    #     """Safely serialize status effects"""
+    #     if not hasattr(self, "status_effects") or not self.status_effects:
+    #         return Json([])
 
-        serialized_effects = []
-        for se in self.status_effects:
-            try:
-                effect_dict = {
-                    "effect": self._get_value(getattr(se, "effect", "unknown")),
-                    "duration": getattr(se, "duration", 0),
-                    "intensity": getattr(se, "intensity", 1),
-                    "source": getattr(se, "source", ""),
-                }
-                serialized_effects.append(effect_dict)
-            except Exception as e:
-                logging.warning(f"Error serializing status effect: {e}")
-                continue
+    #     serialized_effects = []
+    #     for se in self.status_effects:
+    #         try:
+    #             effect_dict = {
+    #                 "effect": self._get_value(getattr(se, "effect", "unknown")),
+    #                 "duration": getattr(se, "duration", 0),
+    #                 "intensity": getattr(se, "intensity", 1),
+    #                 "source": getattr(se, "source", ""),
+    #             }
+    #             serialized_effects.append(effect_dict)
+    #         except Exception as e:
+    #             logging.warning(f"Error serializing status effect: {e}")
+    #             continue
 
-        return serialized_effects
+    #     return serialized_effects
 
-    def _get_value(self, obj):
-        """Safely extract value from objects that might have .value attribute"""
-        if hasattr(obj, "value"):
-            return obj.value
-        return obj
+    # def _get_value(self, obj):
+    #     """Safely extract value from objects that might have .value attribute"""
+    #     if hasattr(obj, "value"):
+    #         return obj.value
+    #     return obj
 
-    def _safe_is_alive(self) -> bool:
-        """Safely check if character is alive"""
-        try:
-            if hasattr(self, "is_alive") and callable(self.check_is_alive):
-                return self.check_is_alive()
-            # Fallback logic
-            current_hp = getattr(self, "current_hp", 100)
-            return current_hp > 0
-        except Exception:
-            return True  # Default assumption
+    # def _safe_is_alive(self) -> bool:
+    #     """Safely check if character is alive"""
+    #     try:
+    #         if hasattr(self, "is_alive") and callable(self.check_is_alive):
+    #             return self.check_is_alive()
+    #         # Fallback logic
+    #         current_hp = getattr(self, "current_hp", 100)
+    #         return current_hp > 0
+    #     except Exception:
+    #         return True  # Default assumption
 
-    def _safe_can_act(self) -> bool:
-        """Safely check if character can act"""
-        try:
-            if hasattr(self, "can_act") and callable(self.can_act):
-                return self.can_act()
-            # Fallback logic
-            return self._safe_is_alive()
-        except Exception:
-            return True  # Default assumption
+    # def _safe_can_act(self) -> bool:
+    #     """Safely check if character can act"""
+    #     try:
+    #         if hasattr(self, "can_act") and callable(self.can_act):
+    #             return self.can_act()
+    #         # Fallback logic
+    #         return self._safe_is_alive()
+    #     except Exception:
+    #         return True  # Default assumption
 
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CharacterState":
-        """Restore character from dictionary with robust error handling"""
-        try:
-            # Validate required fields
-            required_fields = [
-                "name",
-                "id",
-                "strength",
-                "dexterity",
-                "constitution",
-                "intelligence",
-                "wisdom",
-                "charisma",
-            ]
-            missing_fields = [field for field in required_fields if field not in data]
-            if missing_fields:
-                raise ValueError(f"Missing required fields: {missing_fields}")
+    # @classmethod
+    # def from_dict(cls, data: Dict[str, Any]) -> "CharacterState":
+    #     """Restore character from dictionary with robust error handling"""
+    #     try:
+    #         # Validate required fields
+    #         required_fields = [
+    #             "name",
+    #             "id",
+    #             "strength",
+    #             "dexterity",
+    #             "constitution",
+    #             "intelligence",
+    #             "wisdom",
+    #             "charisma",
+    #         ]
+    #         missing_fields = [field for field in required_fields if field not in data]
+    #         if missing_fields:
+    #             raise ValueError(f"Missing required fields: {missing_fields}")
 
-            # Handle character_type safely
-            character_type = None
-            if "character_type" in data:
-                try:
-                    # Assuming you have a CharacterType enum/class
-                    # from your_enums import CharacterType  # Replace with actual import
+    #         # Handle character_type safely
+    #         character_type = None
+    #         if "character_type" in data:
+    #             try:
+    #                 # Assuming you have a CharacterType enum/class
+    #                 # from your_enums import CharacterType  # Replace with actual import
 
-                    if isinstance(data["character_type"], str):
-                        character_type = CharacterType(data["character_type"])
-                    else:
-                        character_type = data["character_type"]
-                except Exception as e:
-                    logging.warning(
-                        f"Error loading character_type: {e}. Using default."
-                    )
-                    character_type = None  # or CharacterType.NPC
+    #                 if isinstance(data["character_type"], str):
+    #                     character_type = CharacterType(data["character_type"])
+    #                 else:
+    #                     character_type = data["character_type"]
+    #             except Exception as e:
+    #                 logging.warning(
+    #                     f"Error loading character_type: {e}. Using default."
+    #                 )
+    #                 character_type = None  # or CharacterType.NPC
 
-            # Create character with core fields
-            character = cls(
-                name=data["name"],
-                strength=int(data["strength"]),
-                dexterity=int(data["dexterity"]),
-                constitution=int(data["constitution"]),
-                intelligence=int(data["intelligence"]),
-                wisdom=int(data["wisdom"]),
-                charisma=int(data["charisma"]),
-                character_type=character_type,
-                bio=data.get("bio", ""),
-            )
+    #         # Create character with core fields
+    #         character = cls(
+    #             name=data["name"],
+    #             strength=int(data["strength"]),
+    #             dexterity=int(data["dexterity"]),
+    #             constitution=int(data["constitution"]),
+    #             intelligence=int(data["intelligence"]),
+    #             wisdom=int(data["wisdom"]),
+    #             charisma=int(data["charisma"]),
+    #             character_type=character_type,
+    #             bio=data.get("bio", ""),
+    #         )
 
-            # Fields to skip during automatic restoration
-            SKIP_KEYS = {
-                "name",
-                "strength",
-                "dexterity",
-                "constitution",
-                "intelligence",
-                "wisdom",
-                "charisma",
-                "character_type",
-                "bio",
-                "status_effects",
-                "last_updated",
-                "inventory",
-                "equipped_weapon",
-                "equipped_armor",
-                "is_alive",
-                "can_act",
-            }
+    #         # Fields to skip during automatic restoration
+    #         SKIP_KEYS = {
+    #             "name",
+    #             "strength",
+    #             "dexterity",
+    #             "constitution",
+    #             "intelligence",
+    #             "wisdom",
+    #             "charisma",
+    #             "character_type",
+    #             "bio",
+    #             "status_effects",
+    #             "last_updated",
+    #             "inventory",
+    #             "equipped_weapon",
+    #             "equipped_armor",
+    #             "is_alive",
+    #             "can_act",
+    #         }
 
-            # Restore simple attributes with type checking
-            simple_field_types = {
-                "current_scene": str,
-                "level": int,
-                "max_hp": int,
-                "current_hp": int,
-                "temporary_hp": int,
-                "armor_class": int,
-                "max_mp": int,
-                "current_mp": int,
-                "gold": int,
-            }
+    #         # Restore simple attributes with type checking
+    #         simple_field_types = {
+    #             "current_scene": str,
+    #             "level": int,
+    #             "max_hp": int,
+    #             "current_hp": int,
+    #             "temporary_hp": int,
+    #             "armor_class": int,
+    #             "max_mp": int,
+    #             "current_mp": int,
+    #             "gold": int,
+    #         }
 
-            for key, expected_type in simple_field_types.items():
-                try:
-                    value = data.get(key)
-                    if value is not None:
-                        # Type conversion with fallback
-                        if expected_type == int:
-                            setattr(
-                                character, key, int(float(value))
-                            )  # Handle "100.0" -> 100
-                        elif expected_type == str:
-                            setattr(character, key, str(value))
-                        else:
-                            setattr(character, key, value)
-                except (ValueError, TypeError) as e:
-                    logging.warning(f"Error converting {key}: {e}. Using default.")
-                    # Default values are already set in __init__
+    #         for key, expected_type in simple_field_types.items():
+    #             try:
+    #                 value = data.get(key)
+    #                 if value is not None:
+    #                     # Type conversion with fallback
+    #                     if expected_type == int:
+    #                         setattr(
+    #                             character, key, int(float(value))
+    #                         )  # Handle "100.0" -> 100
+    #                     elif expected_type == str:
+    #                         setattr(character, key, str(value))
+    #                     else:
+    #                         setattr(character, key, value)
+    #             except (ValueError, TypeError) as e:
+    #                 logging.warning(f"Error converting {key}: {e}. Using default.")
+    #                 # Default values are already set in __init__
 
-            # Restore equipment
-            character.equipped_weapon = cls._deserialize_item(
-                data.get("equipped_weapon")
-            )
-            character.equipped_armor = cls._deserialize_item(data.get("equipped_armor"))
-            character.inventory = cls._deserialize_inventory(data.get("inventory", []))
+    #         # Restore equipment
+    #         character.equipped_weapon = cls._deserialize_item(
+    #             data.get("equipped_weapon")
+    #         )
+    #         character.equipped_armor = cls._deserialize_item(data.get("equipped_armor"))
+    #         character.inventory = cls._deserialize_inventory(data.get("inventory", []))
 
-            # Restore status effects
-            character.status_effects = []
-            for effect_data in data.get("status_effects", []):
-                try:
-                    character.add_status_effect(
-                        StatusEffect(effect_data["effect"]),
-                        effect_data.get("duration", 0),
-                        effect_data.get("intensity", 1),
-                        effect_data.get("source", ""),
-                    )
-                except Exception as e:
-                    logging.warning(f"Error restoring status effect: {e}")
+    #         # Restore status effects
+    #         character.status_effects = []
+    #         for effect_data in data.get("status_effects", []):
+    #             try:
+    #                 character.add_status_effect(
+    #                     StatusEffect(effect_data["effect"]),
+    #                     effect_data.get("duration", 0),
+    #                     effect_data.get("intensity", 1),
+    #                     effect_data.get("source", ""),
+    #                 )
+    #             except Exception as e:
+    #                 logging.warning(f"Error restoring status effect: {e}")
 
-            # Restore timestamp
-            try:
-                last_updated_str = data.get("last_updated")
-                character.last_updated = (
-                    datetime.fromisoformat(last_updated_str)
-                    if last_updated_str
-                    else datetime.now(timezone.utc)
-                )
-            except Exception as e:
-                logging.warning(f"Error parsing last_updated: {e}")
-                character.last_updated = datetime.now(timezone.utc)
+    #         # Restore timestamp
+    #         try:
+    #             last_updated_str = data.get("last_updated")
+    #             character.last_updated = (
+    #                 datetime.fromisoformat(last_updated_str)
+    #                 if last_updated_str
+    #                 else datetime.now(timezone.utc)
+    #             )
+    #         except Exception as e:
+    #             logging.warning(f"Error parsing last_updated: {e}")
+    #             character.last_updated = datetime.now(timezone.utc)
 
-            return character
+    #         return character
 
-        except Exception as e:
-            logging.error(f"Critical error deserializing CharacterState: {e}")
-            raise
+    #     except Exception as e:
+    #         logging.error(f"Critical error deserializing CharacterState: {e}")
+    #         raise
 
     @staticmethod
     def _deserialize_item(item_data) -> Optional["Item"]:
