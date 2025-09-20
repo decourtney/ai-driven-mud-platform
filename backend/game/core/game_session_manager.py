@@ -7,17 +7,13 @@ from datetime import datetime
 from typing import Dict, Any, Optional, Tuple
 from fastapi import HTTPException
 from backend.services.api.server import prisma
-from backend.models import (
-    ParseActionRequest,
-    GenerateActionRequest,
-    GeneratedNarration,
-    GenerateSceneRequest,
-)
+from backend.models import GenerateSceneRequest, CharacterType
 from backend.services.api.connection_manager import (
     ConnectionManager,
     WebSocketMessage,
 )
 from backend.game.game_registry import GAME_REGISTRY
+from backend.game.core.game_state import GameState, CharacterState
 
 # from backend.game.engine_registry import ENGINE_REGISTRY
 from backend.services.ai_models.model_client import AsyncModelServiceClient
@@ -52,17 +48,12 @@ class GameSessionManager:
         )
         return session.id if session else None
 
-    # Deletes any existing sessions and creates a new session for the user
     async def create_session(
         self,
         character_config: Dict[str, Any],
         game_id: str,
         user_id: str,
     ):
-        """
-        Create a new game session and persist to DB
-        """
-
         if game_id not in GAME_REGISTRY:
             raise ValueError(f"Unknown game: {game_id}")
         if not await self.model_client.is_healthy():
@@ -74,15 +65,19 @@ class GameSessionManager:
         # Delete existing session for this user/game if it exists
         await self.delete_sessions(game_id=game_id, user_id=user_id)
 
-        # Create engine instance
-        engine_instance = self.engine_factory(game_id=game_id)
-
-        # Initialize game state with new player state into engine instance
-        game_state, player_state = await engine_instance.create_initial_states(
-            character_config, game_id=game_id
+        # Create initial states
+        new_gamestate = GameState(game_id=game_id)
+        new_playerstate = CharacterState(
+            name=character_config["name"],
+            strength=character_config["strength"],
+            dexterity=character_config["dexterity"],
+            constitution=character_config["constitution"],
+            intelligence=character_config["intelligence"],
+            wisdom=character_config["wisdom"],
+            charisma=character_config["charisma"],
+            character_type=CharacterType(character_config["character_type"]),
+            bio=character_config["bio"],
         )
-        print("[DEBUG]Player State Dict:", player_state)
-        print("[DEBUG]Game State Dict:", game_state)
 
         gamesession_record = await prisma.gamesession.create(
             data={
@@ -91,51 +86,25 @@ class GameSessionManager:
                 "is_active": True,
             }
         )
-        # print("[DEBUG]Game Session Record", gamesession_record)
 
-        gamestate_record = await prisma.gamestate.create(
+        await prisma.gamestate.create(
             data={
                 "game_session_id": gamesession_record.id,
-                **game_state.to_db(for_create=True),
+                **new_gamestate.to_db(for_create=True),
             }
         )
-        # print("[DEBUG]Game State Record", gamestate_record)
 
-        playerstate_record = await prisma.playerstate.create(
+        await prisma.playerstate.create(
             data={
                 "user_id": user_id,
                 "game_session_id": gamesession_record.id,
-                **player_state.to_db(for_create=True),
+                **new_playerstate.to_db(for_create=True),
             }
-        )
-        # print("[DEBUG]Player State Record", playerstate_record)
-
-        # Register engine instance in memory
-        engine_id = self.engine_manager.register_engine(
-            engine_instance, session_id=gamesession_record.id, game_id=game_id
         )
 
         return {
             "session_id": gamesession_record.id,
         }
-
-    async def delete_sessions(self, game_id: str, user_id: str):
-        sessions = await prisma.gamesession.find_many(
-            where={"user_id": user_id, "game_id": game_id}
-        )
-
-        for session in sessions:
-            await self.engine_manager.unregister_engine(
-                game_id=game_id, session_id=session.id, is_save=False
-            )
-
-        # print("[DEBUG]Session to delete:", sessions)
-        deleted = await prisma.gamesession.delete_many(
-            where={"user_id": user_id, "game_id": game_id}
-        )
-        print("[DEBUG]Session deleted:", deleted)
-
-        return
 
     # Get an existing sessions data
     async def get_session(self, game_id: str, session_id: str, user_id: str):
@@ -158,31 +127,25 @@ class GameSessionManager:
             where={"session_id": gamesession_record.id}, order={"created_at": "asc"}
         )
         chat_history = [self.serialize_chat_message(msg) for msg in chatmessage_records]
-        needs_initial_narration = len(chat_history) == 0
 
         # Make sure engine is loaded with game states
         await self.ensure_engine_exists(game_id, gamesession_record.id, user_id)
 
-        # Send initial state to WebSocket clients
-        if hasattr(self, "connection_manager"):
-            await self.connection_manager.send_to_session(
-                gamesession_record.id,
-                WebSocketMessage.initial_state(
-                    game_state=gamestate_record.model_dump_json(),
-                    player_state=playerstate_record.model_dump_json(),
-                    chat_history=chat_history,
-                ),
+    async def delete_sessions(self, game_id: str, user_id: str):
+        sessions = await prisma.gamesession.find_many(
+            where={"user_id": user_id, "game_id": game_id}
+        )
+
+        for session in sessions:
+            await self.engine_manager.unregister_engine(
+                game_id=game_id, session_id=session.id, is_save=False
             )
 
-        # # Handle initial narration for new sessions
-        # if needs_initial_narration:
-        #     asyncio.create_task(
-        #         self.generate_initial_narration_for_session(
-        #             session_id=gamesession_record.id, game_id=game_id
-        #         )
-        #     )
-
-        return
+        # print("[DEBUG]Session to delete:", sessions)
+        deleted = await prisma.gamesession.delete_many(
+            where={"user_id": user_id, "game_id": game_id}
+        )
+        print("[DEBUG]Session deleted:", deleted)
 
     # ==========================================
     # GAME MANAGEMENT
@@ -329,10 +292,9 @@ class GameSessionManager:
                 )
             return {"success": False, "error": str(e)}
 
-    async def send_state_update_to_session(
+    async def send_initial_state_to_session(
         self, game_state: Dict[str, Any], player_state: Dict[str, Any]
     ):
-
         session = await prisma.gamesession.find_first(
             where={"game_state": {"id": game_state["id"]}}
         )
@@ -340,7 +302,34 @@ class GameSessionManager:
         if not session:
             raise RuntimeError(f"No session found for GameState {game_state["id"]}")
 
-        print("[DEBUG] SESSION ID TO SEND UPDATE:", game_state)
+        # Get chat history
+        chatmessage_records = await prisma.chatmessage.find_many(
+            where={"session_id": session.id}, order={"created_at": "asc"}
+        )
+        chat_history = [self.serialize_chat_message(msg) for msg in chatmessage_records]
+
+        # Send initial state to WebSocket clients
+        if hasattr(self, "connection_manager"):
+            await self.connection_manager.send_to_session(
+                session.id,
+                WebSocketMessage.initial_state(
+                    game_state=game_state,
+                    player_state=player_state,
+                    chat_history=chat_history,
+                ),
+            )
+        return
+
+    # NOTE: Should we save the state updates now?
+    async def send_state_update_to_session(
+        self, game_state: Dict[str, Any], player_state: Dict[str, Any]
+    ):
+        session = await prisma.gamesession.find_first(
+            where={"game_state": {"id": game_state["id"]}}
+        )
+
+        if not session:
+            raise RuntimeError(f"No session found for GameState {game_state["id"]}")
 
         if hasattr(self, "connection_manager"):
             await self.connection_manager.send_to_session(
@@ -349,10 +338,18 @@ class GameSessionManager:
             )
         return
 
-    async def send_message_to_session(self, session_id: str, message: Dict[str, Any]):
-        if hasattr(self, "connection_manager"):
-            await self.connection_manager.send_to_session(session_id, message)
-        return
+    # async def send_message_to_session(self, session_id: str, message: Dict[str, Any]):
+    #     if hasattr(self, "connection_manager"):
+    #         await self.connection_manager.send_to_session(
+    #             session_id,
+    #             WebSocketMessage.chat_message(
+    #                 id=action_record.id,
+    #                 speaker=action_record.speaker,
+    #                 content=action_record.content,
+    #                 timestamp=action_record.updated_at.isoformat(),
+    #             ),
+    #         )
+    #     return
 
     # ==========================================
     # ENGINE METHODS

@@ -168,7 +168,7 @@ class WebSocketMessage:
                 "player_state": player_state,
                 "chat_history": chat_history,
             },
-            "timestamp": datetime.now().isoformat(),
+            # "timestamp": datetime.now().isoformat(),
         }
 
     @staticmethod

@@ -69,54 +69,7 @@ class BaseGameEngine(ABC):
     # ----------------------------
     # Game State Management
     # ----------------------------
-    async def create_initial_states(
-        self, character_config: Dict[str, Any], game_id: str
-    ):
-        """Create initial GameState with player, NPCs, and scene data"""
-
-        self.game_state = GameState(game_id=game_id)
-        print("[DEBUG]Game State Obj:", self.game_state)
-
-        # If wrapped in `player_state` key from API - I should probably inspect this
-        if "character_config" in character_config:
-            character_config = character_config["character_config"]
-
-        player_state = CharacterState(
-            name=character_config["name"],
-            strength=character_config["strength"],
-            dexterity=character_config["dexterity"],
-            constitution=character_config["constitution"],
-            intelligence=character_config["intelligence"],
-            wisdom=character_config["wisdom"],
-            charisma=character_config["charisma"],
-            character_type=CharacterType(character_config["character_type"]),
-            bio=character_config["bio"],
-        )
-        print("[DEBUG]Player State Obj:", player_state)
-        self.player_state = player_state
-
-        # asyncio.create_task(
-        #     self.load_scene(
-        #         scene_id=self.player_state.current_scene,
-        #         zone=self.player_state.current_zone,
-        #     )
-        # )
-
-        await self.load_scene(
-            scene_id=self.player_state.current_scene,
-            zone=self.player_state.current_zone,
-        )
-
-        self.session_manager.send_state_update(self.game_state, self.player_state)
-
-        print("loaded scene in create method", self.game_state.loaded_scene)
-        # next_scene = self.scene_manager.move_to_scene(
-        #     current_scene=self.game_state.loaded_scene["id"],
-        #     exit_id=self.game_state.loaded_scene["exits"],
-        # )
-
-        return self.game_state, self.player_state
-
+    
     def load_game_state(self, game_state, player_state):
         print("[DEBUG] LOADING GAME STATE INTO ENGINE")
         try:
@@ -141,12 +94,10 @@ class BaseGameEngine(ABC):
         )
 
         asyncio.create_task(
-            self.session_manager.send_state_update_to_session(
+            self.session_manager.send_initial_state_to_session(
                 self.game_state.to_dict(), self.player_state.to_dict()
             )
         )
-
-        return self.game_state
 
     def get_serialized_game_state(self) -> Tuple[Dict, Dict]:
         print("[DEBUG] RETURNING SERIALIZED GAME STATE")

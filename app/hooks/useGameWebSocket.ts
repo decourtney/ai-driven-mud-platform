@@ -182,7 +182,7 @@ export const useGameWebSocket = ({
               ...prev,
               ...message.data.player_state,
             }));
-            setChatHistory((prev) => [...prev, message.data.chat_history]);
+            setChatHistory(message.data.chat_history);
             break;
           case "chat_message":
             setChatHistory((prev) => [...prev, message.data]);
