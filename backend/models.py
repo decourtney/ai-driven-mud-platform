@@ -197,6 +197,33 @@ class Scene:
     npcs: list[NPC] = field(default_factory=list)
     items: list[Item] = field(default_factory=list)
     discoveries: list[Discovery] = field(default_factory=list)
+    
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "exits": [e.__dict__ for e in self.exits],
+            "structures": [s.__dict__ for s in self.structures],
+            "notable_npcs": [
+                {
+                    **n.__dict__,
+                    "status": n.status.__dict__,
+                    "disposition": n.disposition.value,
+                }
+                for n in self.notable_npcs
+            ],
+            "npcs": [
+                {
+                    **n.__dict__,
+                    "status": n.status.__dict__,
+                    "disposition": n.disposition.value,
+                }
+                for n in self.npcs
+            ],
+            "items": [i.__dict__ for i in self.items],
+            "discoveries": [d.__dict__ for d in self.discoveries],
+    }
 
 
 # -------------------------

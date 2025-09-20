@@ -2,7 +2,7 @@
   "start": {
     "id": "start",
     "title": "Welcome",
-    "description": "Welcome to MudAI! Type your actions to interact with the world.",
+    "description": "Welcome to your text based adventure! Type your actions to interact and I'll guide you to victory... or defeat. Depends on how I'm feeling today... GOODLUCK!.",
     "exits": [
       {
         "id": "village_arrival",

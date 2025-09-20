@@ -64,7 +64,9 @@ class SceneManager:
                 ],
                 npcs=[NPC(**npc) for npc in scene_data.get("npcs", [])],
                 items=[Item(**item) for item in scene_data.get("items", [])],
-                discoveries=[Discovery(**disc) for disc in scene_data.get("discoveries", [])],
+                discoveries=[
+                    Discovery(**disc) for disc in scene_data.get("discoveries", [])
+                ],
             )
 
             # Store it keyed by scene_id
@@ -84,7 +86,7 @@ class SceneManager:
     # -------------------------
     # Scene retrieval & navigation
     # -------------------------
-    async def get_scene(self, scene_id: str, zone: Optional[str]) -> Scene:
+    async def get_scene(self, scene_id: str, zone: Optional[str] = None) -> Scene:
         if zone and self.loaded_zone != zone:
             await self.load_zone(zone)
         if scene_id not in self.loaded_scenes:

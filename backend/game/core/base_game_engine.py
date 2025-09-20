@@ -11,6 +11,7 @@ from backend.models import (
     ValidationResult,
     CharacterType,
     ParseActionRequest,
+    GenerateSceneRequest,
 )
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.game.core.game_session_manager import GameSessionManager
@@ -69,7 +70,7 @@ class BaseGameEngine(ABC):
     # ----------------------------
     # Game State Management
     # ----------------------------
-    
+
     def load_game_state(self, game_state, player_state):
         print("[DEBUG] LOADING GAME STATE INTO ENGINE")
         try:
@@ -145,6 +146,8 @@ class BaseGameEngine(ABC):
         )
         self.player_state.current_scene = self.game_state.loaded_scene.id
         print("[DEBUG] CURRENT LOADED SCENE:", self.game_state.loaded_scene.id)
+
+        await self.present_scene()
         return
 
     async def present_scene(self) -> str:
@@ -155,11 +158,14 @@ class BaseGameEngine(ABC):
         if not await self.model_client.is_narrator_ready():
             raise RuntimeError("Narrator not loaded")
 
-        # Use the narrator to generate scene description based on current game state
-        scene_description = self.model_client.generate_scene_narration(
-            self.game_state.scene, self.game_state.player, self.game_state.npcs
+        request = GenerateSceneRequest(
+            scene=self.game_state.loaded_scene.to_dict(),
+            player=self.player_state.to_dict(),
         )
+        # Use the narrator to generate scene description based on current game state
+        scene_description = await self.model_client.generate_scene(request)
 
+        print(scene_description)
         return scene_description
 
     async def on_scene_diff_update(self, scene_id: str, diff: Dict[str, Any]):
