@@ -9,7 +9,20 @@ const nextConfig: NextConfig = {
         search: "",
       },
     ],
-    remotePatterns: [new URL("https://lh3.googleusercontent.com/**")],
+    remotePatterns: [
+      // new URL("https://lh3.googleusercontent.com/**"),
+      // new URL("https://avatars.githubusercontent.com/**?v=*"),
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com/**",
+        search: "",
+      },
+      {
+        protocol: "https",
+        hostname: "avatars.githubusercontent.com/**",
+        search: "?v=4",
+      },
+    ],
   },
 };
 

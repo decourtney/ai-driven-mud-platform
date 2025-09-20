@@ -7,6 +7,7 @@ from fastapi import Query
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from enum import Enum
+from dataclasses import dataclass, field
 
 
 class CharacterType(Enum):
@@ -106,7 +107,90 @@ class GameContext(BaseModel):
     difficulty_modifier: int = 0
 
 
+# -------------------------
+# Scene and Exit structures
+# -------------------------
+
+
+class Exit:
+    id: str
+    label: str
+    target_scene: str
+    is_locked: Optional[bool] = None
+    zone: Optional[str] = None
+
+
+class Scene:
+    id: str
+    title: str
+    description: str
+    exits: list[Exit] = field(default_factory=list)
+    objects: dict = field(default_factory=dict)
+
+
+class SceneDiff:
+    scene_id: str
+    changes: dict = field(default_factory=dict)
+
+
+class Structure:
+    id: str
+    name: str
+    description: str
+
+
+class Status:
+    is_alive: bool = True
+    is_hostile: bool = False
+    health: int = 10
+
+
+class Disposition(Enum):
+    friendly = "friendly"
+    neutral = "neutral"
+    aggresive = "aggresive"
+
+
+class NotableNPC:
+    id: str
+    name: str
+    description: str
+    status: Status
+    disposition: Disposition
+
+
+class NPC:
+    id: str
+    name: str
+    description: str
+    status: Status
+    disposition: Disposition
+
+
+class Item:
+    id: str
+    name: str
+    description: str
+    is_interactable: bool = False
+    is_loot: bool = False
+
+
+class Discovery:
+    id: str
+    type: str
+    observation: str
+    is_interactable: bool = False
+    is_discovered: bool = False
+    perception_dc: int
+    implication: Optional[str]
+    quest: Optional[str]
+
+
+# -------------------------
 # API models
+# -------------------------
+
+
 class ParseActionRequest(BaseModel):
     action: str
     actor_type: CharacterType

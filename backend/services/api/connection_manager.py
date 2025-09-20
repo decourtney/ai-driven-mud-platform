@@ -140,15 +140,15 @@ class ConnectionManager:
 # Message types for WebSocket communication
 class MessageType:
     # Client -> Server
-    PLAYER_ACTION = "player_action"
-    PING = "ping"
+    player_action = "player_action"
+    ping = "ping"
 
     # Server -> Client
-    ACTION_RESULT = "action_result"
-    GAME_STATE_UPDATE = "game_state_update"
-    CHAT_MESSAGE = "chat_message"
-    ERROR = "error"
-    PONG = "pong"
+    action_result = "action_result"
+    game_state_update = "game_state_update"
+    chat_message = "chat_message"
+    error = "error"
+    pong = "pong"
 
 
 class WebSocketMessage:
@@ -186,7 +186,7 @@ class WebSocketMessage:
     ) -> Dict[str, Any]:
         """Create chat message"""
         return {
-            "type": MessageType.CHAT_MESSAGE,
+            "type": MessageType.chat_message,
             "data": {
                 "id": id,
                 "speaker": speaker,
@@ -197,24 +197,31 @@ class WebSocketMessage:
 
     @staticmethod
     def player_action_result(
-        narration: str, action: str, user_id: str
+        id: str,
+        speaker: str,
+        content: str,
+        timestamp: str,
+        player_state: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Create action result message"""
         return {
-            "type": MessageType.ACTION_RESULT,
+            "type": MessageType.action_result,
             "data": {
-                "narration": narration,
-                "original_action": action,
-                "user_id": user_id,
+                "narration": {
+                    "id": id,
+                    "speaker": speaker,
+                    "content": content,
+                    "timestamp": timestamp,
+                },
+                "player_state": player_state,
             },
-            "timestamp": datetime.now().isoformat(),
         }
 
     @staticmethod
     def error(message: str, error_code: Optional[str] = None) -> Dict[str, Any]:
         """Create error message"""
         return {
-            "type": MessageType.ERROR,
+            "type": MessageType.error,
             "data": {"message": message, "error_code": error_code},
             "timestamp": datetime.now().isoformat(),
         }
@@ -222,13 +229,13 @@ class WebSocketMessage:
     @staticmethod
     def pong() -> Dict[str, Any]:
         """Create pong response"""
-        return {"type": MessageType.PONG, "timestamp": datetime.now().isoformat()}
+        return {"type": MessageType.pong, "timestamp": datetime.now().isoformat()}
 
     @staticmethod
     def game_state_update(updates: Dict[str, Any]) -> Dict[str, Any]:
         """Create game state update message"""
         return {
-            "type": MessageType.GAME_STATE_UPDATE,
+            "type": MessageType.game_state_update,
             "data": updates,
             "timestamp": datetime.now().isoformat(),
         }

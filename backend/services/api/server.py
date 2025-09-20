@@ -357,7 +357,9 @@ class GameAPI:
             """
 
             try:
-                await self.session_manager.delete_sessions(game_id=slug, user_id=user_id)
+                await self.session_manager.delete_sessions(
+                    game_id=slug, user_id=user_id
+                )
                 return {"success": True}
             except ValueError as e:
                 raise HTTPException(status_code=404, detail=str(e))
@@ -541,12 +543,12 @@ class GameAPI:
         message_type = message.get("type")
         data = message.get("data", {})
 
-        if message_type == MessageType.PLAYER_ACTION:
+        if message_type == MessageType.player_action:
             await self.handle_player_action(
                 websocket, data.get("action", ""), slug, session_id, user_id
             )
 
-        elif message_type == MessageType.PING:
+        elif message_type == MessageType.ping:
             # Handle ping for connection health
             if websocket.client_state == WebSocketState.CONNECTED:
                 await self.connection_manager.send_to_client(
@@ -582,7 +584,7 @@ class GameAPI:
             logger.info(f"Processing WebSocket action from {user_id}: {action}")
 
             result = await self.session_manager.parse_action_request(
-                session_id=session_id, action=action, game_id=slug, user_id=user_id 
+                session_id=session_id, action=action, game_id=slug, user_id=user_id
             )
 
         except Exception as e:

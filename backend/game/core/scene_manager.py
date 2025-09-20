@@ -1,35 +1,10 @@
 import json
+import aiofiles
 from pathlib import Path
 from typing import Dict, Optional, Callable, Any
 from dataclasses import dataclass, field
 from backend.game.core.event_bus import EventBus
-
-
-# -------------------------
-# Scene and Exit structures
-# -------------------------
-@dataclass
-class Exit:
-    id: str
-    label: str
-    target_scene: str
-    is_locked: Optional[bool] = None
-    zone: Optional[str] = None
-
-
-@dataclass
-class Scene:
-    id: str
-    title: str
-    description: str
-    exits: list[Exit] = field(default_factory=list)
-    objects: dict = field(default_factory=dict)
-
-
-@dataclass
-class SceneDiff:
-    scene_id: str
-    changes: dict = field(default_factory=dict)
+from backend.models import Scene, SceneDiff, Exit
 
 
 # -------------------------
@@ -41,7 +16,7 @@ class SceneManager:
         self.event_bus = event_bus
         self.scenemanager_root_path = scenemanager_root_path
         self.loaded_zone: Optional[str] = None
-        self.loaded_scenes: Dict[str, Scene] = {}  # currently loaded zone
+        self.loaded_scenes: Dict[str, Scene] = {}  # currently loaded scenes
         self.scene_diffs: Dict[str, SceneDiff] = {}  # track diffs per scene
 
     # -------------------------
@@ -57,8 +32,9 @@ class SceneManager:
         if not file_path.exists():
             raise FileNotFoundError(f"Zone {zone_name} not found at {file_path}")
 
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        async with aiofiles.open(file_path) as f:
+            contents = await f.read()
+            data = json.loads(contents)
 
         self.loaded_scenes = {}
         for scene_id, scene_data in data.items():
@@ -67,21 +43,21 @@ class SceneManager:
 
             # Build Scene object
             scene = Scene(
-                id=scene_data["id"],
-                title=scene_data.get("title", ""),
-                description=scene_data.get("description", ""),
-                exits=exits,
-                objects={
-                    "structures": scene_data.get("structures", []),
-                    "npcs": scene_data.get("npcs", []),
-                    "items": scene_data.get("items", []),
-                    "discoveries": scene_data.get("discoveries", []),
-                },
+                id=data["id"],
+                title=data["title"],
+                description=data["description"],
+                exits=[Exit(**exit_data) for exit_data in data["exits"]],
+                structures=[Structure(**s) for s in data.get("structures", [])],
+                notable_npcs=[NotableNPC(**nnpc) for nnpc in data.get("notable_npcs", [])],
+                npcs=[NPC(**npc) for npc in data.get("npcs", [])],
+                items=[Item(**item) for item in data.get("items", [])],
+                discoveries=[Discovery(**d) for d in data.get("discoveries", [])],
             )
 
             # Store it keyed by scene_id
             self.loaded_scenes[scene_id] = scene
-        print("[DEBUG] LOADED ZONE AND SCENES")
+        print("[DEBUG] SCENE MANAGER LOADED WITH ZONES AND SCENES")
+        return
 
     def _unload_current_zone(self):
         if self.loaded_zone and self.persist_callback:
@@ -95,14 +71,18 @@ class SceneManager:
     # -------------------------
     # Scene retrieval & navigation
     # -------------------------
-    def get_scene(self, zone: str, scene_id: str) -> Scene:
-        if self.loaded_zone != zone:
-            self.load_zone(zone)
+    async def get_scene(self, scene_id: str, zone: Optional[str]) -> Scene:
+        if zone and self.loaded_zone != zone:
+            await self.load_zone(zone)
         if scene_id not in self.loaded_scenes:
             raise KeyError(f"Scene {scene_id} not found in zone {zone}")
+
+        # TODO: need to add diff process here before returning scene
         return self.loaded_scenes[scene_id]
 
     def move_to_scene(self, current_scene: Scene, exit_id: str) -> Scene:
+        print("[DEBUG] Move to scene from",current_scene)
+        print("[DEBUG] Exit id", exit_id)
         exit_ = next((e for e in current_scene.exits if e.id == exit_id), None)
         if not exit_:
             raise ValueError(f"Exit {exit_id} not found in scene {current_scene.id}")

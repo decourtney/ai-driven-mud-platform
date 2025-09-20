@@ -70,7 +70,8 @@
         "id": "busted_statue",
         "name": "Ode to ...",
         "description": "Toppled marble statue of a robed man. Broken and defaced — the plaque only reads 'Ode to'.",
-        "is_interactable": true
+        "is_interactable": true,
+        "is_loot": false
       }
     ],
 

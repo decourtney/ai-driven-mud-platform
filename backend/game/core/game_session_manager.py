@@ -77,7 +77,7 @@ class GameSessionManager:
         # Create engine instance
         engine_instance = self.engine_factory(game_id=game_id)
 
-        # Reconstruct serialized player state into engine instance
+        # Initialize game state with new player state into engine instance
         game_state, player_state = engine_instance.create_initial_states(
             character_config, game_id=game_id
         )
@@ -148,33 +148,6 @@ class GameSessionManager:
                 status_code=503,
                 detail=f"Model server not available at {self.model_client.base_url}",
             )
-
-        # gamesession_record = await prisma.gamesession.find_unique(
-        #     where={"id": session_id}
-        # )
-        # if not gamesession_record:
-        #     raise HTTPException(
-        #         status_code=404,
-        #         detail=f"Couldn't locate session {session_id}",
-        #     )
-
-        # gamestate_record = await prisma.gamestate.find_first(
-        #     where={"game_session_id": gamesession_record.id}
-        # )
-        # if not gamestate_record:
-        #     raise HTTPException(
-        #         status_code=404,
-        #         detail=f"Couldn't locate gamestate for session {gamesession_record.id}",
-        #     )
-
-        # playerstate_record = await prisma.playerstate.find_first(
-        #     where={"game_session_id": gamesession_record.id, "user_id": user_id}
-        # )
-        # if not playerstate_record:
-        #     raise HTTPException(
-        #         status_code=404,
-        #         detail=f"Couldn't locate playerstate for session {gamesession_record.id} | user {user_id}",
-        #     )
 
         gamesession_record, gamestate_record, playerstate_record = (
             await self.get_game_states_from_db(session_id=session_id, user_id=user_id)
@@ -288,10 +261,10 @@ class GameSessionManager:
                     ),
                 )
 
-            result, game_condition = await engine.execute_player_turn(action)
+            narrated_action, player_state, game_condition = await engine.execute_player_turn(action)
 
-            # Check if result is an error or exception
-            if isinstance(result, dict) and result.get("type") in {
+            # Check if narrated_action is an error or exception
+            if isinstance(narrated_action, dict) and narrated_action.get("type") in {
                 "error",
                 "exception",
             }:
@@ -300,22 +273,22 @@ class GameSessionManager:
                     await self.connection_manager.send_to_session(
                         session_id,
                         WebSocketMessage.error(
-                            result.get("message", "An unknown error occurred")
+                            narrated_action.get("message", "An unknown error occurred")
                         ),
                     )
                 # Optionally log
                 logger.warning(
-                    f"Player action returned {result['type']}: {result.get('message')}"
+                    f"Player action returned {narrated_action['type']}: {narrated_action.get('message')}"
                 )
                 return {"success": False, "game_condition": game_condition}
 
-            # Normal case: valid action result
+            # Normal case: valid action narrated_action
             player_turn_result = await prisma.chatmessage.create(
                 {
                     "session_id": session_id,
                     "speaker": "narrator",
-                    "action": result.action_type.value,  # assuming result has these attributes
-                    "content": result.narration,
+                    "action": narrated_action.action_type.value,  # assuming narrated_action has these attributes
+                    "content": narrated_action.narration,
                     "player_id": playerstate_record.id,
                 }
             )
@@ -324,11 +297,12 @@ class GameSessionManager:
             if hasattr(self, "connection_manager"):
                 await self.connection_manager.send_to_session(
                     session_id,
-                    WebSocketMessage.chat_message(
+                    WebSocketMessage.player_action_result(
                         id=player_turn_result.id,
                         speaker=player_turn_result.speaker,
                         content=player_turn_result.content,
                         timestamp=player_turn_result.updated_at.isoformat(),
+                        player_state=player_state,
                     ),
                 )
 
@@ -354,6 +328,9 @@ class GameSessionManager:
                     ),
                 )
             return {"success": False, "error": str(e)}
+
+    def send_messages_to_client(self, gamestate_id, ):
+        pass
 
     # ==========================================
     # ENGINE METHODS

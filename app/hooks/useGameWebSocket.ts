@@ -186,15 +186,8 @@ export const useGameWebSocket = ({
             setGameState((prev) => ({ ...prev, ...message.data }));
             break;
           case "action_result":
-            setChatHistory((prev) => [
-              ...prev,
-              {
-                id: Date.now().toString(),
-                speaker: "DM",
-                content: message.data.narration,
-                timestamp: message.timestamp || new Date().toISOString(),
-              },
-            ]);
+            setChatHistory((prev) => [...prev, message.data.narration]);
+            setPlayerState(message.data.player_state)
             break;
           case "error":
             setLastError(message.data.message);

@@ -83,8 +83,8 @@ model GameState {
   save_version           String?
   turn_counter           Int?
   current_turn_character Int?
-  current_scene          String
-  current_zone           String
+  // current_scene          Json?
+  // current_zone           String?
   recent_events          Json?
   session_started        DateTime?
   initiative_order       Json?
@@ -125,7 +125,8 @@ model PlayerState {
   equipped_weapon Json?
   inventory       Json?
   status_effects  Json?
-  location        String?
+  current_zone    String?
+  current_scene   String?
   created_at      DateTime      @default(now())
   updated_at      DateTime      @updatedAt
   ChatMessage     ChatMessage[]

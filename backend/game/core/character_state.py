@@ -87,7 +87,8 @@ class CharacterState:
         inventory: Optional[List[Item]] = None,
     ):
         # Location
-        self.location = None
+        self.current_zone = "start"
+        self.current_scene = "start"
 
         # Basic identity
         self.id: Optional[str] = None
@@ -518,7 +519,6 @@ class CharacterState:
     # DB CONVERSION
     # ------------------------------
 
-
     @classmethod
     def from_record(cls, record) -> "CharacterState":
         obj = cls(
@@ -549,7 +549,8 @@ class CharacterState:
         obj.is_alive
         obj.can_act
 
-        obj.location = record.location
+        obj.current_zone = record.current_zone
+        obj.current_scene = record.current_scene
 
         # Initialize JSON fields
         obj.equipped_armor = record.equipped_armor or None
@@ -580,7 +581,8 @@ class CharacterState:
             "can_act": self.can_act,
             "character_type": self.character_type.value,
             "bio": self.bio,
-            "location": self.location,
+            "current_zone": self.current_zone,
+            "current_scene": self.current_scene,
             "inventory": Json(self.inventory or []),
             "equipped_weapon": Json(self.equipped_weapon or {}),
             "equipped_armor": Json(self.equipped_armor or {}),
@@ -601,7 +603,8 @@ class CharacterState:
         """Convert character state to dictionary with robust error handling"""
         try:
             return {
-                "location": getattr(self, "location", ""),
+                "current_zone": getattr(self, "current_zone", ""),
+                "current_scene": getattr(self, "current_scene", ""),
                 "name": self.name,
                 "character_type": (
                     self.character_type.value
@@ -806,7 +809,7 @@ class CharacterState:
 
             # Restore simple attributes with type checking
             simple_field_types = {
-                "location": str,
+                "current_scene": str,
                 "level": int,
                 "max_hp": int,
                 "current_hp": int,

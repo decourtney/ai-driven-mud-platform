@@ -93,6 +93,18 @@ class BaseGameEngine(ABC):
         print("[DEBUG]Player State Obj:", player_state)
         self.player_state = player_state
 
+        asyncio.create_task(
+            self.load_scene(
+                scene_id=self.player_state.current_scene,
+                zone=self.player_state.current_zone,
+            )
+        )
+
+        next_scene = self.scene_manager.move_to_scene(
+            current_scene=self.game_state.loaded_scene["id"],
+            exit_id=self.game_state.loaded_scene["exits"],
+        )
+
         return self.game_state, player_state
 
     def load_game_state(self, game_state, player_state):
@@ -111,7 +123,12 @@ class BaseGameEngine(ABC):
             print("[ERROR] while loading CharacterState:", e)
             raise
 
-        asyncio.create_task(self.scene_manager.load_zone(self.game_state.current_zone))
+        asyncio.create_task(
+            self.load_scene(
+                scene_id=self.player_state.current_scene,
+                zone=self.player_state.current_zone,
+            )
+        )
 
         return self.game_state
 
@@ -148,8 +165,19 @@ class BaseGameEngine(ABC):
     # Scene Management
     # ----------------------------
 
-    async def load_zone(self):
-        pass
+    async def load_current_zone(self, zone_name):
+        await self.scene_manager.load_zone(zone_name)
+
+    async def load_scene(
+        self,
+        scene_id,
+        zone: Optional[str] = None,
+    ):
+        self.game_state.loaded_scene = await self.scene_manager.get_scene(
+            scene_id=scene_id, zone=zone
+        )
+        self.player_state.current_scene = self.game_state.loaded_scene.id
+        print("[DEBUG] CURRENT LOADED SCENE:", self.game_state.loaded_scene)
 
     async def present_scene(self) -> str:
         """Generate and return scene description for player"""
@@ -268,12 +296,14 @@ class BaseGameEngine(ABC):
                     }, GameCondition.game_on
 
                 # Execute valid action
-                result = await self.process_parsed_action(parsed_action)
+                narrated_action = await self.process_parsed_action(parsed_action)
+
+                # TODO: need to apply results of valid action to game state and player state
+
                 condition = self.check_game_condition()
-                return result, condition
+                return narrated_action, self.player_state.to_db(), condition
 
             except Exception as e:
-                # Always return a dict so the caller can handle it consistently
                 return {
                     "type": "exception",
                     "message": f"An unexpected error occurred: {str(e)}",
@@ -504,12 +534,12 @@ class BaseGameEngine(ABC):
     # ----------------------------
     # Orchestration Methods for UI
     # ----------------------------
-    def get_current_scene(self) -> str:
-        """Get current scene description (for turn start)"""
-        try:
-            return self.present_scene()
-        except Exception as e:
-            return f"Error presenting scene: {str(e)}"
+    # def get_current_scene(self) -> str:
+    #     """Get current scene description (for turn start)"""
+    #     try:
+    #         return self.present_scene()
+    #     except Exception as e:
+    #         return f"Error presenting scene: {str(e)}"
 
     def get_living_npcs(self) -> List[CharacterState]:
         """Get list of NPCs that can act this turn"""
