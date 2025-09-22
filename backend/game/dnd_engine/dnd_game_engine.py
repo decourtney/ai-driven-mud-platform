@@ -102,7 +102,7 @@ class DnDGameEngine(BaseGameEngine):
 
             # Check if actor exists and is alive
         if parsed_action.actor == "player":
-            if not self.game_state.player.is_alive():
+            if not self.player_state.check_is_alive():
                 return ValidationResult(
                     is_valid=False, reason=f"{parsed_action.actor} is dead."
                 )

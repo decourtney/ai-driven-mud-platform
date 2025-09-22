@@ -17,7 +17,7 @@ class ModelManager:
     ):
         # Create actual instances, not class references
         self.parser = CodeLlamaParser(parser_model_path) if parser_model_path else CodeLlamaParser()
-        self.narrator = GGUFMistralNarrator(narrator_model_path, narrator_adapter_path) if narrator_model_path else GGUFMistralNarrator()
+        self.narrator = GGUFMistralNarrator(narrator_model_path) if narrator_model_path else GGUFMistralNarrator()
         self.models_loaded = False
 
     def load_all_models(self) -> bool:

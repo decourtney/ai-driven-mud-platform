@@ -170,6 +170,15 @@ class WebSocketMessage:
             },
             # "timestamp": datetime.now().isoformat(),
         }
+        
+    @staticmethod
+    def lock_player_input(is_locked: bool) -> Dict[str, Any]:
+        """Create lock player input message"""
+        return {
+            "type": "lock_player_input",
+            "data": {"is_locked": is_locked},
+            "timestamp": datetime.now().isoformat(),
+        }
 
     @staticmethod
     def action_received(action: str) -> Dict[str, Any]:

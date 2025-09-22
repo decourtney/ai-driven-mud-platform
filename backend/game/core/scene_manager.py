@@ -53,7 +53,7 @@ class SceneManager:
             # Build Scene object
             scene = Scene(
                 id=scene_data["id"],
-                title=scene_data["title"],
+                label=scene_data["label"],
                 description=scene_data["description"],
                 exits=[Exit(**exit) for exit in scene_data["exits"]],
                 structures=[

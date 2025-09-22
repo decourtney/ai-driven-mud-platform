@@ -13,20 +13,15 @@ export interface GameInfo {
 
 export interface GameState {
   game_id: string;
-  player: CharacterState;
-  npcs?: CharacterState[];
-  scene?: {
-    name?: string;
-    description?: string;
-    [key: string]: any;
-  };
   turn_counter: string;
   objectives: string;
   completed_objectives: string;
   story_beats: string;
   in_combat: string;
   initiative_order: string;
-  current_turn_character: string;
+  current_turn_phase: string;
+  current_actor: string;
+  is_player_input_locked: boolean;
   weather: string;
   time_of_day: string;
   location_history: string;
@@ -34,7 +29,7 @@ export interface GameState {
   important_npcs_met: string[];
   items_discovered: string;
   session_started: string;
-  last_updated: string;
+  updated_at: string;
   save_version: string;
 }
 
@@ -46,6 +41,8 @@ export interface CharacterState {
   bio: string;
   max_hp: number;
   current_hp: number;
+  max_mp: number;
+  current_mp: number;
   temporary_hp: number;
   armor_class: number;
   strength: number;
@@ -54,8 +51,6 @@ export interface CharacterState {
   intelligence: number;
   wisdom: number;
   charisma: number;
-  max_mp: number;
-  current_mp: number;
   equipped_weapon?: string | null;
   equipped_armor?: string | null;
   inventory: Item[];
@@ -63,7 +58,7 @@ export interface CharacterState {
   status_effects: StatusEffects[];
   is_alive: string;
   can_act: string;
-  last_updated: string;
+  updated_at: string;
 }
 
 export interface CharacterConfig {
@@ -77,7 +72,7 @@ export interface CharacterConfig {
   character_type: string;
   bio: string;
   equipped_weapon?: Item;
-  inventory?: Item[]
+  inventory?: Item[];
 }
 
 export interface Item {

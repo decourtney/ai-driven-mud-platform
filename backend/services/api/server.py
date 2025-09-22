@@ -583,7 +583,7 @@ class GameAPI:
         try:
             logger.info(f"Processing WebSocket action from {user_id}: {action}")
 
-            result = await self.session_manager.parse_action_request(
+            result = await self.session_manager.process_player_action(
                 session_id=session_id, action=action, game_id=slug, user_id=user_id
             )
 

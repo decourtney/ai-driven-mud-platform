@@ -42,6 +42,13 @@ class GameCondition(Enum):
     game_over = "game_over"
 
 
+class TurnPhase(Enum):
+    scene_narration = "scene_narration"
+    player_turn = "player_turn"
+    npc_turn = "npc_turn"
+    end_turn = "end_turn"
+
+
 class ActionType(str, Enum):
     attack = "attack"
     spell = "spell"
@@ -189,7 +196,7 @@ class Discovery:
 @dataclass
 class Scene:
     id: str
-    title: str
+    label: str
     description: str
     exits: list[Exit] = field(default_factory=list)
     structures: list[Structure] = field(default_factory=list)
@@ -197,11 +204,11 @@ class Scene:
     npcs: list[NPC] = field(default_factory=list)
     items: list[Item] = field(default_factory=list)
     discoveries: list[Discovery] = field(default_factory=list)
-    
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
-            "title": self.title,
+            "label": self.label,
             "description": self.description,
             "exits": [e.__dict__ for e in self.exits],
             "structures": [s.__dict__ for s in self.structures],
@@ -223,7 +230,7 @@ class Scene:
             ],
             "items": [i.__dict__ for i in self.items],
             "discoveries": [d.__dict__ for d in self.discoveries],
-    }
+        }
 
 
 # -------------------------

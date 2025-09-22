@@ -1,19 +1,19 @@
 {
   "start": {
     "id": "start",
-    "title": "Welcome",
-    "description": "Welcome to your text based adventure! Type your actions to interact and I'll guide you to victory... or defeat. Depends on how I'm feeling today... GOODLUCK!.",
+    "label": "Waking Up",
+    "description": "You awaken on a bed of leaves, the cool morning air brushing against your face. The scent of damp earth and pine surrounds you. The sun peeks through the canopy above, casting soft light over your small campsite.",
     "exits": [
       {
         "id": "village_arrival",
-        "label": "Village Arrival",
+        "label": "Beaten path leading to a small village",
         "target_scene": "village_arrival"
       }
     ]
   },
   "village_arrival": {
     "id": "village_arrival",
-    "title": "The Forgotten Village",
+    "label": "The Forgotten Village",
     "description": "A shabby village square, eerily quiet.",
 
     "exits": [

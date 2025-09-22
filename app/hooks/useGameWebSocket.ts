@@ -43,7 +43,9 @@ export const useGameWebSocket = ({
   const connectingRef = useRef(false);
 
   const [isConnected, setIsConnected] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([] as ChatMessage[]);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(
+    [] as ChatMessage[]
+  );
   const [gameState, setGameState] = useState<GameState>({} as GameState);
   const [playerState, setPlayerState] = useState<CharacterState>(
     {} as CharacterState
@@ -184,6 +186,12 @@ export const useGameWebSocket = ({
             }));
             setChatHistory(message.data.chat_history);
             break;
+          case "lock_player_input":
+            setGameState((prev) => ({
+              ...prev,
+              is_player_input_locked: message.data.is_locked,
+            }));
+            break;
           case "chat_message":
             setChatHistory((prev) => [...prev, message.data]);
             break;
@@ -227,19 +235,27 @@ export const useGameWebSocket = ({
     onConnectionChange,
   ]);
 
-  const sendAction = useCallback((action: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: "player_action",
-          data: { action },
-          timestamp: new Date().toISOString(),
-        })
-      );
-    } else {
-      setLastError("Cannot send action: not connected");
-    }
-  }, []);
+  const sendAction = useCallback(
+    (action: string) => {
+      if (gameState.is_player_input_locked) {
+        setLastError("Cannot send action: input is currently locked");
+        return;
+      }
+
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: "player_action",
+            data: { action },
+            timestamp: new Date().toISOString(),
+          })
+        );
+      } else {
+        setLastError("Cannot send action: not connected");
+      }
+    },
+    [gameState.is_player_input_locked]
+  );
 
   const reconnect = useCallback(() => {
     cleanup();

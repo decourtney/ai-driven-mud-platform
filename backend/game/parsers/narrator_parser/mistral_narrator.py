@@ -13,7 +13,7 @@ try:
 except ImportError:
     LLAMA_CPP_AVAILABLE = False
     print(
-        "[-] llama-cpp-python not installed. Install with: pip install llama-cpp-python"
+        "\033[91m[-]\033[0m llama-cpp-python not installed. Install with: pip install llama-cpp-python"
     )
 
 from backend.game.core.interfaces import ActionNarrator
@@ -26,9 +26,9 @@ class GGUFMistralNarrator(ActionNarrator):
     def __init__(
         self,
         model_path: str = "/home/donovan/ai_models/ministral-8B-instruct-2410-gguf/Ministral-8B-Instruct-2410-Q4_K_M.gguf",
-        n_gpu_layers: int = -1,  # -1 = offload all layers to GPU
+        n_gpu_layers: int = 1,  # -1 = offload all layers to GPU
         n_ctx: int = 4096,  # Context window
-        verbose: bool = False,  # Disable verbose mode to stop flooding
+        verbose: bool = True,
     ):
         self.model_path = model_path
         self.n_gpu_layers = n_gpu_layers
@@ -47,7 +47,7 @@ class GGUFMistralNarrator(ActionNarrator):
     def load_model(self) -> bool:
         """Load the GGUF model with llama-cpp-python"""
         if not LLAMA_CPP_AVAILABLE:
-            print("[-] llama-cpp-python not available")
+            print("\033[91m[-]\033[0m llama-cpp-python not available")
             return False
 
         try:
@@ -55,7 +55,7 @@ class GGUFMistralNarrator(ActionNarrator):
 
             # Check if file exists
             if not os.path.exists(self.model_path):
-                print(f"[-] Model file does not exist: {self.model_path}")
+                print(f"\033[91m[-]\033[0m Model file does not exist: {self.model_path}")
                 return False
 
             # Show file info
@@ -107,8 +107,8 @@ class GGUFMistralNarrator(ActionNarrator):
         except Exception as e:
             import traceback
 
-            print(f"[-] Failed to load GGUF Mistral narrator: {e}")
-            print(f"[-] Full traceback: {traceback.format_exc()}")
+            print(f"\033[91m[-]\033[0m Failed to load GGUF Mistral narrator: {e}")
+            print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
             self._is_loaded = False
             return False
 
@@ -125,7 +125,7 @@ class GGUFMistralNarrator(ActionNarrator):
             print("[+] GGUF Mistral narrator unloaded successfully")
             return True
         except Exception as e:
-            print(f"[-] Error unloading GGUF Mistral: {e}")
+            print(f"\033[91m[-]\033[0m Error unloading GGUF Mistral: {e}")
             return False
 
     def is_loaded(self) -> bool:
@@ -135,7 +135,7 @@ class GGUFMistralNarrator(ActionNarrator):
         self, action: ParsedAction, hit: bool, damage_type: str = "wound"
     ) -> str:
         if not self.is_loaded():
-            print("[-] Narrator model not loaded")
+            print("\033[91m[-]\033[0m Narrator model not loaded")
             return f"{action.actor} performs {action.action}."
 
         try:
@@ -143,9 +143,9 @@ class GGUFMistralNarrator(ActionNarrator):
 
             # Debug the prompt if needed
             if self.verbose:
-                print(f"[DEBUG] Input Prompt: {input_prompt}")
+                print(f"\033[93m[DEBUG]\033[0m Input Prompt: {input_prompt}")
 
-            raw_text = self._generate_text(input_prompt, max_tokens=64, temperature=0.6)
+            raw_text = self._generate_text(input_prompt, max_tokens=200, temperature=0.1)
 
             # Check if generation failed
             if len(raw_text.strip()) < 5:
@@ -157,15 +157,15 @@ class GGUFMistralNarrator(ActionNarrator):
             )
 
             if self.verbose:
-                print(f"[DEBUG] Raw: '{raw_text}'")
-                print(f"[DEBUG] Cleaned: '{cleaned}'")
+                print(f"\033[93m[DEBUG]\033[0m Raw: '{raw_text}'")
+                print(f"\033[93m[DEBUG]\033[0m Cleaned: '{cleaned}'")
 
             return cleaned
         except Exception as e:
-            print(f"[-] Narration generation failed: {e}")
+            print(f"\033[91m[-]\033[0m Narration generation failed: {e}")
             import traceback
 
-            print(f"[-] Full traceback: {traceback.format_exc()}")
+            print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
             return f"{action.actor} performs {action.action}."
 
         # NOTE: parameters for this are not even close!
@@ -173,37 +173,39 @@ class GGUFMistralNarrator(ActionNarrator):
     def generate_scene_narration(self, request: GenerateSceneRequest):
         """Generate a scene description using the narrator model"""
         if not self.is_loaded():
-            print("[-] Narrator model not loaded")
-            return f"You find yourself in {request.scene.get('name', 'an unknown location')}."
+            print("\033[91m[-]\033[0m Narrator model not loaded")
+            return f"You find yourself in {request.scene.get('label', 'an unknown location')}."
 
         try:
             # Create the prompt for scene description
             scene_prompt = self._create_scene_prompt(request)
-            print(scene_prompt)
+
             if self.verbose:
-                print(f"[DEBUG] Scene prompt: {scene_prompt}")
+                print(f"\033[93m[DEBUG]\033[0m Scene prompt: {scene_prompt}")
 
             # Generate the scene description
             raw_text = self._generate_text(
-                scene_prompt, max_tokens=200, temperature=0.6
+                # NOTE: 200 tokens is for building and testing - will need to be much higher
+                # NOTE: Temp of 0.1 is to keep it very focused on description - may need to adjust
+                scene_prompt, max_tokens=200, temperature=0.1
             )
 
             # Clean and format the description
-            # cleaned_description = self._clean_scene_description(raw_text, scene['name'], player['name'])
+            # cleaned_description = self._clean_scene_description(raw_text, scene['label'], player['name'])
             cleaned_description = raw_text
 
             if self.verbose:
-                print(f"[DEBUG] Raw scene: '{raw_text}'")
-                print(f"[DEBUG] Cleaned scene: '{cleaned_description}'")
+                print(f"\033[93m[DEBUG]\033[0m Raw scene: '{raw_text}'")
+                print(f"\033[93m[DEBUG]\033[0m Cleaned scene: '{cleaned_description}'")
 
             return cleaned_description
 
         except Exception as e:
-            print(f"[-] Scene description generation failed: {e}")
+            print(f"\033[91m[-]\033[0m Scene description generation failed: {e}")
             import traceback
 
-            print(f"[-] Full traceback: {traceback.format_exc()}")
-            return f"You find yourself in {request.scene['name']}."
+            print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
+            return f"You find yourself in {request.scene['label']}."
 
     def _create_input_prompt(
         self, action: ParsedAction, hit: bool, damage_type: str
@@ -331,7 +333,7 @@ class GGUFMistralNarrator(ActionNarrator):
         return re.sub(r"\{([^}]+)\}", replacer, system_prompt_template)
 
     def _generate_text(
-        self, input: str, max_tokens: int = 64, temperature: float = 0.4
+        self, input: str, max_tokens: int = 200, temperature: float = 0.1
     ) -> str:
         try:
             # Generate with llama-cpp-python
@@ -343,7 +345,7 @@ class GGUFMistralNarrator(ActionNarrator):
                 top_k=50,
                 repeat_penalty=1.15,
                 frequency_penalty=0.2,
-                stop=["</s>", "[INST]", "[/INST]"],  # Stop tokens
+                stop=["[/INST]"],  # Stop tokens
                 echo=False,  # Don't echo the prompt
             )
 
@@ -352,16 +354,16 @@ class GGUFMistralNarrator(ActionNarrator):
 
             # Debug output
             if self.verbose or len(generated_text.strip()) < 5:
-                print(f"[DEBUG] Generated text: '{generated_text.strip()}'")
-                print(f"[DEBUG] Text length: {len(generated_text.strip())}")
+                print(f"\033[93m[DEBUG]\033[0m Generated text: '{generated_text.strip()}'")
+                print(f"\033[93m[DEBUG]\033[0m Text length: {len(generated_text.strip())}")
 
             return generated_text.strip()
 
         except Exception as e:
-            print(f"[-] Error in _generate_text: {e}")
+            print(f"\033[91m[-]\033[0m Error in _generate_text: {e}")
             import traceback
 
-            print(f"[-] Full traceback: {traceback.format_exc()}")
+            print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
             return "The action occurs."
 
     def _clean_action_narration(

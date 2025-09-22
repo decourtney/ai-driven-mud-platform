@@ -129,6 +129,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
           chatHistory={chatHistory}
           isConnected={isConnected}
           slug={slug}
+          gameState={gameState}
         />
       </div>
     </div>

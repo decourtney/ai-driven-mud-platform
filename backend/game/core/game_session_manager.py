@@ -67,6 +67,7 @@ class GameSessionManager:
 
         # Create initial states
         new_gamestate = GameState(game_id=game_id)
+
         new_playerstate = CharacterState(
             name=character_config["name"],
             strength=character_config["strength"],
@@ -126,7 +127,7 @@ class GameSessionManager:
         chatmessage_records = await prisma.chatmessage.find_many(
             where={"session_id": gamesession_record.id}, order={"created_at": "asc"}
         )
-        chat_history = [self.serialize_chat_message(msg) for msg in chatmessage_records]
+        chat_history = [self.serialize_chat_record(msg) for msg in chatmessage_records]
 
         # Make sure engine is loaded with game states
         await self.ensure_engine_exists(game_id, gamesession_record.id, user_id)
@@ -146,6 +147,17 @@ class GameSessionManager:
             where={"user_id": user_id, "game_id": game_id}
         )
         print("[DEBUG]Session deleted:", deleted)
+
+    async def get_session_id_using_game_state_id(
+        self, game_state_id: str
+    ) -> Optional[str]:
+        session = await prisma.gamesession.find_first(
+            where={"game_state": {"id": game_state_id}}
+        )
+        if not session:
+            raise RuntimeError(f"No session found for GameState {game_state_id}")
+
+        return session.id if session else None
 
     # ==========================================
     # GAME MANAGEMENT
@@ -175,12 +187,36 @@ class GameSessionManager:
         )
         return
 
-    async def parse_action_request(
+    async def lock_player_input(
+        self,
+        is_locked: bool,
+        session_id: Optional[str] = None,
+        game_state_id: Optional[str] = None,
+    ):
+        if game_state_id:
+            session = await prisma.gamesession.find_first(
+                where={"game_state": {"id": game_state_id}}
+            )
+        session.id = session_id or session.id
+
+        if not session.id:
+            raise RuntimeError(f"No session found for GameState {game_state_id}")
+
+        if hasattr(self, "connection_manager"):
+            await self.connection_manager.send_to_session(
+                session.id, WebSocketMessage.lock_player_input(is_locked=is_locked)
+            )
+        return
+
+    async def process_player_action(
         self, session_id: str, action: str, game_id: str, user_id: str
     ):
         """
         Process player action and send results via WebSocket
         """
+        asyncio.create_task(
+            self.lock_player_input(is_locked=True, session_id=session_id)
+        )
 
         try:
             # Ensure engine is loaded and get it directly
@@ -199,89 +235,80 @@ class GameSessionManager:
                 where={"user_id": user_id, "game_session_id": session_id}
             )
 
-            # Save the action as a chatmessage
-            action_record = await prisma.chatmessage.create(
-                {
-                    "session_id": session_id,
-                    "speaker": "player",
-                    "action": "user_prompt",
-                    "content": action,
-                    "player_id": playerstate_record.id,
-                },
-            )
-
-            # Send the action as a chat message first
-            if hasattr(self, "connection_manager"):
-                await self.connection_manager.send_to_session(
-                    session_id,
-                    WebSocketMessage.chat_message(
-                        id=action_record.id,
-                        speaker=action_record.speaker,
-                        content=action_record.content,
-                        timestamp=action_record.updated_at.isoformat(),
-                    ),
-                )
-
-            narrated_action, player_state, game_condition = (
-                await engine.execute_player_turn(action)
-            )
-
-            # Check if narrated_action is an error or exception
-            if isinstance(narrated_action, dict) and narrated_action.get("type") in {
-                "error",
-                "exception",
-            }:
-                # Send the error message to the client
-                if hasattr(self, "connection_manager"):
-                    await self.connection_manager.send_to_session(
-                        session_id,
-                        WebSocketMessage.error(
-                            narrated_action.get("message", "An unknown error occurred")
-                        ),
-                    )
-                # Optionally log
-                logger.warning(
-                    f"Player action returned {narrated_action['type']}: {narrated_action.get('message')}"
-                )
-                return {"success": False, "game_condition": game_condition}
-
-            # Normal case: valid action narrated_action
-            player_turn_result = await prisma.chatmessage.create(
-                {
-                    "session_id": session_id,
-                    "speaker": "narrator",
-                    "action": narrated_action.action_type.value,  # assuming narrated_action has these attributes
-                    "content": narrated_action.narration,
-                    "player_id": playerstate_record.id,
-                }
-            )
-
-            # Send narration to client
-            if hasattr(self, "connection_manager"):
-                await self.connection_manager.send_to_session(
-                    session_id,
-                    WebSocketMessage.player_action_result(
-                        id=player_turn_result.id,
-                        speaker=player_turn_result.speaker,
-                        content=player_turn_result.content,
-                        timestamp=player_turn_result.updated_at.isoformat(),
-                        player_state=player_state,
-                    ),
-                )
-
-            return {"success": True, "game_condition": game_condition}
-
-        except Exception as e:
-            # Send error via WebSocket
-            error_message = {
-                "type": "error",
-                "data": {
-                    "message": f"Action processing failed: {str(e)}",
-                    "error_code": "ACTION_FAILED",
-                },
-                "timestamp": datetime.now().isoformat(),
+            message = {
+                "speaker": "player",
+                "action": "user_prompt",
+                "content": action,
+                "player_id": playerstate_record.id,
             }
 
+            # Send the action as a chat message first
+            asyncio.create_task(
+                self.send_message_to_session(session_id=session_id, message=message)
+            )
+
+            # # Save the action as a chatmessage
+            # action_record = await prisma.chatmessage.create(
+            #     {
+            #         "session_id": session_id,
+            #         "speaker": "player",
+            #         "action": "user_prompt",
+            #         "content": action,
+            #         "player_id": playerstate_record.id,
+            #     },
+            # )
+
+            # Send the action as a chat message first
+            # if hasattr(self, "connection_manager"):
+            #     await self.connection_manager.send_to_session(
+            #         session_id,
+            #         WebSocketMessage.chat_message(
+            #             id=action_record.id,
+            #             speaker=action_record.speaker,
+            #             content=action_record.content,
+            #             timestamp=action_record.updated_at.isoformat(),
+            #         ),
+            #     )
+
+            action_result, player_state = await engine.execute_player_action(action)
+
+            message = {
+                "speaker": "narrator",
+                "action": action_result.action_type.value,
+                "content": action_result.narration,
+                "player_id": player_state["id"],
+            }
+
+            # Send the action result and player state to the session
+            await self.send_player_action_to_session(
+                session_id=session_id, message=message, player_state=player_state
+            )
+
+            # Normal case: valid action action_result
+            # player_turn_result = await prisma.chatmessage.create(
+            #     {
+            #         "session_id": session_id,
+            #         "speaker": "narrator",
+            #         "action": action_result.action_type.value,
+            #         "content": action_result.narration,
+            #         "player_id": playerstate_record.id,
+            #     }
+            # )
+
+            # Send narration to client
+            # if hasattr(self, "connection_manager"):
+            #     await self.connection_manager.send_to_session(
+            #         session_id,
+            #         WebSocketMessage.player_action_result(
+            #             id=player_turn_result.id,
+            #             speaker=player_turn_result.speaker,
+            #             content=player_turn_result.content,
+            #             timestamp=player_turn_result.updated_at.isoformat(),
+            #             player_state=player_state,
+            #         ),
+            #     )
+
+        except Exception as e:
             if hasattr(self, "connection_manager"):
                 await self.connection_manager.send_to_session(
                     session_id,
@@ -306,7 +333,7 @@ class GameSessionManager:
         chatmessage_records = await prisma.chatmessage.find_many(
             where={"session_id": session.id}, order={"created_at": "asc"}
         )
-        chat_history = [self.serialize_chat_message(msg) for msg in chatmessage_records]
+        chat_history = [self.serialize_chat_record(msg) for msg in chatmessage_records]
 
         # Send initial state to WebSocket clients
         if hasattr(self, "connection_manager"):
@@ -318,7 +345,6 @@ class GameSessionManager:
                     chat_history=chat_history,
                 ),
             )
-        return
 
     # NOTE: Should we save the state updates now?
     async def send_state_update_to_session(
@@ -338,18 +364,77 @@ class GameSessionManager:
             )
         return
 
-    # async def send_message_to_session(self, session_id: str, message: Dict[str, Any]):
-    #     if hasattr(self, "connection_manager"):
-    #         await self.connection_manager.send_to_session(
-    #             session_id,
-    #             WebSocketMessage.chat_message(
-    #                 id=action_record.id,
-    #                 speaker=action_record.speaker,
-    #                 content=action_record.content,
-    #                 timestamp=action_record.updated_at.isoformat(),
-    #             ),
-    #         )
-    #     return
+    async def send_message_to_session(
+        self,
+        message: Dict[str, Any],
+        session_id: Optional[str] = None,
+        game_state_id: Optional[str] = None,
+    ):
+        if game_state_id:
+            session = await prisma.gamesession.find_first(
+                where={"game_state": {"id": game_state_id}}
+            )
+        session_id = session_id or session.id
+
+        if not session_id:
+            raise RuntimeError(f"No session found for GameState {game_state_id}")
+
+        chatmessage_record = await prisma.chatmessage.create(
+            {"session_id": session_id, **message}
+        )
+
+        if not chatmessage_record:
+            raise RuntimeError(
+                f"Failed to save chat message for GameState {game_state_id}"
+            )
+
+        if hasattr(self, "connection_manager"):
+            await self.connection_manager.send_to_session(
+                session_id,
+                WebSocketMessage.chat_message(
+                    id=chatmessage_record.id,
+                    speaker=chatmessage_record.speaker,
+                    content=chatmessage_record.content,
+                    timestamp=chatmessage_record.updated_at.isoformat(),
+                ),
+            )
+        return
+
+    async def send_player_action_to_session(
+        self,
+        message: Dict[str, Any],
+        player_state: Dict[str, Any],
+        session_id: Optional[str] = None,
+        game_state_id: Optional[str] = None,
+    ):
+        if game_state_id:
+            session = await prisma.gamesession.find_first(
+                where={"game_state": {"id": game_state_id}}
+            )
+        session_id = session_id or session.id
+
+        if not session_id:
+            raise RuntimeError(f"No session found for GameState {game_state_id}")
+
+        chatmessage_record = await prisma.chatmessage.create(
+            {
+                "session_id": session_id,
+                "player_id": player_state["id"],
+                **message,
+            }
+        )
+
+        if hasattr(self, "connection_manager"):
+            await self.connection_manager.send_to_session(
+                session_id,
+                WebSocketMessage.player_action_result(
+                    id=chatmessage_record.id,
+                    speaker=chatmessage_record.speaker,
+                    content=chatmessage_record.content,
+                    timestamp=chatmessage_record.updated_at.isoformat(),
+                    player_state=player_state,
+                ),
+            )
 
     # ==========================================
     # ENGINE METHODS
@@ -404,7 +489,7 @@ class GameSessionManager:
         # Create and initialize engine
         engine_instance = self.engine_factory(game_id=game_id)
 
-        engine_instance.load_game_state(
+        await engine_instance.load_game_state(
             game_state=gamestate_record,
             player_state=playerstate_record,
         )
@@ -442,7 +527,7 @@ class GameSessionManager:
     # UTILS
     # ==========================================
 
-    def serialize_chat_message(self, msg):
+    def serialize_chat_record(self, msg):
         return {
             "id": msg.id,
             "speaker": msg.speaker,
@@ -481,96 +566,96 @@ class GameSessionManager:
 
         return gamesession_record, gamestate_record, playerstate_record
 
-    async def generate_initial_narration_for_session(
-        self, session_id: str, game_id: str
-    ):
-        """
-        Generate initial narration and send via WebSocket
-        """
+    # async def generate_initial_narration_for_session(
+    #     self, session_id: str, game_id: str
+    # ):
+    #     """
+    #     Generate initial narration and send via WebSocket
+    #     """
 
-        try:
-            # Get session data
-            # gamesession_record = await prisma.gamesession.find_unique(
-            #     where={"id": session_id}
-            # )
+    #     try:
+    #         # Get session data
+    #         # gamesession_record = await prisma.gamesession.find_unique(
+    #         #     where={"id": session_id}
+    #         # )
 
-            playerstate_record = await prisma.playerstate.find_first(
-                where={"game_session_id": session_id}
-            )
-            print(playerstate_record.model_dump())
-            if not playerstate_record:
-                return
+    #         playerstate_record = await prisma.playerstate.find_first(
+    #             where={"game_session_id": session_id}
+    #         )
+    #         print(playerstate_record.model_dump())
+    #         if not playerstate_record:
+    #             return
 
-            # Load scene configuration
-            with open(
-                f"backend/game/dnd_engine/scenes/{game_id}/village.json", "r"
-            ) as file:
-                scene_conf = json.load(file)
+    #         # Load scene configuration
+    #         with open(
+    #             f"backend/game/dnd_engine/scenes/{game_id}/village.json", "r"
+    #         ) as file:
+    #             scene_conf = json.load(file)
 
-            # # Create system message first
-            # system_message = await prisma.chatmessage.create(
-            #     data={
-            #         "session_id": session_id,
-            #         "speaker": "system",
-            #         "action": "narrate",
-            #         "content": scene_conf["session_start"]["description"],
-            #     }
-            # )
+    #         # # Create system message first
+    #         # system_message = await prisma.chatmessage.create(
+    #         #     data={
+    #         #         "session_id": session_id,
+    #         #         "speaker": "system",
+    #         #         "action": "narrate",
+    #         #         "content": scene_conf["session_start"]["description"],
+    #         #     }
+    #         # )
 
-            # # Send system message via WebSocket immediately
-            # if hasattr(self, "connection_manager"):
-            #     await self.connection_manager.send_to_session(
-            #         session_id,
-            #         WebSocketMessage.chat_message(
-            #             id=system_message.id,
-            #             speaker=system_message.speaker,
-            #             content=system_message.content,
-            #             timestamp=system_message.updated_at.isoformat(),
-            #         ),
-            #     )
+    #         # # Send system message via WebSocket immediately
+    #         # if hasattr(self, "connection_manager"):
+    #         #     await self.connection_manager.send_to_session(
+    #         #         session_id,
+    #         #         WebSocketMessage.chat_message(
+    #         #             id=system_message.id,
+    #         #             speaker=system_message.speaker,
+    #         #             content=system_message.content,
+    #         #             timestamp=system_message.updated_at.isoformat(),
+    #         #         ),
+    #         #     )
 
-            # Generate AI narration
-            scene_request = GenerateSceneRequest(
-                scene=scene_conf["village_arrival"],
-                player=playerstate_record.model_dump(),
-            )
+    #         # Generate AI narration
+    #         scene_request = GenerateSceneRequest(
+    #             scene=scene_conf["village_arrival"],
+    #             player=playerstate_record.model_dump(),
+    #         )
 
-            initial_narration = await self.model_client.generate_scene(scene_request)
+    #         initial_narration = await self.model_client.generate_scene(scene_request)
 
-            # Save AI narration to database
-            narrator_message = await prisma.chatmessage.create(
-                data={
-                    "session_id": session_id,
-                    "speaker": "narrator",
-                    "action": "narrate",
-                    "content": initial_narration.narration,
-                }
-            )
+    #         # Save AI narration to database
+    #         narrator_message = await prisma.chatmessage.create(
+    #             data={
+    #                 "session_id": session_id,
+    #                 "speaker": "narrator",
+    #                 "action": "narrate",
+    #                 "content": initial_narration.narration,
+    #             }
+    #         )
 
-            # Send AI narration via WebSocket
-            if hasattr(self, "connection_manager"):
-                await self.connection_manager.send_to_session(
-                    session_id,
-                    WebSocketMessage.chat_message(
-                        id=narrator_message.id,
-                        speaker=narrator_message.speaker,
-                        content=narrator_message.content,
-                        timestamp=narrator_message.updated_at.isoformat(),
-                    ),
-                )
+    #         # Send AI narration via WebSocket
+    #         if hasattr(self, "connection_manager"):
+    #             await self.connection_manager.send_to_session(
+    #                 session_id,
+    #                 WebSocketMessage.chat_message(
+    #                     id=narrator_message.id,
+    #                     speaker=narrator_message.speaker,
+    #                     content=narrator_message.content,
+    #                     timestamp=narrator_message.updated_at.isoformat(),
+    #                 ),
+    #             )
 
-            print(f"[DEBUG] Generated initial narration for session {session_id}")
+    #         print(f"[DEBUG] Generated initial narration for session {session_id}")
 
-        except Exception as e:
-            print(f"[ERROR] Failed to generate initial narration: {e}")
-            # Send fallback message
-            if hasattr(self, "connection_manager"):
-                await self.connection_manager.send_to_session(
-                    session_id,
-                    WebSocketMessage.chat_message(
-                        id=str(uuid.uuid4()),
-                        speaker="system",
-                        content="Welcome to your adventure! The world awaits your actions.",
-                        timestamp=datetime.now().isoformat(),
-                    ),
-                )
+    #     except Exception as e:
+    #         print(f"[ERROR] Failed to generate initial narration: {e}")
+    #         # Send fallback message
+    #         if hasattr(self, "connection_manager"):
+    #             await self.connection_manager.send_to_session(
+    #                 session_id,
+    #                 WebSocketMessage.chat_message(
+    #                     id=str(uuid.uuid4()),
+    #                     speaker="system",
+    #                     content="Welcome to your adventure! The world awaits your actions.",
+    #                     timestamp=datetime.now().isoformat(),
+    #                 ),
+    #             )

@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional, Set
 from prisma import Json
 from datetime import datetime, timezone
 from backend.game.core.character_state import CharacterState
-from backend.models import Scene
+from backend.models import Scene, TurnPhase
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +19,11 @@ class GameState:
     def __init__(self, game_id: str):
         self.id: Optional[str] = None
         self.game_id = game_id
-        # self.current_zone = "start"
         self.loaded_scene: Scene = None
         self.turn_counter = 0
+        self.current_turn_phase: Optional[str] = None
+        self.current_actor: Optional[str] = None
+        self.is_player_input_locked = True
 
         # Game progression - Not sure about these yet
         self.objectives: List[str] = None
@@ -31,7 +33,6 @@ class GameState:
         # Combat state
         self.in_combat = False
         self.initiative_order: List[str] = None  # Character names in initiative order
-        self.current_turn_character: Optional[str] = None
 
         # Environment - Dont know if weather and time will factor in - Time could be based on Turn Count
         self.weather = "clear"
@@ -201,15 +202,15 @@ class GameState:
     def from_db(cls, record):
         obj = cls(record.game_id)
         obj.id = record.id
-        # obj.current_zone = record.current_zone or "start"
-        # obj.loaded_scene = record.loaded_scene or {}
         obj.turn_counter = record.turn_counter
+        obj.current_turn_phase = record.current_turn_phase
+        obj.current_actor = record.current_actor
+        obj.is_player_input_locked = record.is_player_input_locked
         obj.objectives = record.objectives or []
         obj.completed_objectives = record.completed_objectives or []
         obj.story_beats = record.story_beats or []
         obj.in_combat = record.in_combat
         obj.initiative_order = record.initiative_order or []
-        obj.current_turn_character = record.current_turn_character
         obj.weather = record.weather or "clear"
         obj.time_of_day = record.time_of_day or "day"
         obj.location_history = record.location_history or []
@@ -223,15 +224,15 @@ class GameState:
     def to_db(self, for_create: bool = False):
         data = {
             "game_id": self.game_id,
-            # "current_zone": self.current_zone,
-            # "loaded_scene": Json(self.loaded_scene or {}),
             "turn_counter": self.turn_counter,
+            "current_turn_phase": self.current_turn_phase,
+            "current_actor": self.current_actor,
+            "is_player_input_locked": self.is_player_input_locked,
             "objectives": Json(self.objectives or []),
             "completed_objectives": Json(self.completed_objectives or []),
             "story_beats": Json(self.story_beats or []),
             "in_combat": self.in_combat,
             "initiative_order": Json(self.initiative_order or []),
-            "current_turn_character": self.current_turn_character,
             "weather": self.weather,
             "time_of_day": self.time_of_day,
             "location_history": Json(self.location_history or []),
@@ -255,12 +256,14 @@ class GameState:
             "id": self.id,
             "game_id": self.game_id,
             "turn_counter": self.turn_counter,
+            "current_turn_phase": self.current_turn_phase,
+            "current_actor": self.current_actor,
+            "is_player_input_locked": self.is_player_input_locked,
             "objectives": self.objectives or [],
             "completed_objectives": self.completed_objectives or [],
             "story_beats": self.story_beats or [],
             "in_combat": self.in_combat,
             "initiative_order": self.initiative_order or [],
-            "current_turn_character": self.current_turn_character,
             "weather": self.weather,
             "time_of_day": self.time_of_day,
             "location_history": self.location_history or [],
