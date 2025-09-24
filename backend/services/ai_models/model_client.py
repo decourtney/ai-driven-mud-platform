@@ -222,7 +222,9 @@ class AsyncModelServiceClient:
     ) -> GeneratedNarration:
         try:
             response = await self.client.post(
-                f"{self.base_url}/generate_action", json=request.model_dump()
+                f"{self.base_url}/generate_action",
+                content=request.model_dump_json(),
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 
@@ -253,9 +255,12 @@ class AsyncModelServiceClient:
             response.raise_for_status()
 
             result_dict = response.json()
-            result = GeneratedNarration(**result_dict)
 
-            return result
+            # Ensure 'narration' is always present for Pydantic
+            if "narration" not in result_dict or not result_dict["narration"]:
+                result_dict["narration"] = ""
+
+            return GeneratedNarration(**result_dict)
 
         except httpx.HTTPError as http_err:
             try:
@@ -263,11 +268,13 @@ class AsyncModelServiceClient:
             except Exception:
                 error_detail = str(http_err)
             print(f"[CLIENT] Generation request failed: {error_detail}")
-            return GeneratedNarration(action_type="unknown", details=error_detail)
+            return GeneratedNarration(
+                narration="", action_type="unknown", details=error_detail
+            )
 
         except Exception as e:
             print(f"[CLIENT] Generation request failed: {e}")
-            return GeneratedNarration(action_type="unknown", details=str(e))
+            return GeneratedNarration(narration="", action_type="unknown", details=str(e))
 
     async def generate_invalid_action(
         self, request: ValidationResult

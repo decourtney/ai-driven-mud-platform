@@ -1,13 +1,14 @@
 // WebSocket-enabled ChatPanel.tsx
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Terminal, Wifi, WifiOff } from "lucide-react";
-import { ChatMessage } from "@/app/types/game";
+import { ChatMessage, GameState } from "@/app/types/game";
 
 interface ChatInterface {
   onPlayerAction: (action: string) => void;
   chatHistory: ChatMessage[];
   isConnected: boolean;
   slug: string;
+  gameState: GameState;
 }
 
 export default function ChatPanel({
@@ -15,6 +16,7 @@ export default function ChatPanel({
   chatHistory,
   isConnected,
   slug,
+  gameState,
 }: ChatInterface) {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -149,8 +151,12 @@ export default function ChatPanel({
         {/* Enhanced Command Hints */}
         <div className="mb-3 space-y-1">
           <div className="text-xs font-mono text-gray-500">
-            {isConnected && (
+            {isConnected && !gameState.is_player_input_locked ? (
               <span className="text-green-400 ml-2">Ready for commands</span>
+            ) : (
+              <span className="text-red-400 animate-pulse">
+                Processing...
+              </span>
             )}
           </div>
           {!isConnected && (
@@ -168,9 +174,9 @@ export default function ChatPanel({
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={getPlaceholder()}
-              disabled={!isConnected}
+              disabled={!isConnected || gameState.is_player_input_locked}
               className={`w-full bg-gray-900 border text-green-400 font-mono px-4 py-3 focus:outline-none transition-all duration-200 ${
-                !isConnected
+                !isConnected || gameState.is_player_input_locked
                   ? "border-red-500 opacity-50 cursor-not-allowed"
                   : "border-green-500 focus:border-green-300"
               }`}
@@ -181,9 +187,13 @@ export default function ChatPanel({
           </div>
           <button
             type="submit"
-            disabled={!inputValue.trim() || !isConnected}
+            disabled={
+              !inputValue.trim() ||
+              !isConnected ||
+              gameState.is_player_input_locked
+            }
             className={`font-mono font-bold px-6 py-3 transition-all duration-200 flex items-center ${
-              !isConnected
+              !isConnected || gameState.is_player_input_locked
                 ? "bg-gray-600 cursor-not-allowed text-gray-400"
                 : "bg-green-600 hover:bg-green-700 text-black"
             }`}

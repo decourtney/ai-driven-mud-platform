@@ -1,6 +1,6 @@
 # Example D&D-specific implementation
 from typing import Optional, Callable
-
+from pathlib import Path
 from backend.game.core.base_game_engine import BaseGameEngine
 from backend.models import (
     ParsedAction,
@@ -13,6 +13,7 @@ from backend.game.core.character_state import CharacterState
 from backend.game.core.game_state import GameState
 from backend.game.core.dice_system import DiceRollerFactory, BaseDiceRoller
 from backend.game.core.game_session_manager import GameSessionManager
+from backend.game.core.scene_manager import SceneManager
 from backend.game.core.event_bus import EventBus
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 
@@ -28,12 +29,17 @@ class DnDGameEngine(BaseGameEngine):
         model_client: AsyncModelServiceClient,
         session_manager: GameSessionManager,
         event_bus: EventBus,
+        game_id: str,
         **kwargs,
     ):
+        scenemanager_root_path = Path(__file__).parent / "scenes" / game_id
+
         super().__init__(
             model_client=model_client,
             session_manager=session_manager,
             event_bus=event_bus,
+            game_id=game_id,
+            scenemanager_root_path=scenemanager_root_path,
             **kwargs,
         )
 
@@ -47,7 +53,7 @@ class DnDGameEngine(BaseGameEngine):
 
     #     # Check if actor exists and is alive
     #     if parsed_action.actor == "player":
-    #         if not self.game_state.player.is_alive():
+    #         if not self.player_state.is_alive():
     #             return ValidationResult(
     #                 is_valid=False, reason=f"{parsed_action.actor} is dead."
     #             )
@@ -61,11 +67,11 @@ class DnDGameEngine(BaseGameEngine):
     #     # Validate target exists if specified
     #     if parsed_action.target:
     #         if (
-    #             parsed_action.target == self.game_state.player.name
+    #             parsed_action.target == self.player_state.name
     #             or parsed_action.target == "player"
     #             or parsed_action.target == "self"
     #         ):
-    #             if not self.game_state.player.is_alive():
+    #             if not self.player_state.is_alive():
     #                 return ValidationResult(
     #                     is_valid=False, reason="Cannot target defeated player"
     #                 )
@@ -96,7 +102,7 @@ class DnDGameEngine(BaseGameEngine):
 
             # Check if actor exists and is alive
         if parsed_action.actor == "player":
-            if not self.game_state.player.is_alive():
+            if not self.player_state.check_is_alive():
                 return ValidationResult(
                     is_valid=False, reason=f"{parsed_action.actor} is dead."
                 )
@@ -138,9 +144,9 @@ class DnDGameEngine(BaseGameEngine):
     # ) -> ValidationResult:
     #     """Validate D&D-specific action constraints"""
     #     actor_state = (
-    #         self.game_state.player
+    #         self.player_state
     #         if parsed_action.actor == "player"
-    #         or parsed_action.actor == self.game_state.player.name
+    #         or parsed_action.actor == self.player_state.name
     #         else self.game_state.get_npc_by_name(parsed_action.actor)
     #     )
 
@@ -200,7 +206,7 @@ class DnDGameEngine(BaseGameEngine):
             scene_rules.get("stealth_required", False)
             and parsed_action.action_type == ActionType.attack
         ):
-            if not self.game_state.player.has_status("stealth"):
+            if not self.player_state.has_status("stealth"):
                 return ValidationResult(
                     is_valid=False,
                     reason="You must remain stealthy here",
@@ -215,7 +221,7 @@ class DnDGameEngine(BaseGameEngine):
             return GameCondition.game_over
 
         # Check player defeat
-        if not self.game_state.player.is_alive():
+        if not self.player_state.check_is_alive():
             return GameCondition.player_defeat
 
         # D&D-specific victory conditions could be added here
@@ -225,11 +231,11 @@ class DnDGameEngine(BaseGameEngine):
     def ai_decide_npc_action(self, npc: CharacterState) -> ParsedAction:
         """D&D-specific AI decision making for NPCs"""
         # Simple aggressive behavior for now
-        if self.game_state.player.is_alive():
+        if self.player_state.is_alive():
             return ParsedAction(
                 actor=npc.name,
                 action="attacks",
-                target=self.game_state.player.name,
+                target=self.player_state.name,
                 action_type=ActionType.attack,
                 weapon=npc.equipped_weapon,
                 subject=None,

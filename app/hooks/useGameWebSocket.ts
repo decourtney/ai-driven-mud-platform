@@ -43,9 +43,13 @@ export const useGameWebSocket = ({
   const connectingRef = useRef(false);
 
   const [isConnected, setIsConnected] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [playerState, setPlayerState] = useState<CharacterState | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(
+    [] as ChatMessage[]
+  );
+  const [gameState, setGameState] = useState<GameState>({} as GameState);
+  const [playerState, setPlayerState] = useState<CharacterState>(
+    {} as CharacterState
+  );
   const [lastError, setLastError] = useState<string | null>(null);
 
   const MAX_RECONNECT_ATTEMPTS = 5;
@@ -175,26 +179,35 @@ export const useGameWebSocket = ({
           case "connection_confirmed":
             break;
           case "initial_state":
-            setGameState(message.data.game_state);
-            setPlayerState(message.data.player_state);
-            setChatHistory(message.data.chat_history || []);
+            setGameState((prev) => ({ ...prev, ...message.data.game_state }));
+            setPlayerState((prev) => ({
+              ...prev,
+              ...message.data.player_state,
+            }));
+            setChatHistory(message.data.chat_history);
+            break;
+          case "lock_player_input":
+            setGameState((prev) => ({
+              ...prev,
+              is_player_input_locked: message.data.is_locked,
+            }));
             break;
           case "chat_message":
             setChatHistory((prev) => [...prev, message.data]);
             break;
-          case "game_state_update":
-            setGameState((prev) => ({ ...prev, ...message.data }));
+          case "session_state_update":
+            setGameState((prev) => ({ ...prev, ...message.data.game_state }));
+            setPlayerState((prev) => ({
+              ...prev,
+              ...message.data.player_state,
+            }));
             break;
           case "action_result":
-            setChatHistory((prev) => [
+            setChatHistory((prev) => [...prev, message.data.narration]);
+            setPlayerState((prev) => ({
               ...prev,
-              {
-                id: Date.now().toString(),
-                speaker: "DM",
-                content: message.data.narration,
-                timestamp: message.timestamp || new Date().toISOString(),
-              },
-            ]);
+              ...message.data.player_state,
+            }));
             break;
           case "error":
             setLastError(message.data.message);
@@ -222,19 +235,27 @@ export const useGameWebSocket = ({
     onConnectionChange,
   ]);
 
-  const sendAction = useCallback((action: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: "player_action",
-          data: { action },
-          timestamp: new Date().toISOString(),
-        })
-      );
-    } else {
-      setLastError("Cannot send action: not connected");
-    }
-  }, []);
+  const sendAction = useCallback(
+    (action: string) => {
+      if (gameState.is_player_input_locked) {
+        setLastError("Cannot send action: input is currently locked");
+        return;
+      }
+
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: "player_action",
+            data: { action },
+            timestamp: new Date().toISOString(),
+          })
+        );
+      } else {
+        setLastError("Cannot send action: not connected");
+      }
+    },
+    [gameState.is_player_input_locked]
+  );
 
   const reconnect = useCallback(() => {
     cleanup();

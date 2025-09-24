@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional, Set
 from prisma import Json
 from datetime import datetime, timezone
 from backend.game.core.character_state import CharacterState
+from backend.models import Scene, TurnPhase
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +19,11 @@ class GameState:
     def __init__(self, game_id: str):
         self.id: Optional[str] = None
         self.game_id = game_id
-        self.current_scene: Dict[str, Any] = None
+        self.loaded_scene: Scene = None
         self.turn_counter = 0
+        self.current_turn_phase: Optional[str] = None
+        self.current_actor: Optional[str] = None
+        self.is_player_input_locked = False
 
         # Game progression - Not sure about these yet
         self.objectives: List[str] = None
@@ -29,7 +33,6 @@ class GameState:
         # Combat state
         self.in_combat = False
         self.initiative_order: List[str] = None  # Character names in initiative order
-        self.current_turn_character: Optional[str] = None
 
         # Environment - Dont know if weather and time will factor in - Time could be based on Turn Count
         self.weather = "clear"
@@ -196,17 +199,18 @@ class GameState:
     # ------------------------------
 
     @classmethod
-    def from_record(cls, record):
+    def from_db(cls, record):
         obj = cls(record.game_id)
         obj.id = record.id
-        obj.current_scene = record.current_scene or {}
         obj.turn_counter = record.turn_counter
+        obj.current_turn_phase = record.current_turn_phase
+        obj.current_actor = record.current_actor
+        obj.is_player_input_locked = record.is_player_input_locked
         obj.objectives = record.objectives or []
         obj.completed_objectives = record.completed_objectives or []
         obj.story_beats = record.story_beats or []
         obj.in_combat = record.in_combat
         obj.initiative_order = record.initiative_order or []
-        obj.current_turn_character = record.current_turn_character
         obj.weather = record.weather or "clear"
         obj.time_of_day = record.time_of_day or "day"
         obj.location_history = record.location_history or []
@@ -220,14 +224,15 @@ class GameState:
     def to_db(self, for_create: bool = False):
         data = {
             "game_id": self.game_id,
-            "current_scene": Json(self.current_scene or {}),
             "turn_counter": self.turn_counter,
+            "current_turn_phase": self.current_turn_phase,
+            "current_actor": self.current_actor,
+            "is_player_input_locked": self.is_player_input_locked,
             "objectives": Json(self.objectives or []),
             "completed_objectives": Json(self.completed_objectives or []),
             "story_beats": Json(self.story_beats or []),
             "in_combat": self.in_combat,
             "initiative_order": Json(self.initiative_order or []),
-            "current_turn_character": self.current_turn_character,
             "weather": self.weather,
             "time_of_day": self.time_of_day,
             "location_history": Json(self.location_history or []),
@@ -246,135 +251,160 @@ class GameState:
 
         return data
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "game_id": self.game_id,
+            "turn_counter": self.turn_counter,
+            "current_turn_phase": self.current_turn_phase,
+            "current_actor": self.current_actor,
+            "is_player_input_locked": self.is_player_input_locked,
+            "objectives": self.objectives or [],
+            "completed_objectives": self.completed_objectives or [],
+            "story_beats": self.story_beats or [],
+            "in_combat": self.in_combat,
+            "initiative_order": self.initiative_order or [],
+            "weather": self.weather,
+            "time_of_day": self.time_of_day,
+            "location_history": self.location_history or [],
+            "recent_events": self.recent_events or [],
+            "important_npcs_met": list(self.important_npcs_met),
+            "items_discovered": self.items_discovered or [],
+            "session_started": (
+                self.session_started.isoformat() if self.session_started else None
+            ),
+            "save_version": self.save_version,
+        }
+
     # ------------------------------
     # Serialization
     # ------------------------------
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert game state to dictionary for saving"""
-        try:
-            return {
-                "id": self.id,
-                "game_id": self.game_id,
-                "turn_counter": self.turn_counter,
-                "in_combat": self.in_combat,
-                "weather": self.weather,
-                "time_of_day": self.time_of_day,
-                "session_started": self.session_started.isoformat(),
-                "last_updated": self.last_updated.isoformat(),
-                "save_version": self.save_version,
-                "current_scene": self.current_scene or Json({}),
-                "objectives": self.objectives or Json([]),
-                "completed_objectives": self.completed_objectives or Json([]),
-                "story_beats": self.story_beats or Json([]),
-                "initiative_order": self.initiative_order or Json([]),
-                "location_history": self.location_history or Json([]),
-                "recent_events": self.recent_events or Json([]),
-                "important_npcs_met": self.important_npcs_met or Json([]),
-                "items_discovered": self.items_discovered or Json([]),
-            }
-        except Exception as e:
-            logging.error(f"Error serializing GameState: {e}")
-            raise
+    # def to_dict(self) -> Dict[str, Any]:
+    #     """Convert game state to dictionary for saving"""
+    #     try:
+    #         return {
+    #             "id": self.id,
+    #             "game_id": self.game_id,
+    #             "turn_counter": self.turn_counter,
+    #             "in_combat": self.in_combat,
+    #             "weather": self.weather,
+    #             "time_of_day": self.time_of_day,
+    #             "session_started": self.session_started.isoformat(),
+    #             "last_updated": self.last_updated.isoformat(),
+    #             "save_version": self.save_version,
+    #             "loaded_scene": self.loaded_scene or Json({}),
+    #             "objectives": self.objectives or Json([]),
+    #             "completed_objectives": self.completed_objectives or Json([]),
+    #             "story_beats": self.story_beats or Json([]),
+    #             "initiative_order": self.initiative_order or Json([]),
+    #             "location_history": self.location_history or Json([]),
+    #             "recent_events": self.recent_events or Json([]),
+    #             "important_npcs_met": self.important_npcs_met or Json([]),
+    #             "items_discovered": self.items_discovered or Json([]),
+    #         }
+    #     except Exception as e:
+    #         logging.error(f"Error serializing GameState: {e}")
+    #         raise
 
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "GameState":
-        """Load game state from dictionary with robust error handling"""
-        try:
-            game_state = cls()
+    # @classmethod
+    # def from_dict(cls, data: Dict[str, Any]) -> "GameState":
+    #     """Load game state from dictionary with robust error handling"""
+    #     try:
+    #         game_state = cls()
 
-            # Define field mappings with types and defaults
-            field_mappings = {
-                "id": (str),
-                "game_id": (str),
-                "turn_counter": (int, 0),
-                "save_version": (str, "1.0"),
-                "objectives": (list, []),
-                "completed_objectives": (list, []),
-                "story_beats": (list, []),
-                "initiative_order": (list, []),
-                "location_history": (list, []),
-                "recent_events": (list, []),
-                "items_discovered": (list, []),
-                "weather": (str, "clear"),
-                "time_of_day": (str, "day"),
-                "current_turn_character": (type(None), None),  # Optional string
-                "in_combat": (bool, False),
-                "current_scene": (dict, {}),
-            }
+    #         # Define field mappings with types and defaults
+    #         field_mappings = {
+    #             "id": (str),
+    #             "game_id": (str),
+    #             "turn_counter": (int, 0),
+    #             "save_version": (str, "1.0"),
+    #             "objectives": (list, []),
+    #             "completed_objectives": (list, []),
+    #             "story_beats": (list, []),
+    #             "initiative_order": (list, []),
+    #             "location_history": (list, []),
+    #             "recent_events": (list, []),
+    #             "items_discovered": (list, []),
+    #             "weather": (str, "clear"),
+    #             "time_of_day": (str, "day"),
+    #             "current_turn_character": (type(None), None),  # Optional string
+    #             "in_combat": (bool, False),
+    #             "loaded_scene": (dict, {}),
+    #         }
 
-            # Apply field mappings with type checking
-            for field_name, (expected_type, default_value) in field_mappings.items():
-                try:
-                    value = data.get(field_name, default_value)
+    #         # Apply field mappings with type checking
+    #         for field_name, (expected_type, default_value) in field_mappings.items():
+    #             try:
+    #                 value = data.get(field_name, default_value)
 
-                    # Handle optional fields (like current_turn_character)
-                    if expected_type == type(None) and value is None:
-                        setattr(game_state, field_name, value)
-                    elif value is not None and not isinstance(value, expected_type):
-                        # Try to convert the type
-                        if expected_type == list and not isinstance(value, list):
-                            value = [value] if value else []
-                        elif expected_type == dict and not isinstance(value, dict):
-                            value = default_value
-                        elif expected_type in (str, int, bool):
-                            value = expected_type(value)
+    #                 # Handle optional fields (like current_turn_character)
+    #                 if expected_type == type(None) and value is None:
+    #                     setattr(game_state, field_name, value)
+    #                 elif value is not None and not isinstance(value, expected_type):
+    #                     # Try to convert the type
+    #                     if expected_type == list and not isinstance(value, list):
+    #                         value = [value] if value else []
+    #                     elif expected_type == dict and not isinstance(value, dict):
+    #                         value = default_value
+    #                     elif expected_type in (str, int, bool):
+    #                         value = expected_type(value)
 
-                    setattr(game_state, field_name, value)
+    #                 setattr(game_state, field_name, value)
 
-                except (ValueError, TypeError) as e:
-                    logging.warning(
-                        f"Error setting field {field_name}: {e}. Using default value."
-                    )
-                    setattr(game_state, field_name, default_value)
+    #             except (ValueError, TypeError) as e:
+    #                 logging.warning(
+    #                     f"Error setting field {field_name}: {e}. Using default value."
+    #                 )
+    #                 setattr(game_state, field_name, default_value)
 
-            # Handle datetime fields with fallbacks
-            datetime_fields = {
-                "session_started": datetime.now(timezone.utc),
-                "last_updated": datetime.now(timezone.utc),
-            }
+    #         # Handle datetime fields with fallbacks
+    #         datetime_fields = {
+    #             "session_started": datetime.now(timezone.utc),
+    #             "last_updated": datetime.now(timezone.utc),
+    #         }
 
-            for field_name, fallback in datetime_fields.items():
-                try:
-                    value = data.get(field_name)
-                    if value:
-                        if isinstance(value, str):
-                            setattr(
-                                game_state, field_name, datetime.fromisoformat(value)
-                            )
-                        elif isinstance(value, datetime):
-                            setattr(game_state, field_name, value)
-                        else:
-                            setattr(game_state, field_name, fallback)
-                    else:
-                        setattr(game_state, field_name, fallback)
-                except (ValueError, TypeError) as e:
-                    logging.warning(
-                        f"Error parsing datetime field {field_name}: {e}. Using current time."
-                    )
-                    setattr(game_state, field_name, fallback)
+    #         for field_name, fallback in datetime_fields.items():
+    #             try:
+    #                 value = data.get(field_name)
+    #                 if value:
+    #                     if isinstance(value, str):
+    #                         setattr(
+    #                             game_state, field_name, datetime.fromisoformat(value)
+    #                         )
+    #                     elif isinstance(value, datetime):
+    #                         setattr(game_state, field_name, value)
+    #                     else:
+    #                         setattr(game_state, field_name, fallback)
+    #                 else:
+    #                     setattr(game_state, field_name, fallback)
+    #             except (ValueError, TypeError) as e:
+    #                 logging.warning(
+    #                     f"Error parsing datetime field {field_name}: {e}. Using current time."
+    #                 )
+    #                 setattr(game_state, field_name, fallback)
 
-            # Handle sets (important_npcs_met)
-            try:
-                npcs_met_data = data.get("important_npcs_met", [])
-                if isinstance(npcs_met_data, (list, set)):
-                    game_state.important_npcs_met = set(
-                        str(item) for item in npcs_met_data
-                    )
-                else:
-                    game_state.important_npcs_met = set()
-            except Exception as e:
-                logging.warning(f"Error processing important_npcs_met: {e}")
-                game_state.important_npcs_met = set()
+    #         # Handle sets (important_npcs_met)
+    #         try:
+    #             npcs_met_data = data.get("important_npcs_met", [])
+    #             if isinstance(npcs_met_data, (list, set)):
+    #                 game_state.important_npcs_met = set(
+    #                     str(item) for item in npcs_met_data
+    #                 )
+    #             else:
+    #                 game_state.important_npcs_met = set()
+    #         except Exception as e:
+    #             logging.warning(f"Error processing important_npcs_met: {e}")
+    #             game_state.important_npcs_met = set()
 
-            # Update last_updated to reflect loading
-            game_state.last_updated = datetime.now(timezone.utc)
+    #         # Update last_updated to reflect loading
+    #         game_state.last_updated = datetime.now(timezone.utc)
 
-            return game_state
+    #         return game_state
 
-        except Exception as e:
-            logging.error(f"Critical error deserializing GameState: {e}")
-            raise
+    #     except Exception as e:
+    #         logging.error(f"Critical error deserializing GameState: {e}")
+    #         raise
 
     def validate_state(self) -> bool:
         """Validate the game state integrity"""

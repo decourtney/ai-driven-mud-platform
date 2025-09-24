@@ -268,7 +268,7 @@ class CodeLlamaParser(ActionParser):
         if json_str:
             try:
                 # Fix common JSON issues
-                json_str = json_str.replace("'", '"')
+                # json_str = json_str.replace("'", '"')
                 json_str = re.sub(r",\s*}", "}", json_str)
                 parsed_json = json.loads(json_str)
 

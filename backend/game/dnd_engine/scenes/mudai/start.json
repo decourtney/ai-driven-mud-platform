@@ -1,0 +1,97 @@
+{
+  "start": {
+    "id": "start",
+    "label": "Waking Up",
+    "description": "You awaken on a bed of leaves, the cool morning air brushing against your face. The scent of damp earth and pine surrounds you. The sun peeks through the canopy above, casting soft light over your small campsite.",
+    "exits": [
+      {
+        "id": "village_arrival",
+        "label": "Beaten path leading to a small village",
+        "target_scene": "village_arrival"
+      }
+    ]
+  },
+  "village_arrival": {
+    "id": "village_arrival",
+    "label": "The Forgotten Village",
+    "description": "A shabby village square, eerily quiet.",
+
+    "exits": [
+      {
+        "id": "village_road",
+        "label": "Main road deeper into village",
+        "target_scene": "village_road"
+      },
+      {
+        "id": "hill_path",
+        "label": "Path back up the hill",
+        "target_scene": "hill_path"
+      },
+      {
+        "id": "inn_entrance",
+        "label": "Enter the Spork Inn",
+        "target_scene": "inn",
+        "is_locked": false
+      },
+      {
+        "id": "blacksmith_shop_entrance",
+        "label": "Enter the Rusty Nail",
+        "target_scene": "blacksmith_shop",
+        "is_locked": false
+      }
+    ],
+
+    "structures": [
+      {
+        "id": "inn",
+        "name": "Spork Inn",
+        "description": "Ugly shack with a faded sign — could be a fork, could be a spoon."
+      },
+      {
+        "id": "blacksmith_shop",
+        "name": "Rusty Nail",
+        "description": "Run down building with a cold hearth."
+      }
+    ],
+
+    "notable_npcs": [],
+    "npcs": [
+      {
+        "id": "rabid_wolf",
+        "name": "Rabid Wolf",
+        "description": "A disease-maddened wolf with glowing red eyes",
+        "status": { "is_alive": true, "is_hostile": true, "health": 8 },
+        "disposition": "aggressive"
+      }
+    ],
+
+    "items": [
+      {
+        "id": "busted_statue",
+        "name": "Ode to ...",
+        "description": "Toppled marble statue of a robed man. Broken and defaced — the plaque only reads 'Ode to'.",
+        "is_interactable": true,
+        "is_loot": false
+      }
+    ],
+
+    "discoveries": [
+      {
+        "id": "no_footprints",
+        "type": "environment",
+        "observation": "No recent footprints in the dust on doorsteps",
+        "implication": "The village has been empty for some time",
+        "is_discovered": false,
+        "perception_dc": 12
+      },
+      {
+        "id": "quest_hint_bandits",
+        "type": "quest_hook",
+        "observation": "Scraps of cloth with a bandit insignia caught on a broken fence.",
+        "quest": "bandit_hideout",
+        "is_discovered": false,
+        "perception_dc": 15
+      }
+    ]
+  }
+}

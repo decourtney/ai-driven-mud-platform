@@ -43,8 +43,13 @@ class GameEngineManager:
             # Identify engines to cleanup
             for game_id, sessions in self.engines.items():
                 for session_id, entry in sessions.items():
+                    # print(getattr(entry["engine"], "is_processing", 'couldnt find attribute'))
+                    # Skip if engine is busy
+                    if getattr(entry["engine"], "is_processing", False):
+                        continue
+
                     if now - entry["last_active"] > idle_threshold:
-                        print("[DEBUG]Purging old engine instances")
+                        print("[DEBUG] PURGING STALE ENGINE INSTANCES")
                         game_state, player_state = entry[
                             "engine"
                         ].get_serialized_game_state()
@@ -75,7 +80,6 @@ class GameEngineManager:
                     if isinstance(result, Exception):
                         # Log but continue
                         print(f"[WARNING] Error saving engine state: {result}")
-
 
     def get_registered_engine(
         self, game_id: str, session_id: str

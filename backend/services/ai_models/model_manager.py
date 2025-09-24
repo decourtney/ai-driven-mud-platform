@@ -3,7 +3,13 @@ import torch
 from typing import Optional, Dict, List, Any
 
 from backend.game.core.interfaces import ActionParser, ActionNarrator
-from backend.models import ParsedAction, ValidationResult, GenerateSceneRequest, ParseActionRequest
+from backend.models import (
+    ParsedAction,
+    ValidationResult,
+    GenerateSceneRequest,
+    ParseActionRequest,
+    GenerateActionRequest,
+)
 from backend.game.parsers.action_parser.codellama_parser import CodeLlamaParser
 from backend.game.parsers.narrator_parser.mistral_narrator import GGUFMistralNarrator
 
@@ -12,12 +18,20 @@ class ModelManager:
     def __init__(
         self,
         parser_model_path: Optional[str] = None,
-        narrator_model_path: Optional[str] = None, 
-        narrator_adapter_path: Optional[str] = None
+        narrator_model_path: Optional[str] = None,
+        narrator_adapter_path: Optional[str] = None,
     ):
         # Create actual instances, not class references
-        self.parser = CodeLlamaParser(parser_model_path) if parser_model_path else CodeLlamaParser()
-        self.narrator = GGUFMistralNarrator(narrator_model_path, narrator_adapter_path) if narrator_model_path else GGUFMistralNarrator()
+        self.parser = (
+            CodeLlamaParser(parser_model_path)
+            if parser_model_path
+            else CodeLlamaParser()
+        )
+        self.narrator = (
+            GGUFMistralNarrator(narrator_model_path)
+            if narrator_model_path
+            else GGUFMistralNarrator()
+        )
         self.models_loaded = False
 
     def load_all_models(self) -> bool:
@@ -29,12 +43,16 @@ class ModelManager:
             print("[+] Loading Narrator model...")
             if not self.narrator.load_model():
                 raise RuntimeError("Failed to load narrator")
-            print(f"[+] Narrator loaded - GPU usage: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
+            print(
+                f"[+] Narrator loaded - GPU usage: {torch.cuda.memory_allocated() / 1024**3:.2f} GB"
+            )
 
             print("[+] Loading Action parser...")
             if not self.parser.load_model():
                 raise RuntimeError("Failed to load parser")
-            print(f"[+] Parser loaded - GPU usage: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
+            print(
+                f"[+] Parser loaded - GPU usage: {torch.cuda.memory_allocated() / 1024**3:.2f} GB"
+            )
 
             self.models_loaded = True
             return True
@@ -63,12 +81,13 @@ class ModelManager:
                 raise RuntimeError("Failed to load models")
         return self.parser.parse_action(request)
 
-    def generate_action_narration(self, parsed_action: ParsedAction, hit: bool, damage_type: str) -> str:
+    # change this signature to accept request: GenerateActionRequest then adjust model
+    def generate_action_narration(self, request: GenerateActionRequest) -> str:
         """Generate narration response - no loading/unloading needed"""
         if not self.is_narrator_ready():
             if not self.load_all_models():
                 raise RuntimeError("Failed to load models")
-        return self.narrator.generate_action_narration(parsed_action, hit, damage_type)
+        return self.narrator.generate_action_narration(request)
 
     def generate_scene_narration(self, request: GenerateSceneRequest) -> str:
         """Generate scene description - no loading/unloading needed"""
@@ -77,15 +96,15 @@ class ModelManager:
                 raise RuntimeError("Failed to load models")
         return self.narrator.generate_scene_narration(request)
 
-    def generate_invalid_action_narration(self, validation_result: ValidationResult) -> str:
+    def generate_invalid_action_narration(
+        self, validation_result: ValidationResult
+    ) -> str:
         """Generate narration for invalid action"""
         if not self.is_narrator_ready():
             if not self.load_all_models():
                 raise RuntimeError("Failed to load models")
-        return 'Invalid action' # Temporary placeholder
-        return self.narrator.generate_invalid_action_narration(
-            validation_result
-        )
+        return "Invalid action"  # Temporary placeholder
+        return self.narrator.generate_invalid_action_narration(validation_result)
 
     def get_memory_usage(self) -> dict:
         """Get current GPU memory usage"""
@@ -93,7 +112,7 @@ class ModelManager:
             return {
                 "allocated_gb": torch.cuda.memory_allocated() / 1024**3,
                 "reserved_gb": torch.cuda.memory_reserved() / 1024**3,
-                "device": torch.cuda.get_device_name()
+                "device": torch.cuda.get_device_name(),
             }
         return {"error": "CUDA not available"}
 
