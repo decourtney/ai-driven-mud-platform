@@ -23,7 +23,7 @@ class GameState:
         self.turn_counter = 0
         self.current_turn_phase: Optional[str] = None
         self.current_actor: Optional[str] = None
-        self.is_player_input_locked = True
+        self.is_player_input_locked = False
 
         # Game progression - Not sure about these yet
         self.objectives: List[str] = None

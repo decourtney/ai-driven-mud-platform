@@ -14,6 +14,7 @@ from backend.models import (
     GenerateSceneRequest,
     GeneratedNarration,
     TurnPhase,
+    GenerateActionRequest,
 )
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.game.core.game_session_manager import GameSessionManager
@@ -62,6 +63,7 @@ class BaseGameEngine(ABC):
 
         self.game_state = None
         self.player_state = None
+        self.is_processing = False
         self.max_invalid_attempts = kwargs.get("max_invalid_attempts", 3)
 
     @abstractmethod
@@ -97,8 +99,8 @@ class BaseGameEngine(ABC):
             scene_id=self.player_state.current_scene,
             zone=self.player_state.current_zone,
         )
-
-        asyncio.create_task(self.start_turn())
+        print("\033[91m[DEBUG]\033[0m STARTING TURN AFTER LOADING GAME STATE")
+        asyncio.create_task(self.take_turn())
 
     def get_serialized_game_state(self) -> Tuple[Dict, Dict]:
         print("[DEBUG] RETURNING SERIALIZED GAME STATE")
@@ -120,14 +122,14 @@ class BaseGameEngine(ABC):
         """Apply a single action result to the game state"""
         # Update player or NPC based on who acted
         if (
-            result.parsed_action.actor == self.game_state.player.name
+            result.parsed_action.actor == self.player_state.name
             or result.parsed_action.actor == "player"
         ):
             npc = self.game_state.get_npc_by_name(result.parsed_action.target)
             if npc:
                 npc.apply_action_result(result)
         else:
-            self.game_state.player.apply_action_result(result)
+            self.player_state.apply_action_result(result)
 
     # ----------------------------
     # Scene Management
@@ -256,11 +258,15 @@ class BaseGameEngine(ABC):
     # GAME ORCHESTRATION
     # ----------------------------
 
-    async def start_turn(self):
+    async def take_turn(self):
         """
         Start or resume a turn cycle based on persistent game_state.
         """
         # Determine phase from game_state or start fresh
+        print(
+            "\033[91m[DEBUG]\033[0m STARTING TURN CYCLE:",
+            self.game_state.current_turn_phase,
+        )
         phase = (
             TurnPhase(self.game_state.current_turn_phase)
             if self.game_state.current_turn_phase
@@ -268,20 +274,20 @@ class BaseGameEngine(ABC):
         )
 
         if phase == TurnPhase.scene_narration:
-            await self._handle_scene_narration()
+            await self.handle_scene_narration()
         elif phase == TurnPhase.player_turn:
-            await self._prepare_player_turn()
+            await self.handle_player_turn()
         elif phase == TurnPhase.npc_turn:
-            await self._handle_npc_turn()
+            await self.handle_npc_turn()
         else:
             # Default: start scene narration
-            await self._handle_scene_narration()
+            await self.handle_scene_narration()
 
     # --------------------------
     # Scene Narration
     # --------------------------
-    async def _handle_scene_narration(self):
-        self.game_state.current_turn_phase = TurnPhase.scene_narration.value
+    async def handle_scene_narration(self):
+        self.is_processing = True
         self.game_state.current_actor = None
         self.game_state.is_player_input_locked = True
         await self.session_manager.lock_player_input(
@@ -289,26 +295,34 @@ class BaseGameEngine(ABC):
             is_locked=self.game_state.is_player_input_locked,
         )
 
-        # scene_narration = await self.present_scene()
+        scene_narration = await self.present_scene()
 
-        # message = {
-        #     "speaker": "narrator",
-        #     "action": "narrate",
-        #     "content": scene_narration.narration,
-        # }
+        message = {
+            "speaker": "narrator",
+            "action": "narrate",
+            "content": scene_narration.narration,
+        }
 
-        # await self.session_manager.send_message_to_session(
-        #     game_state_id=self.game_state.id, message=message
-        # )
+        await self.session_manager.send_message_to_session(
+            game_state_id=self.game_state.id, message=message
+        )
 
-        # After narration, move to player turn
-        await self._prepare_player_turn()
+        # TODO After narration determine next phase - Player / NPC / End Turn or Game Over
+        await self.determine_next_phase()
+        self.is_processing = False
+        
+        asyncio.create_task(self.take_turn())
+        
+    async def determine_next_phase(self):
+        """Some method to determine next phase based on game state"""
+        # run through simple logic for now
+        self.game_state.current_turn_phase = TurnPhase.player_turn.value
+        pass
 
     # --------------------------
     # Player Turn
     # --------------------------
-    async def _prepare_player_turn(self):
-        self.game_state.current_turn_phase = TurnPhase.player_turn.value
+    async def handle_player_turn(self):
         self.game_state.current_actor = "player"
         self.game_state.is_player_input_locked = False
         await self.session_manager.lock_player_input(
@@ -319,8 +333,8 @@ class BaseGameEngine(ABC):
     # --------------------------
     # NPC Turn
     # --------------------------
-    async def _handle_npc_turn(self):
-        self.game_state.current_turn_phase = TurnPhase.npc_turn.value
+    async def handle_npc_turn(self):
+        # self.game_state.current_turn_phase = TurnPhase.npc_turn.value
         self.game_state.current_actor = None
         self.game_state.is_player_input_locked = True
         await self.session_manager.lock_player_input(
@@ -364,7 +378,7 @@ class BaseGameEngine(ABC):
         self.on_turn_end()
 
         # Ready for next turn: start scene narration for next turn
-        await self.start_turn()
+        await self.take_turn()
 
         # async def advance_turn_after_player(self):
         #     """
@@ -523,16 +537,16 @@ class BaseGameEngine(ABC):
             raise RuntimeError("Narrator not loaded")
 
         difficulty = self.get_action_difficulty(
-            parsed_action.action_type, self.game_state
+            action_type=parsed_action.action_type, context=self.game_state
         )
 
         # Get any modifiers for this action (game-specific)
-        modifiers = self.get_action_modifiers(parsed_action)
+        modifiers = self.get_action_modifiers(parsed_action=parsed_action)
 
         # Roll using the game-specific dice system
         dice_result = self.dice_roller.roll_action(
             difficulty=difficulty,
-            action_type=parsed_action.action_type.value,
+            action_type=parsed_action.action_type,
             **modifiers,
         )
 
@@ -556,10 +570,19 @@ class BaseGameEngine(ABC):
             action_result.fumble = dice_result.fumble
 
         # Apply result and generate narration
-        self.update_game_state([action_result])
-        action_result.narration = await self.model_client.generate_action_narration(
-            parsed_action, dice_result.hit, dice_result.outcome_type
+        # self.update_game_state([action_result])
+
+        generate_action_request = GenerateActionRequest(
+            parsed_action=parsed_action,
+            hit=dice_result.hit,
+            damage_type=dice_result.outcome_type,
         )
+        generated_action = await self.model_client.generate_action(
+            generate_action_request
+        )
+        if generated_action.narration:
+            action_result.narration = generated_action.narration or ""
+        print("[DEBUG] Generated Action Narration:", action_result)
 
         # Hook for additional game-specific processing
         self.on_action_processed(action_result, dice_result)
@@ -575,6 +598,7 @@ class BaseGameEngine(ABC):
 
         # Base modifiers that most games might use
         actor_state = self.get_actor_state(parsed_action.actor)
+
         if hasattr(actor_state, "get_action_bonus"):
             modifiers["modifier"] = actor_state.get_action_bonus(
                 parsed_action.action_type
@@ -591,11 +615,11 @@ class BaseGameEngine(ABC):
         modifiers = {}
 
         # Common environmental effects
-        if self.game_state and self.game_state.scene:
-            if self.game_state.scene.get("darkness", False):
-                modifiers["environmental_penalty"] = -2
-            if self.game_state.scene.get("difficult_terrain", False):
-                modifiers["terrain_penalty"] = -1
+        # if self.game_state and self.game_state.loaded_scene:
+        #     if self.game_state.loaded_scene.get("darkness", False):
+        #         modifiers["environmental_penalty"] = -2
+        #     if self.game_state.loaded_scene.get("difficult_terrain", False):
+        #         modifiers["terrain_penalty"] = -1
 
         return modifiers
 
@@ -611,7 +635,7 @@ class BaseGameEngine(ABC):
         """Helper to get actor state from game state"""
         # This wont work well using player name - should use character_type
         if actor_name == "player":
-            return self.game_state.player
+            return self.player_state
         else:
             return self.game_state.get_npc_by_name(actor_name)
 
@@ -667,7 +691,7 @@ class BaseGameEngine(ABC):
         return {
             "status": "active",
             "turn": self.game_state.turn_counter,
-            "player_alive": self.game_state.player.is_alive(),
+            "player_alive": self.player_state.is_alive(),
             "npcs_alive": sum(1 for npc in self.game_state.npcs if npc.is_alive()),
             "scene": self.game_state.scene.get("name", "unknown"),
         }

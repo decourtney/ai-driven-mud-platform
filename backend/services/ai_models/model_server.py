@@ -196,7 +196,7 @@ class ModelServer:
         @app.post("/parse_action", response_model=ParsedAction)
         def parse_action(request: ParseActionRequest = Body(...)):
             """Parse player action using CodeLlama"""
-            
+
             if not self.model_manager.is_parser_ready():
                 # Try to auto-load
                 print("[MODEL] Parser not ready, attempting to load...")
@@ -222,11 +222,7 @@ class ModelServer:
                     )
 
             try:
-                narration = self.model_manager.generate_action_narration(
-                    parsed_action=request.parsed_action,
-                    hit=request.hit,
-                    damage_type=request.damage_type,
-                )
+                narration = self.model_manager.generate_action_narration(request)
 
                 return GeneratedNarration(narration=narration)
 

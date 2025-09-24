@@ -17,7 +17,7 @@ except ImportError:
     )
 
 from backend.game.core.interfaces import ActionNarrator
-from backend.models import ParsedAction, ActionType, GenerateSceneRequest
+from backend.models import ParsedAction, ActionType, GenerateSceneRequest, GenerateActionRequest
 
 
 class GGUFMistralNarrator(ActionNarrator):
@@ -55,7 +55,9 @@ class GGUFMistralNarrator(ActionNarrator):
 
             # Check if file exists
             if not os.path.exists(self.model_path):
-                print(f"\033[91m[-]\033[0m Model file does not exist: {self.model_path}")
+                print(
+                    f"\033[91m[-]\033[0m Model file does not exist: {self.model_path}"
+                )
                 return False
 
             # Show file info
@@ -131,29 +133,30 @@ class GGUFMistralNarrator(ActionNarrator):
     def is_loaded(self) -> bool:
         return self._is_loaded and self.model is not None
 
-    def generate_action_narration(
-        self, action: ParsedAction, hit: bool, damage_type: str = "wound"
-    ) -> str:
+    def generate_action_narration(self, request: GenerateActionRequest) -> str:
+        print("\033[91m[DEBUG]\033[0m Generating action narration...")
         if not self.is_loaded():
             print("\033[91m[-]\033[0m Narrator model not loaded")
-            return f"{action.actor} performs {action.action}."
+            return f"{request.parsed_action.actor} performs {request.parsed_action.action}."
 
         try:
-            input_prompt = self._create_input_prompt(action, hit, damage_type)
+            input_prompt = self._create_input_prompt(request.parsed_action, request.hit, request.damage_type)
 
             # Debug the prompt if needed
             if self.verbose:
                 print(f"\033[93m[DEBUG]\033[0m Input Prompt: {input_prompt}")
 
-            raw_text = self._generate_text(input_prompt, max_tokens=200, temperature=0.1)
+            raw_text = self._generate_text(
+                input_prompt, max_tokens=200, temperature=0.1
+            )
 
             # Check if generation failed
             if len(raw_text.strip()) < 5:
                 print(f"[!] Generation failed, raw text: '{raw_text}'")
-                return f"{action.actor} performs {action.action}."
+                return f"{request.parsed_action.actor} performs {request.parsed_action.action}."
 
             cleaned = self._clean_action_narration(
-                raw_text, action.actor, action.target
+                raw_text, request.parsed_action.actor, request.parsed_action.target
             )
 
             if self.verbose:
@@ -166,11 +169,12 @@ class GGUFMistralNarrator(ActionNarrator):
             import traceback
 
             print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
-            return f"{action.actor} performs {action.action}."
+            return f"{request.parsed_action.actor} performs {request.parsed_action.action}."
 
         # NOTE: parameters for this are not even close!
 
     def generate_scene_narration(self, request: GenerateSceneRequest):
+        print("\033[91m[DEBUG]\033[0m Generating scene narration...")
         """Generate a scene description using the narrator model"""
         if not self.is_loaded():
             print("\033[91m[-]\033[0m Narrator model not loaded")
@@ -187,7 +191,9 @@ class GGUFMistralNarrator(ActionNarrator):
             raw_text = self._generate_text(
                 # NOTE: 200 tokens is for building and testing - will need to be much higher
                 # NOTE: Temp of 0.1 is to keep it very focused on description - may need to adjust
-                scene_prompt, max_tokens=200, temperature=0.1
+                scene_prompt,
+                max_tokens=200,
+                temperature=0.1,
             )
 
             # Clean and format the description
@@ -208,34 +214,34 @@ class GGUFMistralNarrator(ActionNarrator):
             return f"You find yourself in {request.scene['label']}."
 
     def _create_input_prompt(
-        self, action: ParsedAction, hit: bool, damage_type: str
+        self, parsed_action: ParsedAction, hit: bool, damage_type: str
     ) -> str:
         # Build the scenario description
-        actor = action.actor
-        target = action.target or "the target"
-        action_desc = action.action
+        actor = parsed_action.actor
+        target = parsed_action.target or "the target"
+        action_desc = parsed_action.action
 
         # Add weapon if present and not already in action description
         if (
-            action.weapon
-            and action.action_type == ActionType.attack
-            and action.weapon not in action_desc
+            parsed_action.weapon
+            and parsed_action.action_type == ActionType.attack
+            and parsed_action.weapon not in action_desc
         ):
-            action_desc = f"{action_desc} with {action.weapon}"
-        elif action.weapon and action.action_type == ActionType.spell:
-            action_desc = f"{action_desc} using {action.weapon}"
+            action_desc = f"{action_desc} with {parsed_action.weapon}"
+        elif parsed_action.weapon and parsed_action.action_type == ActionType.spell:
+            action_desc = f"{action_desc} using {parsed_action.weapon}"
 
         # Build the base scenario
         if not hit:
-            if action.action_type == ActionType.spell:
+            if parsed_action.action_type == ActionType.spell:
                 scenario = f"{actor} tries to cast {action_desc} against {target} but the magic fails."
-            elif action.action_type == ActionType.social:
+            elif parsed_action.action_type == ActionType.social:
                 scenario = f"{actor} attempts to {action_desc} with {target} but fails to persuade them."
             else:
                 scenario = f"{actor} tries to {action_desc} against {target} but misses completely."
         else:
             if (
-                action.action_type == ActionType.spell
+                parsed_action.action_type == ActionType.spell
             ):  # Will have to determine if spell type is an attack or not
                 if damage_type == "kill":
                     scenario = f"{actor} unleashes devastating {action_desc} magic that proves fatal to {target}."
@@ -245,14 +251,14 @@ class GGUFMistralNarrator(ActionNarrator):
                     scenario = (
                         f"{actor} successfully casts {action_desc} against {target}."
                     )
-            elif action.action_type == ActionType.social:
+            elif parsed_action.action_type == ActionType.social:
                 if damage_type == "outstanding_success":
                     scenario = f"{actor} completely wins over {target} with masterful {action_desc}."
                 elif damage_type == "great_success":
                     scenario = f"{actor} effectively convinces {target} through skilled {action_desc}."
                 else:
                     scenario = f"{actor} successfully uses {action_desc} to influence {target}."
-            elif action.action_type == ActionType.attack:
+            elif parsed_action.action_type == ActionType.attack:
                 if damage_type == "kill":
                     scenario = f"{actor} delivers a killing blow with {action_desc}, ending {target}'s life."
                 elif damage_type == "critical":
@@ -266,34 +272,42 @@ class GGUFMistralNarrator(ActionNarrator):
 
         # Add subject context if present
         subject_context = ""
-        if action.subject:
-            if action.action_type == ActionType.social:
-                subject_context = f" The topic is: {action.subject}."
-            elif action.action_type == ActionType.spell:
-                subject_context = f" The spell targets: {action.subject}."
+        if parsed_action.subject:
+            if parsed_action.action_type == ActionType.social:
+                subject_context = f" The topic is: {parsed_action.subject}."
+            elif parsed_action.action_type == ActionType.spell:
+                subject_context = f" The spell targets: {parsed_action.subject}."
             else:
-                subject_context = f" Context: {action.subject}."
+                subject_context = f" Context: {parsed_action.subject}."
 
         # Add details if present
         details_context = ""
-        if action.details:
-            details_context = f" Additional details: {action.details}."
+        if parsed_action.details:
+            details_context = f" Additional details: {parsed_action.details}."
 
         # Build the full prompt
         full_scenario = scenario + subject_context + details_context
 
         # Balanced prompt with contextual information
-        return f"""[INST] You are a skilled D&D dungeon master. 
-            Write exactly one vivid sentence describing this scene. 
-            Focus on sensory details and dynamic action. 
-            No game mechanics or generic terms like "player" or "character".
-            Use proper names if provided otherwise use pronouns.
-            Do not use names not given.
-            Speak in the third person.
+        return f"""[INST] <<SYS>>
+        You are a Dungeon Master generating narration for a single D&D action.
+        Rules:
+        - Use third person narration (e.g., "The rogue swings their blade...").
+        - Incorporate the action, actor, target, and outcome.
+        - Use proper names if provided, otherwise use role/pronoun.
+        - Keep it vivid and sensory, but concise (1–2 sentences).
+        - Do not mention dice, mechanics, or game terms like "roll", "DC", "success".
+        - Respect the scene context: only reference NPCs, items, or details actually given.
+        <</SYS>>
 
-            Scene: {full_scenario}
+        Scene context: {full_scenario}
 
-            One sentence description: [/INST]"""
+        Actor: {parsed_action.actor} ({parsed_action.actor_type})
+        Action: {parsed_action.action}
+        Target: {parsed_action.target or "None"}
+        Outcome: {"Hit" if hit else "Miss"} ({damage_type})
+
+        Narration: [/INST]"""
 
     def _create_scene_prompt(self, request: GenerateSceneRequest):
         """Create the prompt for scene description generation"""
@@ -336,7 +350,11 @@ class GGUFMistralNarrator(ActionNarrator):
         self, input: str, max_tokens: int = 200, temperature: float = 0.1
     ) -> str:
         try:
+            print("\033[93m[DEBUG]\033[0m Model:", self.model)
+            print("\033[93m[DEBUG]\033[0m Prompt length:", len(input))
+            
             # Generate with llama-cpp-python
+            self.model.reset()
             response = self.model(
                 input,
                 max_tokens=max_tokens,
@@ -354,8 +372,12 @@ class GGUFMistralNarrator(ActionNarrator):
 
             # Debug output
             if self.verbose or len(generated_text.strip()) < 5:
-                print(f"\033[93m[DEBUG]\033[0m Generated text: '{generated_text.strip()}'")
-                print(f"\033[93m[DEBUG]\033[0m Text length: {len(generated_text.strip())}")
+                print(
+                    f"\033[93m[DEBUG]\033[0m Generated text: '{generated_text.strip()}'"
+                )
+                print(
+                    f"\033[93m[DEBUG]\033[0m Text length: {len(generated_text.strip())}"
+                )
 
             return generated_text.strip()
 
