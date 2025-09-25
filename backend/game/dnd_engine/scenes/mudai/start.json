@@ -20,24 +20,44 @@
       {
         "id": "village_road",
         "label": "Main road deeper into village",
-        "target_scene": "village_road"
+        "target_scene": "village_road",
+        "blocked": { "active": false },
+        "locked": { "active": false }
       },
       {
         "id": "hill_path",
         "label": "Path back up the hill",
-        "target_scene": "hill_path"
+        "target_scene": "hill_path",
+        "blocked": { "active": false },
+        "locked": { "active": false }
       },
       {
         "id": "inn_entrance",
-        "label": "Enter the Spork Inn",
+        "label": "Entrance to the Spork Inn",
         "target_scene": "inn",
-        "is_locked": false
+        "blocked": { "active": false },
+        "locked": { "active": false }
       },
       {
         "id": "blacksmith_shop_entrance",
-        "label": "Enter the Rusty Nail",
+        "label": "Entrance to the Rusty Nail blacksmith shop",
         "target_scene": "blacksmith_shop",
-        "is_locked": false
+        "blocked": {
+          "active": true,
+          "reason": "The door is jammed shut.",
+          "can_unblock": {
+            "active": true,
+            "requirement": { "strength_dc": 18 }
+          }
+        },
+        "locked": {
+          "active": true,
+          "requirement": "blacksmith_key",
+          "can_lockpick": {
+            "active": true,
+            "requirement": { "dexterity_dc": 22 }
+          }
+        }
       }
     ],
 

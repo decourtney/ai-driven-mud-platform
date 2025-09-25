@@ -23,7 +23,7 @@ from backend.models import (
     GenerateSceneRequest,
     GeneratedNarration,
     HealthResponse,
-    ValidationResult,
+    GenerateInvalidActionRequest,
 )
 
 
@@ -253,8 +253,15 @@ class ModelServer:
                 )
 
         @app.post("/generate_invalid_action", response_model=GeneratedNarration)
-        def generate_invalid_action(request: ValidationResult):
+        def generate_invalid_action(request: GenerateInvalidActionRequest):
             """Generate narration of invalid user action... for flavor?"""
+            if not self.model_manager.is_narrator_ready():
+                # Try to auto-load
+                print("[MODEL] Narrator not ready, attempting to load...")
+                if not self.model_manager.load_all_models():
+                    raise HTTPException(
+                        status_code=503, detail="Narrator model not available"
+                    )
 
             try:
                 narration = self.model_manager.generate_invalid_action_narration(

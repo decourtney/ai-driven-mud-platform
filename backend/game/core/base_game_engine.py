@@ -15,6 +15,8 @@ from backend.models import (
     GeneratedNarration,
     TurnPhase,
     GenerateActionRequest,
+    StatusEffect,
+    GenerateInvalidActionRequest,
 )
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.game.core.game_session_manager import GameSessionManager
@@ -63,6 +65,7 @@ class BaseGameEngine(ABC):
 
         self.game_state = None
         self.player_state = None
+        self.npc_states: Dict[str, CharacterState] = {}
         self.is_processing = False
         self.max_invalid_attempts = kwargs.get("max_invalid_attempts", 3)
 
@@ -100,7 +103,7 @@ class BaseGameEngine(ABC):
             zone=self.player_state.current_zone,
         )
         print("\033[91m[DEBUG]\033[0m STARTING TURN AFTER LOADING GAME STATE")
-        asyncio.create_task(self.take_turn())
+        # asyncio.create_task(self.take_turn())
 
     def get_serialized_game_state(self) -> Tuple[Dict, Dict]:
         print("[DEBUG] RETURNING SERIALIZED GAME STATE")
@@ -191,70 +194,6 @@ class BaseGameEngine(ABC):
         await self.session_manager.save_scene_diff(scene_id, diff)
 
     # ----------------------------
-    # Abstract Action Validation
-    # ----------------------------
-    @abstractmethod
-    def validate_action(self, parsed_action: ParsedAction) -> ValidationResult:
-        """
-        Validate action against current game state and game rules.
-        Must be implemented by subclasses to define game-specific validation.
-        """
-        pass
-
-    # @abstractmethod
-    # def validate_action_constraints(
-    #     self, parsed_action: ParsedAction
-    # ) -> ValidationResult:
-    #     """
-    #     Validate action type specific constraints (weapons, spells, etc.).
-    #     Game-specific implementation required.
-    #     """
-    #     pass
-
-    def validate_scene_rules(self, parsed_action: ParsedAction) -> ValidationResult:
-        """
-        Validate against scene-specific rules.
-        Base implementation handles common scene rules, can be extended.
-        """
-        if not self.game_state:
-            return ValidationResult(False, "Game state not initialized")
-
-        scene_rules = self.game_state.scene.get("rules", {})
-
-        # Generic scene rule validations that most games might use
-        if scene_rules.get("no_actions", False):
-            return ValidationResult(
-                False, "No actions allowed in this area", "wait for the scene to change"
-            )
-
-        blocked_exits = scene_rules.get("blocked_exits", [])
-        if parsed_action.action_type == ActionType.movement:
-            direction = (
-                parsed_action.details.get("direction", "").lower()
-                if parsed_action.details
-                else ""
-            )
-            if direction in blocked_exits:
-                return ValidationResult(
-                    False,
-                    f"The {direction} exit is blocked",
-                    "try a different direction",
-                )
-
-        return ValidationResult(True)
-
-    # ----------------------------
-    # Abstract Game Condition Checking
-    # ----------------------------
-    @abstractmethod
-    def check_game_condition(self) -> GameCondition:
-        """
-        Check if game should continue, end in victory, or defeat.
-        Must be implemented by subclasses to define win/lose conditions.
-        """
-        pass
-
-    # ----------------------------
     # GAME ORCHESTRATION
     # ----------------------------
 
@@ -310,9 +249,9 @@ class BaseGameEngine(ABC):
         # TODO After narration determine next phase - Player / NPC / End Turn or Game Over
         await self.determine_next_phase()
         self.is_processing = False
-        
+
         asyncio.create_task(self.take_turn())
-        
+
     async def determine_next_phase(self):
         """Some method to determine next phase based on game state"""
         # run through simple logic for now
@@ -323,6 +262,11 @@ class BaseGameEngine(ABC):
     # Player Turn
     # --------------------------
     async def handle_player_turn(self):
+        """
+        This method unlocks the player input then
+        the engine waits for a provided input action
+        that triggers execute_player_action
+        """
         self.game_state.current_actor = "player"
         self.game_state.is_player_input_locked = False
         await self.session_manager.lock_player_input(
@@ -380,38 +324,6 @@ class BaseGameEngine(ABC):
         # Ready for next turn: start scene narration for next turn
         await self.take_turn()
 
-        # async def advance_turn_after_player(self):
-        #     """
-        #     Decide who acts next: another player, NPC, or narration
-        #     """
-        #     living_npcs = self.get_living_npcs()
-        #     if living_npcs:
-        #         self.game_state.current_turn_phase = TurnPhase.npc_turn
-        #         for npc in living_npcs:
-        #             self.game_state.current_actor = npc.name
-        #             npc_narration, condition = self.execute_single_npc_action(npc)
-        #             await self.session_manager.send_narration(npc_narration)
-
-        #             if condition != GameCondition.game_on:
-        #                 await self.session_manager.end_game(condition)
-        #                 return
-
-        #     # After NPCs, update scene
-        #     updated_scene, condition = await self.get_updated_scene_after_actions()
-        #     await self.session_manager.send_narration(updated_scene if isinstance(updated_scene, str) else updated_scene.narration)
-
-        #     if condition != GameCondition.game_on:
-        #         await self.session_manager.end_game(condition)
-        #         return
-
-        #     # Prepare for next player turn
-        #     self.game_state.current_turn_phase = TurnPhase.player_turn
-        #     self.game_state.current_actor = "player"
-        #     await self.session_manager.lock_player_input(
-        #         game_state_id=self.game_state.id,
-        #         is_locked=self.game_state.is_player_input_locked,
-        #     )
-
     async def execute_player_action(self, action: str):
         """
         Execute a complete player turn with validation loop.
@@ -425,21 +337,32 @@ class BaseGameEngine(ABC):
                 parsed_action = await self.model_client.parse_action(
                     ParseActionRequest(action=action, actor_type=CharacterType.player)
                 )
-                print("[DEBUG]Parsed Action:", parsed_action)
+                print("[DEBUG] Parsed Action:", parsed_action)
 
                 # Validate action
                 validation_result = self.validate_action(parsed_action)
-                print("[DEBUG]Validation Result:", validation_result)
+                print("[DEBUG] Validation Result:", validation_result)
 
+                # If invalid request narration of invalid action
                 if not validation_result.is_valid:
-                    invalid_attempts += 1
-                    error_narration = await self.model_client.generate_invalid_action(
-                        validation_result
+                    invalid_action_request = GenerateInvalidActionRequest(
+                        validation_result=validation_result, parsed_action=parsed_action
                     )
-                    return {
-                        "type": "error",
-                        "message": error_narration.narration,
-                    }, GameCondition.game_on
+                    result = await self.model_client.generate_invalid_action(
+                        invalid_action_request
+                    )
+
+                    invalid_action_result = ActionResult(
+                        parsed_action=parsed_action,
+                        action_type=parsed_action.action_type,
+                        hit=False,
+                        dice_roll=0,
+                        damage_type="failure",
+                        narration=result.narration,
+                        difficulty=0,
+                    )
+
+                    return invalid_action_result, self.player_state.to_dict()
 
                 # Execute valid action
                 action_result = await self.process_parsed_action(parsed_action)
@@ -513,6 +436,89 @@ class BaseGameEngine(ABC):
 
         except Exception as e:
             return f"Error updating scene: {str(e)}", GameCondition.game_over
+
+    # ----------------------------
+    # Abstract Action Validation
+    # ----------------------------
+
+    @abstractmethod
+    def validate_action(self, parsed_action: ParsedAction) -> ValidationResult:
+        """
+        Validate action against current game state and game rules.
+        Must be implemented by subclasses to define game-specific validation.
+        """
+        return
+
+    # def validate_movement(self, parsed_action: ParsedAction) -> ValidationResult:
+    #     """
+    #     Validate movement actions against scene rules.
+    #     Base implementation checks for blocked exits.
+    #     """
+    #     if not self.game_state:
+    #         return ValidationResult(False, "Game state not initialized")
+
+    #     # Get actor state
+    #     actor_state = self.get_actor_state(
+    #         actor_type=parsed_action.actor_type, actor_name=parsed_action.actor
+    #     )
+
+    #     self.player_state.add_status_effect(StatusEffect.stunned, duration=2, intensity=1, source="fear")
+
+    #     # Check if actor can move TODO: expand with status effects, conditions, etc.
+    #     if not actor_state.can_move():
+    #         return ValidationResult(
+    #             False,
+    #             f"{parsed_action.actor} cannot move due to current status effects.",
+    #             "wait until you can move again",
+    #         )
+
+    #     # check if exit exists
+
+    #     return ValidationResult(True)
+
+    def validate_scene_rules(self, parsed_action: ParsedAction) -> ValidationResult:
+        """
+        Validate against scene-specific rules.
+        Base implementation handles common scene rules, can be extended.
+        """
+        if not self.game_state:
+            return ValidationResult(False, "Game state not initialized")
+
+        scene_rules = self.game_state.scene.get("rules", {})
+
+        # Generic scene rule validations that most games might use
+        if scene_rules.get("no_actions", False):
+            return ValidationResult(
+                False, "No actions allowed in this area", "wait for the scene to change"
+            )
+
+        blocked_exits = scene_rules.get("blocked_exits", [])
+        if parsed_action.action_type == ActionType.movement:
+            direction = (
+                parsed_action.details.get("direction", "").lower()
+                if parsed_action.details
+                else ""
+            )
+            if direction in blocked_exits:
+                return ValidationResult(
+                    False,
+                    f"The {direction} exit is blocked",
+                    "try a different direction",
+                )
+
+        return ValidationResult(True)
+
+    # ----------------------------
+    # Abstract Game Condition Checking
+    # ----------------------------
+
+    @abstractmethod
+    def check_game_condition(self) -> GameCondition:
+        """
+        Check if game should continue, end in victory, or defeat.
+        Must be implemented by subclasses to define win/lose conditions.
+        """
+        pass
 
     # ----------------------------
     # Abstract AI Decision Making
@@ -597,7 +603,9 @@ class BaseGameEngine(ABC):
         modifiers = {}
 
         # Base modifiers that most games might use
-        actor_state = self.get_actor_state(parsed_action.actor)
+        actor_state = self.get_actor_state(
+            actor_type=parsed_action.actor_type, actor_name=parsed_action.actor
+        )
 
         if hasattr(actor_state, "get_action_bonus"):
             modifiers["modifier"] = actor_state.get_action_bonus(
@@ -631,13 +639,13 @@ class BaseGameEngine(ABC):
         """
         pass
 
-    def get_actor_state(self, actor_name: str):
+    def get_actor_state(self, actor_type: CharacterType, actor_name: str):
         """Helper to get actor state from game state"""
         # This wont work well using player name - should use character_type
-        if actor_name == "player":
+        if actor_type.value == "player":
             return self.player_state
         else:
-            return self.game_state.get_npc_by_name(actor_name)
+            return self.npc_states.get(actor_name, None)
 
     def on_action_processed(self, result: ActionResult, dice_result):
         """

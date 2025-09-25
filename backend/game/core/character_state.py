@@ -208,6 +208,20 @@ class CharacterState:
         )
         print("-----------------------------------")
 
+    def can_move(self) -> bool:
+        """Check if character can move"""
+        for instance in self.status_effects:
+            if instance.effect in {
+                StatusEffect.paralyzed,
+                StatusEffect.stunned,
+                StatusEffect.unconscious,
+                StatusEffect.grappled,
+                StatusEffect.restrained,
+                StatusEffect.incapaciatated,
+            }:
+                return False
+        pass
+
     # ------------------------------
     # Health management
     # ------------------------------
@@ -227,7 +241,7 @@ class CharacterState:
         if actual_damage > 0:
             self.current_hp = max(0, self.current_hp - actual_damage)
 
-        self.last_updated = datetime.now(timezone.utc)
+        # self.last_updated = datetime.now(timezone.utc)
 
         # Check for unconsciousness
         # if self.current_hp <= 0 and not self.has_status(StatusEffect.UNCONSCIOUS):
@@ -248,13 +262,13 @@ class CharacterState:
         if self.current_hp > 0:
             self.remove_status_effect(StatusEffect.UNCONSCIOUS)
 
-        self.last_updated = datetime.now(timezone.utc)
+        # self.last_updated = datetime.now(timezone.utc)
         return actual_healing
 
     def add_temporary_hp(self, amount: int):
         """Add temporary hit points (don't stack, take higher value)"""
         self.temporary_hp = max(self.temporary_hp, amount)
-        self.last_updated = datetime.now(timezone.utc)
+        # self.last_updated = datetime.now(timezone.utc)
 
     # ------------------------------
     # Status effect management
@@ -286,12 +300,12 @@ class CharacterState:
             effect=effect, duration=duration, intensity=intensity, source=source
         )
         self.status_effects.append(effect_instance)
-        self.last_updated = datetime.now(timezone.utc)
+        # self.last_updated = datetime.now(timezone.utc)
 
     def remove_status_effect(self, effect: StatusEffect):
         """Remove a status effect"""
         self.status_effects = [se for se in self.status_effects if se.effect != effect]
-        self.last_updated = datetime.now(timezone.utc)
+        # self.last_updated = datetime.now(timezone.utc)
 
     def update_status_effects(self):
         """Update status effect durations (call at end of turn)"""
@@ -365,7 +379,7 @@ class CharacterState:
         if weapon in self.inventory:
             self.inventory.remove(weapon)
 
-        self.last_updated = datetime.now(timezone.utc)
+        # self.last_updated = datetime.now(timezone.utc)
         return True
 
     def equip_armor(self, armor: Item) -> bool:
@@ -387,20 +401,20 @@ class CharacterState:
                 "dexterity"
             )
 
-        self.last_updated = datetime.now(timezone.utc)
+        # self.last_updated = datetime.now(timezone.utc)
         return True
 
     def add_item(self, item: Item):
         """Add item to inventory"""
         self.inventory.append(item)
-        self.last_updated = datetime.now(timezone.utc)
+        # self.last_updated = datetime.now(timezone.utc)
 
     def remove_item(self, item_name: str) -> Optional[Item]:
         """Remove item from inventory by name"""
         for item in self.inventory:
             if item.name.lower() == item_name.lower():
                 self.inventory.remove(item)
-                self.last_updated = datetime.now(timezone.utc)
+                # self.last_updated = datetime.now(timezone.utc)
                 return item
         return None
 
@@ -411,7 +425,7 @@ class CharacterState:
         """Learn a new spell"""
         if spell not in self.known_spells:
             self.known_spells.append(spell)
-            self.last_updated = datetime.now(timezone.utc)
+            # self.last_updated = datetime.now(timezone.utc)
 
     def can_cast_spell(self, spell: Spell) -> bool:
         """Check if character can cast a specific spell"""
@@ -431,7 +445,7 @@ class CharacterState:
         self.spell_slots[spell.level] -= 1
         self.current_mp = max(0, self.current_mp - 1)
 
-        self.last_updated = datetime.now(timezone.utc)
+        # self.last_updated = datetime.now(timezone.utc)
         return True
 
     # ------------------------------
@@ -466,7 +480,7 @@ class CharacterState:
         elif ability.lower() == "charisma":
             self.charisma = value
 
-        self.last_updated = datetime.now(timezone.utc)
+        # self.last_updated = datetime.now(timezone.utc)
 
     # ------------------------------
     # Action result processing
@@ -492,7 +506,7 @@ class CharacterState:
         if self.current_hp <= 0 and result.damage_type != DamageType.kill:
             result.damage_type = DamageType.kill
 
-        self.last_updated = datetime.now(timezone.utc)
+        # self.last_updated = datetime.now(timezone.utc)
 
     def _calculate_damage_from_result(self, result: ActionResult) -> int:
         """Calculate damage from action result"""
@@ -945,53 +959,3 @@ class CharacterState:
                 continue
 
         return items
-
-    def add_status_effect(self, effect, duration, intensity=1, source=""):
-        """Add a status effect (placeholder - implement based on your StatusEffect class)"""
-        # This is a placeholder - replace with your actual implementation
-        if not hasattr(self, "status_effects"):
-            self.status_effects = []
-
-        # Your status effect logic here
-        pass
-
-
-# # Mock classes for testing - replace with your actual classes
-# class StatusEffect:
-#     def __init__(self, effect):
-#         self.effect = effect
-#         self.duration = 0
-#         self.intensity = 1
-#         self.source = ""
-
-
-# class Item:
-#     def __init__(self, name="Unknown Item"):
-#         self.name = name
-#         self.id = name
-#         self.item_type = "misc"
-#         self.description = ""
-#         self.damage_dice = ""
-#         self.armor_class = 0
-#         self.gold_value = 0
-#         self.weight = 0
-
-#     def to_dict(self):
-#         return {
-#             "name": self.name,
-#             "id": self.id,
-#             "item_type": self.item_type,
-#             "description": self.description,
-#             "damage_dice": self.damage_dice,
-#             "armor_class": self.armor_class,
-#             "gold_value": self.gold_value,
-#             "weight": self.weight,
-#         }
-
-#     @classmethod
-#     def from_dict(cls, data):
-#         item = cls(data.get("name", "Unknown"))
-#         for key, value in data.items():
-#             if hasattr(item, key):
-#                 setattr(item, key, value)
-#         return item

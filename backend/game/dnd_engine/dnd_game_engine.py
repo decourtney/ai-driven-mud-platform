@@ -8,6 +8,7 @@ from backend.models import (
     DamageType,
     GameCondition,
     ValidationResult,
+    StatusEffect,
 )
 from backend.game.core.character_state import CharacterState
 from backend.game.core.game_state import GameState
@@ -113,6 +114,7 @@ class DnDGameEngine(BaseGameEngine):
                     is_valid=False, reason=f"{parsed_action.actor} is dead."
                 )
 
+        # Dynamic dispatch to specific validator
         method_name = f"validate_{parsed_action.action_type.value}_constraints"
         validator = getattr(self, method_name, None)
 
@@ -122,7 +124,7 @@ class DnDGameEngine(BaseGameEngine):
                 reason=f"No validator for {parsed_action.action_type.value}",
             )
 
-        return validator()
+        return validator(parsed_action)
 
     def validate_attack_constraints(self):
         return ValidationResult(is_valid=True)
@@ -133,7 +135,38 @@ class DnDGameEngine(BaseGameEngine):
     def validate_social_constraints(self):
         return ValidationResult(is_valid=True)
 
-    def validate_movement_constraints(self):
+    def validate_movement_constraints(
+        self, parsed_action: ParsedAction
+    ) -> ValidationResult:
+        """
+        Validate movement actions against scene rules.
+        Base implementation checks for blocked exits.
+        """
+        if not self.game_state:
+            return ValidationResult(False, "Game state not initialized")
+
+        # Get actor state
+        actor_state = self.get_actor_state(
+            actor_type=parsed_action.actor_type, actor_name=parsed_action.actor
+        )
+
+        # Testing purposes only: add stunned status effect
+        # actor_state.add_status_effect(
+        #     effect=StatusEffect.stunned, duration=2, intensity=1, source="fear"
+        # )
+
+        # Check if actor can move TODO: expand with status effects, conditions, etc.
+        if not actor_state.can_move():
+            print("\033[91m[DEBUG]\033[0m Actor cannot move due to status effects")
+            return ValidationResult(
+                is_valid=False,
+                reason=f"{parsed_action.actor} cannot move due to current status effects.",
+                suggested_action="wait until you can move again",
+            )
+
+        # check if exit exists
+        
+
         return ValidationResult(is_valid=True)
 
     def validate_interact_constraints(self):

@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional, Set
 from prisma import Json
 from datetime import datetime, timezone
 from backend.game.core.character_state import CharacterState
-from backend.models import Scene, TurnPhase
+from backend.scene_models import Scene
 
 logger = logging.getLogger(__name__)
 

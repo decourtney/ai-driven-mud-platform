@@ -171,15 +171,15 @@ class GameSessionManager:
         await prisma.gamesession.update(
             where={"id": session_id}, data={"is_active": False}
         )
-        
+
         await prisma.gamestate.update(
             where={"id": game_state["id"]}, data=game_state
         )
-        
+
         await prisma.playerstate.update(
             where={"id": player_state["id"]}, data=player_state
         )
-        
+
         return
 
     async def save_player_state(self, player_state: Dict[str, Any]):
@@ -223,16 +223,17 @@ class GameSessionManager:
         """
         Process player action and send results via WebSocket
         """
-        asyncio.create_task(
-            self.lock_player_input(is_locked=True, session_id=session_id)
-        )
-
         try:
             # Ensure engine is loaded and get it directly
             engine_id, engine = await self.ensure_engine_exists(
                 game_id, session_id, user_id
             )
             logger.info(f"Engine {engine_id} ready for session {session_id}")
+
+            # Lock player input to prevent concurrent actions - comment out for testing input
+            asyncio.create_task(
+                self.lock_player_input(is_locked=True, session_id=session_id)
+            )
 
             # Send immediate acknowledgment
             if hasattr(self, "connection_manager"):
@@ -255,7 +256,6 @@ class GameSessionManager:
             asyncio.create_task(
                 self.send_message_to_session(session_id=session_id, message=message)
             )
-
 
             action_result, player_state = await engine.execute_player_action(action)
             print("[DEBUG] action result in session manager", action_result)
@@ -341,7 +341,7 @@ class GameSessionManager:
         game_state_id: Optional[str] = None,
     ):
         session = None
-            
+
         if game_state_id:
             session = await prisma.gamesession.find_first(
                 where={"game_state": {"id": game_state_id}}

@@ -5,7 +5,7 @@ from typing import Optional, Dict, List, Any
 from backend.game.core.interfaces import ActionParser, ActionNarrator
 from backend.models import (
     ParsedAction,
-    ValidationResult,
+    GenerateInvalidActionRequest,
     GenerateSceneRequest,
     ParseActionRequest,
     GenerateActionRequest,
@@ -97,14 +97,13 @@ class ModelManager:
         return self.narrator.generate_scene_narration(request)
 
     def generate_invalid_action_narration(
-        self, validation_result: ValidationResult
+        self, request: GenerateInvalidActionRequest
     ) -> str:
         """Generate narration for invalid action"""
         if not self.is_narrator_ready():
             if not self.load_all_models():
                 raise RuntimeError("Failed to load models")
-        return "Invalid action"  # Temporary placeholder
-        return self.narrator.generate_invalid_action_narration(validation_result)
+        return self.narrator.generate_invalid_action_narration(request)
 
     def get_memory_usage(self) -> dict:
         """Get current GPU memory usage"""
