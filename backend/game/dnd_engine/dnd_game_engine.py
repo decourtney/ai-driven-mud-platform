@@ -1,5 +1,7 @@
 # Example D&D-specific implementation
-from typing import Optional, Callable
+import re
+from difflib import SequenceMatcher
+from typing import Optional, Callable, Any
 from pathlib import Path
 from backend.game.core.base_game_engine import BaseGameEngine
 from backend.models import (
@@ -10,6 +12,7 @@ from backend.models import (
     ValidationResult,
     StatusEffect,
 )
+from backend.scene_models import Exit
 from backend.game.core.character_state import CharacterState
 from backend.game.core.game_state import GameState
 from backend.game.core.dice_system import DiceRollerFactory, BaseDiceRoller
@@ -126,13 +129,13 @@ class DnDGameEngine(BaseGameEngine):
 
         return validator(parsed_action)
 
-    def validate_attack_constraints(self):
+    def validate_attack_constraints(self, parsed_action: ParsedAction) -> ValidationResult:
         return ValidationResult(is_valid=True)
 
-    def validate_spell_constraints(self):
+    def validate_spell_constraints(self, parsed_action: ParsedAction) -> ValidationResult:
         return ValidationResult(is_valid=True)
 
-    def validate_social_constraints(self):
+    def validate_social_constraints(self, parsed_action: ParsedAction) -> ValidationResult:
         return ValidationResult(is_valid=True)
 
     def validate_movement_constraints(
@@ -165,12 +168,90 @@ class DnDGameEngine(BaseGameEngine):
             )
 
         # check if exit exists
-        
+        # fuzzy_exit = self.best_exit_match_fuzzy(
+        #     parsed_action=parsed_action, scene_exits=self.game_state.loaded_scene.exits
+        # )
+        # print("\033[93m[DEBUG]\033[0m Validating movement to fuzzy exit:", fuzzy_exit)
+        # token_exit = self.best_exit_match_tokens(
+        #     parsed_action=parsed_action, scene_exits=self.game_state.loaded_scene.exits
+        # )
+        # print("\033[93m[DEBUG]\033[0m Validating movement to token exit:", token_exit)
 
         return ValidationResult(is_valid=True)
 
-    def validate_interact_constraints(self):
+    def validate_interact_constraints(sel, parsed_action: ParsedAction) -> ValidationResult:
         return ValidationResult(is_valid=True)
+
+    def normalize_string(self, text: Any) -> list[str]:
+        """Lowercase, remove punctuation, split into words, remove stopwords."""
+        STOPWORDS = {"to", "the", "a", "an", "run", "walk", "go", "move", "goto"}
+
+        if text is None:
+            return []
+        if isinstance(text, list):
+            # flatten list of tokens into string
+            text = " ".join(map(str, text))
+        elif not isinstance(text, str):
+            # coerce anything else (e.g. int, dict) to string
+            text = str(text)
+
+        text = re.sub(r"[^\w\s]", "", text.lower())
+        words = text.split()
+        return [w for w in words if w not in STOPWORDS]
+
+    # -------------------------------------------------------------------------------------------------------
+    # -------------------------------------------------------------------------------------------------------
+
+    def best_exit_match_fuzzy(
+        self, parsed_action: ParsedAction, scene_exits: list[Exit]
+    ):
+        candidates = [parsed_action.action, parsed_action.target, parsed_action.subject]
+        candidates = [c for c in candidates if c]
+
+        best_match, best_score = None, 0.0
+        for exit in scene_exits:
+            exit_text = f"{exit.label} {exit.target_scene}".lower()
+            for candidate in candidates:
+                score = SequenceMatcher(
+                    None,
+                    self.normalize_string(candidate),
+                    # candidate,
+                    self.normalize_string(exit_text),
+                    # exit_text,
+                ).ratio()
+                if score > best_score:
+                    best_match, best_score = exit, score
+
+        # tune threshold (0.5–0.7 works well)
+        return best_match if best_score > 0.6 else None
+
+    # -------------------------------------------------------------------------------------------------------
+    # -------------------------------------------------------------------------------------------------------
+
+    def token_similarity(self, a: str, b: str) -> float:
+        set_a, set_b = set(self.normalize_string(a)), set(self.normalize_string(b))
+        # set_a, set_b = set(a.lower().split()), set(b.lower().split())
+        return len(set_a & set_b) / len(set_a | set_b) if set_a or set_b else 0.0
+
+    def best_exit_match_tokens(
+        self, parsed_action: ParsedAction, scene_exits: list[Exit]
+    ):
+        candidates = [parsed_action.action, parsed_action.target, parsed_action.subject]
+        candidates = [c for c in candidates if c]
+
+        best_match, best_score = None, 0.0
+        for exit in scene_exits:
+            exit_text = f"{exit.label} {exit.target_scene}"
+            for candidate in candidates:
+                score = self.token_similarity(candidate, exit_text)
+                if score > best_score:
+                    best_match, best_score = exit, score
+
+        # tune threshold (0.3–0.5 is usually enough)
+        return best_match if best_score > 0.3 else None
+
+    # -------------------------------------------------------------------------------------------------------
+    # -------------------------------------------------------------------------------------------------------
 
     # def validate_action_constraints(
     #     self, parsed_action: ParsedAction

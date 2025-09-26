@@ -17,6 +17,8 @@ from backend.models import (
     GeneratedNarration,
     ParsedAction,
     GenerateInvalidActionRequest,
+    SceneExitRequest,
+    SceneExitResult
 )
 
 
@@ -216,6 +218,30 @@ class AsyncModelServiceClient:
         except Exception as e:
             print(f"[CLIENT] Parse request failed: {e}")
             return ParsedAction(action_type="unknown", details=str(e))
+        
+    async def determine_scene_exit(self, request: SceneExitRequest)-> SceneExitResult:
+        try:
+            response = await self.client.post(
+                f"{self.base_url}/determine_scene_exit",
+                content=request.model_dump_json(),
+                headers={"Content-Type": "application/json"},
+            )
+            response.raise_for_status()
+
+            result_dict = response.json()
+            return SceneExitResult(**result_dict)
+
+        except httpx.HTTPError as http_err:
+            try:
+                error_detail = response.json().get("detail", str(http_err))
+            except Exception:
+                error_detail = str(http_err)
+            print(f"[CLIENT] Scene exit determination request failed: {error_detail}")
+            return SceneExitResult(target_scene="unknown")
+
+        except Exception as e:
+            print(f"[CLIENT] Scene exit determination request failed: {e}")
+            return SceneExitResult(target_scene="unknown")
 
     async def generate_action(
         self, request: GenerateActionRequest

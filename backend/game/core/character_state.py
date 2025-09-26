@@ -220,7 +220,7 @@ class CharacterState:
                 StatusEffect.incapaciatated,
             }:
                 return False
-        pass
+        return True
 
     # ------------------------------
     # Health management

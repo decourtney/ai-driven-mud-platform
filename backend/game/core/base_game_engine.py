@@ -18,6 +18,7 @@ from backend.models import (
     StatusEffect,
     GenerateInvalidActionRequest,
 )
+from backend.scene_models import Scene, Exit
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.game.core.game_session_manager import GameSessionManager
 from backend.game.core.dice_system import BaseDiceRoller
@@ -449,65 +450,6 @@ class BaseGameEngine(ABC):
         """
         return
 
-    # def validate_movement(self, parsed_action: ParsedAction) -> ValidationResult:
-    #     """
-    #     Validate movement actions against scene rules.
-    #     Base implementation checks for blocked exits.
-    #     """
-    #     if not self.game_state:
-    #         return ValidationResult(False, "Game state not initialized")
-
-    #     # Get actor state
-    #     actor_state = self.get_actor_state(
-    #         actor_type=parsed_action.actor_type, actor_name=parsed_action.actor
-    #     )
-
-    #     self.player_state.add_status_effect(StatusEffect.stunned, duration=2, intensity=1, source="fear")
-
-    #     # Check if actor can move TODO: expand with status effects, conditions, etc.
-    #     if not actor_state.can_move():
-    #         return ValidationResult(
-    #             False,
-    #             f"{parsed_action.actor} cannot move due to current status effects.",
-    #             "wait until you can move again",
-    #         )
-
-    #     # check if exit exists
-
-    #     return ValidationResult(True)
-
-    def validate_scene_rules(self, parsed_action: ParsedAction) -> ValidationResult:
-        """
-        Validate against scene-specific rules.
-        Base implementation handles common scene rules, can be extended.
-        """
-        if not self.game_state:
-            return ValidationResult(False, "Game state not initialized")
-
-        scene_rules = self.game_state.scene.get("rules", {})
-
-        # Generic scene rule validations that most games might use
-        if scene_rules.get("no_actions", False):
-            return ValidationResult(
-                False, "No actions allowed in this area", "wait for the scene to change"
-            )
-
-        blocked_exits = scene_rules.get("blocked_exits", [])
-        if parsed_action.action_type == ActionType.movement:
-            direction = (
-                parsed_action.details.get("direction", "").lower()
-                if parsed_action.details
-                else ""
-            )
-            if direction in blocked_exits:
-                return ValidationResult(
-                    False,
-                    f"The {direction} exit is blocked",
-                    "try a different direction",
-                )
-
-        return ValidationResult(True)
-
     # ----------------------------
     # Abstract Game Condition Checking
     # ----------------------------
@@ -541,6 +483,11 @@ class BaseGameEngine(ABC):
         """
         if not await self.model_client.is_narrator_ready():
             raise RuntimeError("Narrator not loaded")
+        
+        # TODO: handle movement actions differently
+        if parsed_action.action_type == ActionType.movement:
+            # Handle movement actions separately     
+            pass
 
         difficulty = self.get_action_difficulty(
             action_type=parsed_action.action_type, context=self.game_state

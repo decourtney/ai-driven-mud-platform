@@ -24,6 +24,8 @@ from backend.models import (
     GeneratedNarration,
     HealthResponse,
     GenerateInvalidActionRequest,
+    SceneExitRequest,
+    SceneExitResult
 )
 
 
@@ -209,6 +211,23 @@ class ModelServer:
 
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Parse failed: {e}")
+            
+        @app.post("/determine_scene_exit", response_model=SceneExitResult)
+        def determine_scene_exit(request: SceneExitRequest = Body(...)):
+            """Determine which scene exit the player intends to use"""
+
+            if not self.model_manager.is_parser_ready():
+                # Try to auto-load
+                print("[MODEL] Parser not ready, attempting to load...")
+                if not self.model_manager.load_all_models():
+                    raise HTTPException(
+                        status_code=503, detail="Parser model not available"
+                    )
+            try:
+                return self.model_manager.determine_scene_exit(request)
+
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Determine scene exit failed: {e}")
 
         @app.post("/generate_action", response_model=GeneratedNarration)
         def generate_action_narration(request: GenerateActionRequest):

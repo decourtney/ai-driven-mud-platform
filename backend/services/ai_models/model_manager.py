@@ -9,6 +9,8 @@ from backend.models import (
     GenerateSceneRequest,
     ParseActionRequest,
     GenerateActionRequest,
+    SceneExitRequest,
+    SceneExitResult
 )
 from backend.game.parsers.action_parser.codellama_parser import CodeLlamaParser
 from backend.game.parsers.narrator_parser.mistral_narrator import GGUFMistralNarrator
@@ -80,6 +82,13 @@ class ModelManager:
             if not self.load_all_models():
                 raise RuntimeError("Failed to load models")
         return self.parser.parse_action(request)
+    
+    def determine_scene_exit(self, request: SceneExitRequest) -> SceneExitResult:
+        """Determine scene exit based on action and available exits"""
+        if not self.is_parser_ready():
+            if not self.load_all_models():
+                raise RuntimeError("Failed to load models")
+        return self.parser.determine_scene_exit(request)
 
     # change this signature to accept request: GenerateActionRequest then adjust model
     def generate_action_narration(self, request: GenerateActionRequest) -> str:

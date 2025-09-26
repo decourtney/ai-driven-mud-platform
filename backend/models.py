@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from enum import Enum
 from dataclasses import dataclass, field
+from backend.scene_models import Exit
 
 
 class CharacterType(Enum):
@@ -101,6 +102,10 @@ class ActionResult(BaseModel):
     difficulty: Optional[int] = None
 
 
+class SceneExitResult(BaseModel):
+    target_scene: str
+
+
 class ValidationResult(BaseModel):
     is_valid: bool
     reason: Optional[str] = None
@@ -122,6 +127,11 @@ class GameContext(BaseModel):
 class ParseActionRequest(BaseModel):
     action: str
     actor_type: CharacterType
+
+
+class SceneExitRequest(BaseModel):
+    action: str
+    scene_exits: List[Exit]
 
 
 class GenerateActionRequest(BaseModel):
