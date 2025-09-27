@@ -98,9 +98,11 @@ class SceneManager:
         if zone and self.loaded_zone != zone:
             await self.load_zone(zone)
         if scene_id not in self.loaded_scenes:
-            raise KeyError(f"Scene {scene_id} not found in zone {zone}")
+            raise KeyError(
+                f"\033[91m[DEBUG]\033[0mScene {scene_id} not found in zone {zone}"
+            )
 
-        # TODO: need to add diff process here before returning scene
+        # TODO: need to add getting diff process here before returning scene
         return self.loaded_scenes[scene_id]
 
     def move_to_scene(self, current_scene: Scene, exit_id: str) -> Scene:

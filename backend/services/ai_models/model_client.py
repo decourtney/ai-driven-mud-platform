@@ -26,7 +26,7 @@ class AsyncModelServiceClient:
     """Async version of model service client"""
 
     def __init__(
-        self, model_service_url: str = "http://localhost:8001", timeout: float = 30.0
+        self, model_service_url: str = "http://localhost:8001", timeout: float = 45.0
     ):
         self.base_url = model_service_url.rstrip("/")
         self.timeout = timeout

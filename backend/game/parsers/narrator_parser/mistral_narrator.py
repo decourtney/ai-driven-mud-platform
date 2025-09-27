@@ -398,7 +398,7 @@ class GGUFMistralNarrator(ActionNarrator):
             )
 
             if self.verbose:
-                print(f"\033[93m[DEBUG]\033[0m Raw: '{raw_text}'")
+                # print(f"\033[93m[DEBUG]\033[0m Raw: '{raw_text}'")
                 print(f"\033[93m[DEBUG]\033[0m Cleaned: '{cleaned}'")
 
             return cleaned
@@ -472,9 +472,9 @@ class GGUFMistralNarrator(ActionNarrator):
 
             # Debug output
             if self.verbose or len(generated_text.strip()) < 5:
-                print(
-                    f"\033[93m[DEBUG]\033[0m Generated text: '{generated_text.strip()}'"
-                )
+                # print(
+                #     f"\033[93m[DEBUG]\033[0m Generated text: '{generated_text.strip()}'"
+                # )
                 print(
                     f"\033[93m[DEBUG]\033[0m Text length: {len(generated_text.strip())}"
                 )

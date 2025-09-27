@@ -8,7 +8,13 @@ import re
 import json
 import gc
 from difflib import SequenceMatcher
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from transformers import (
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    BitsAndBytesConfig,
+    StoppingCriteria,
+    StoppingCriteriaList,
+)
 from typing import Dict, Optional
 from backend.game.core.interfaces import ActionParser
 from backend.models import (
@@ -20,6 +26,20 @@ from backend.models import (
 )
 from backend.scene_models import Exit
 from .fallback_parser import FallbackParser
+
+class StopOnStrings(StoppingCriteria):
+    def __init__(self, stop_strings, tokenizer):
+        self.tokenizer = tokenizer
+        self.stop_sequences = [
+            tokenizer(s, return_tensors="pt").input_ids.squeeze() for s in stop_strings
+        ]
+
+    def __call__(self, input_ids, scores, **kwargs):
+        for stop_seq in self.stop_sequences:
+            if len(input_ids[0]) >= len(stop_seq):
+                if input_ids[0, -len(stop_seq):].tolist() == stop_seq.tolist():
+                    return True
+        return False
 
 
 class CodeLlamaParser(ActionParser):
@@ -126,51 +146,6 @@ class CodeLlamaParser(ActionParser):
             print(f"[DEBUG] Cleaned input: '{cleaned_input}'")
 
             response = self.generate_from_model(prompt)
-            # # Tokenize and generate
-            # inputs = self.tokenizer(
-            #     prompt,
-            #     return_tensors="pt",
-            #     max_length=1024,
-            #     truncation=True,
-            #     padding=True,
-            # )
-
-            # # Move ALL inputs to the same device as model
-            # if self.device == "cuda":
-            #     inputs = {k: v.to(self.device) for k, v in inputs.items()}
-
-            # print("[DEBUG] About to generate with model")
-            # with torch.no_grad():
-            #     try:
-            #         outputs = self.model.generate(
-            #             **inputs,
-            #             max_new_tokens=80,
-            #             do_sample=False,
-            #             pad_token_id=self.tokenizer.eos_token_id,
-            #             eos_token_id=self.tokenizer.eos_token_id,
-            #             tokenizer=self.tokenizer,
-            #             stop_strings=[
-            #                 "\n\nInput:",
-            #                 "Input:",
-            #                 "\n\n",
-            #                 "Output:",
-            #                 "\nInput",
-            #             ],
-            #         )
-            #     except:
-            #         print("[DEBUG] Using fallback generation (no stop_strings)")
-            #         outputs = self.model.generate(
-            #             **inputs,
-            #             max_new_tokens=80,
-            #             do_sample=False,
-            #             pad_token_id=self.tokenizer.eos_token_id,
-            #             eos_token_id=self.tokenizer.eos_token_id,
-            #         )
-
-            # # Decode response
-            # response = self.tokenizer.decode(
-            #     outputs[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True
-            # ).strip()
             print(f"[DEBUG] Model response: '{response}'")
 
             # Parse the response
@@ -237,7 +212,7 @@ class CodeLlamaParser(ActionParser):
             "weapon": null,
             "subject": null,
             "details": null
-            }
+            }===END===
 
             Input: "I swing my sword at the goblin"
             Output: {
@@ -248,7 +223,7 @@ class CodeLlamaParser(ActionParser):
             "weapon": "sword",
             "subject": null,
             "details": null
-            }
+            }===ENB===
             """
 
         return f"""{system_prompt}
@@ -256,6 +231,7 @@ class CodeLlamaParser(ActionParser):
         Input: "{action}"
         Output: """
 
+    # NOTE: May need to adjust generation parameters for best results
     def generate_from_model(self, prompt: str, max_tokens=80) -> str:
         inputs = self.tokenizer(
             prompt,
@@ -266,19 +242,39 @@ class CodeLlamaParser(ActionParser):
         )
         if self.device == "cuda":
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+        stopping_criteria = self.make_stop_criteria(["===END==="], self.tokenizer)
+
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
                 max_new_tokens=max_tokens,
-                do_sample=True, 
+                do_sample=True,
                 temperature=0.1,
                 top_p=0.9,
+                # top_k=50,
+                # repetition_penalty=1.2,
+                # length_penalty=1.0,
                 pad_token_id=self.tokenizer.eos_token_id,
                 eos_token_id=self.tokenizer.eos_token_id,
+                stopping_criteria=stopping_criteria,
             )
-        return self.tokenizer.decode(
+
+        decoded = self.tokenizer.decode(
             outputs[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True
         ).strip()
+
+        stop_strings = ["===END==="]  # or however many you use
+        for stop in stop_strings:
+            idx = decoded.find(stop)
+            if idx != -1:
+                decoded = decoded[:idx].strip()
+                break
+            
+        return decoded
+
+    def make_stop_criteria(self, stop_strings, tokenizer):
+        return StoppingCriteriaList([StopOnStrings(stop_strings, tokenizer)])
 
     def parse_llama_response(
         self, response: str, original_input: str
@@ -368,31 +364,14 @@ class CodeLlamaParser(ActionParser):
     # Scene exit determination methods
     # -------------------------------------------------------------------------------------------
 
-    def normalize_string(self, text: str) -> list[str]:
-        """Lowercase, remove punctuation, split into words, remove stopwords."""
-        STOPWORDS = {"to", "the", "a", "an", "run", "walk", "go", "move", "goto"}
-        text = re.sub(r"[^\w\s]", "", text.lower())
-        words = text.split()
-        return [w for w in words if w not in STOPWORDS]
-
-    def token_similarity(self, a: str, b: str) -> float:
-        set_a = set(self.normalize_string(a))
-        set_b = set(self.normalize_string(b))
-        return len(set_a & set_b) / len(set_a | set_b) if set_a or set_b else 0.0
-
-    def sequence_similarity(self, a: str, b: str) -> float:
-        """Fallback: fuzzy string ratio."""
-        return SequenceMatcher(None, a.lower(), b.lower()).ratio()
-
     def determine_scene_exit(self, request: SceneExitRequest) -> SceneExitResult:
         if not self.is_loaded():
             raise RuntimeError("CodeLlama parser not loaded")
 
-        cleaned_input = request.action.strip()
+        cleaned_input = request.target.strip()
         prompt = self.create_scene_exit_prompt(cleaned_input, request.scene_exits)
 
-        response = self.generate_from_model(prompt).strip()
-        response = response.strip("`").strip().lower()  # clean triple backticks if present
+        response = self.generate_from_model(prompt).strip("`").strip()
 
         chosen = response if response != "" else "none"
         print("\033[91m[DEBUG]\033[0m Model chose exit ID:", chosen)
@@ -411,7 +390,7 @@ class CodeLlamaParser(ActionParser):
             print(
                 f"[DEBUG] Similarity between '{cleaned_input}' and '{exit_label}': {sim:.2f}"
             )
-            
+
             #########################################
             #                                       #
             #      sim threshold can be tuned       #
@@ -426,7 +405,23 @@ class CodeLlamaParser(ActionParser):
 
         return SceneExitResult(target_scene=chosen)
 
-    def create_scene_exit_prompt(self, action: str, exits: list[Exit]) -> str:
+    def normalize_string(self, text: str) -> list[str]:
+        """Lowercase, remove punctuation, split into words, remove stopwords."""
+        STOPWORDS = {"to", "the", "a", "an", "run", "walk", "go", "move", "goto"}
+        text = re.sub(r"[^\w\s]", "", text.lower())
+        words = text.split()
+        return [w for w in words if w not in STOPWORDS]
+
+    def token_similarity(self, a: str, b: str) -> float:
+        set_a = set(self.normalize_string(a))
+        set_b = set(self.normalize_string(b))
+        return len(set_a & set_b) / len(set_a | set_b) if set_a or set_b else 0.0
+
+    def sequence_similarity(self, a: str, b: str) -> float:
+        """Fallback: fuzzy string ratio."""
+        return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+    def create_scene_exit_prompt(self, target: str, exits: list[Exit]) -> str:
         # Load prompt template from JSON
         with open(
             "backend/game/parsers/action_parser/scene_exit_prompt.json", "r"
@@ -437,5 +432,5 @@ class CodeLlamaParser(ActionParser):
         # Build exits string
         exits_str = "\n".join(f"ID = {e.id}: Label = {e.label}" for e in exits)
         # Fill template
-        prompt = template.format(action=action, exits=exits_str)
+        prompt = template.format(target=target, exits=exits_str)
         return prompt

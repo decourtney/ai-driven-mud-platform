@@ -130,7 +130,7 @@ class ParseActionRequest(BaseModel):
 
 
 class SceneExitRequest(BaseModel):
-    action: str
+    target: str
     scene_exits: List[Exit]
 
 

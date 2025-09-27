@@ -156,29 +156,47 @@ class Scene:
     items: list[Item] = field(default_factory=list)
     discoveries: list[Discovery] = field(default_factory=list)
 
+
     def to_dict(self) -> dict:
+        def as_dict(obj):
+            if hasattr(obj, "to_dict"):
+                return obj.to_dict()
+            elif hasattr(obj, "__dict__"):
+                return obj.__dict__
+            elif isinstance(obj, dict):
+                return obj
+            return obj
+
         return {
             "id": self.id,
             "label": self.label,
             "description": self.description,
             "exits": [e.to_dict() for e in self.exits],
-            "structures": [s.__dict__ for s in self.structures],
+            "structures": [as_dict(s) for s in self.structures],
             "notable_npcs": [
                 {
-                    **n.__dict__,
-                    "status": n.status.__dict__,
-                    "disposition": n.disposition.value,
+                    **as_dict(n),
+                    "status": as_dict(n.status),
+                    "disposition": (
+                        n.disposition.value
+                        if isinstance(n.disposition, Enum)
+                        else n.disposition
+                    ),
                 }
                 for n in self.notable_npcs
             ],
             "npcs": [
                 {
-                    **n.__dict__,
-                    "status": n.status.__dict__,
-                    "disposition": n.disposition.value,
+                    **as_dict(n),
+                    "status": as_dict(n.status),
+                    "disposition": (
+                        n.disposition.value
+                        if isinstance(n.disposition, Enum)
+                        else n.disposition
+                    ),
                 }
                 for n in self.npcs
             ],
-            "items": [i.__dict__ for i in self.items],
-            "discoveries": [d.__dict__ for d in self.discoveries],
-        }
+            "items": [as_dict(i) for i in self.items],
+            "discoveries": [as_dict(d) for d in self.discoveries],
+    }

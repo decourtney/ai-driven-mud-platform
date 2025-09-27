@@ -99,88 +99,49 @@ class DnDGameEngine(BaseGameEngine):
 
     #     return ValidationResult(is_valid=True)
 
-    def validate_action(self, parsed_action: ParsedAction) -> ValidationResult:
-        """Validate action against D&D rules and current game state"""
-        if not self.game_state:
-            return ValidationResult(is_valid=False, reason="Game state not initialized")
+    # def validate_action(self, parsed_action: ParsedAction) -> ValidationResult:
+    #     """Validate action against D&D rules and current game state"""
+    #     base_validation = super().validate_action(parsed_action)
 
-            # Check if actor exists and is alive
-        if parsed_action.actor == "player":
-            if not self.player_state.check_is_alive():
-                return ValidationResult(
-                    is_valid=False, reason=f"{parsed_action.actor} is dead."
-                )
-        else:
-            npc = self.game_state.get_npc_by_name(parsed_action.actor)
-            if npc and not npc.is_alive():
-                return ValidationResult(
-                    is_valid=False, reason=f"{parsed_action.actor} is dead."
-                )
+    #     if not base_validation.is_valid:
+    #         return base_validation
 
-        # Dynamic dispatch to specific validator
-        method_name = f"validate_{parsed_action.action_type.value}_constraints"
-        validator = getattr(self, method_name, None)
+    #     # Dynamic dispatch to specific validator
+    #     method_name = f"validate_{parsed_action.action_type.value}_constraints"
+    #     validator = getattr(self, method_name, None)
 
-        if validator is None:
-            return ValidationResult(
-                is_valid=False,
-                reason=f"No validator for {parsed_action.action_type.value}",
-            )
+    #     if validator is None:
+    #         return ValidationResult(
+    #             is_valid=False,
+    #             reason=f"No validator for {parsed_action.action_type.value}",
+    #         )
 
-        return validator(parsed_action)
+    #     return validator(parsed_action)
 
-    def validate_attack_constraints(self, parsed_action: ParsedAction) -> ValidationResult:
-        return ValidationResult(is_valid=True)
+    # def validate_interact_constraints(
+    #     sel, parsed_action: ParsedAction
+    # ) -> ValidationResult:
+    #     return ValidationResult(is_valid=True)
 
-    def validate_spell_constraints(self, parsed_action: ParsedAction) -> ValidationResult:
-        return ValidationResult(is_valid=True)
+    # def validate_attack_constraints(
+    #     self, parsed_action: ParsedAction
+    # ) -> ValidationResult:
+    #     return ValidationResult(is_valid=True)
 
-    def validate_social_constraints(self, parsed_action: ParsedAction) -> ValidationResult:
-        return ValidationResult(is_valid=True)
+    # def validate_spell_constraints(
+    #     self, parsed_action: ParsedAction
+    # ) -> ValidationResult:
+    #     return ValidationResult(is_valid=True)
 
-    def validate_movement_constraints(
-        self, parsed_action: ParsedAction
-    ) -> ValidationResult:
-        """
-        Validate movement actions against scene rules.
-        Base implementation checks for blocked exits.
-        """
-        if not self.game_state:
-            return ValidationResult(False, "Game state not initialized")
+    # def validate_social_constraints(
+    #     self, parsed_action: ParsedAction
+    # ) -> ValidationResult:
+    #     return ValidationResult(is_valid=True)
 
-        # Get actor state
-        actor_state = self.get_actor_state(
-            actor_type=parsed_action.actor_type, actor_name=parsed_action.actor
-        )
-
-        # Testing purposes only: add stunned status effect
-        # actor_state.add_status_effect(
-        #     effect=StatusEffect.stunned, duration=2, intensity=1, source="fear"
-        # )
-
-        # Check if actor can move TODO: expand with status effects, conditions, etc.
-        if not actor_state.can_move():
-            print("\033[91m[DEBUG]\033[0m Actor cannot move due to status effects")
-            return ValidationResult(
-                is_valid=False,
-                reason=f"{parsed_action.actor} cannot move due to current status effects.",
-                suggested_action="wait until you can move again",
-            )
-
-        # check if exit exists
-        # fuzzy_exit = self.best_exit_match_fuzzy(
-        #     parsed_action=parsed_action, scene_exits=self.game_state.loaded_scene.exits
-        # )
-        # print("\033[93m[DEBUG]\033[0m Validating movement to fuzzy exit:", fuzzy_exit)
-        # token_exit = self.best_exit_match_tokens(
-        #     parsed_action=parsed_action, scene_exits=self.game_state.loaded_scene.exits
-        # )
-        # print("\033[93m[DEBUG]\033[0m Validating movement to token exit:", token_exit)
-
-        return ValidationResult(is_valid=True)
-
-    def validate_interact_constraints(sel, parsed_action: ParsedAction) -> ValidationResult:
-        return ValidationResult(is_valid=True)
+    # def validate_movement_constraints(
+    #     self, parsed_action: ParsedAction
+    # ) -> ValidationResult:
+    #     return ValidationResult(is_valid=True)
 
     def normalize_string(self, text: Any) -> list[str]:
         """Lowercase, remove punctuation, split into words, remove stopwords."""

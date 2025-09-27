@@ -6,8 +6,10 @@
     "exits": [
       {
         "id": "village_arrival",
-        "label": "Beaten path leading to a small village",
-        "target_scene": "village_arrival"
+        "label": "path to village",
+        "target_scene": "village_arrival",
+        "blocked": { "active": false },
+        "locked": { "active": false }
       }
     ]
   },
@@ -18,29 +20,29 @@
 
     "exits": [
       {
-        "id": "village_road",
-        "label": "Main road deeper into village",
-        "target_scene": "village_road",
-        "blocked": { "active": false },
-        "locked": { "active": false }
-      },
-      {
-        "id": "hill_path",
-        "label": "Path back up the hill",
+        "id": "start",
+        "label": "path up hill",
         "target_scene": "hill_path",
         "blocked": { "active": false },
         "locked": { "active": false }
       },
       {
+        "id": "village_road",
+        "label": "road to village",
+        "target_scene": "village_road",
+        "blocked": { "active": false },
+        "locked": { "active": false }
+      },
+      {
         "id": "inn_entrance",
-        "label": "Entrance to the Spork Inn",
+        "label": "entrance to Spork Inn",
         "target_scene": "inn",
         "blocked": { "active": false },
         "locked": { "active": false }
       },
       {
         "id": "blacksmith_shop_entrance",
-        "label": "Entrance to the Rusty Nail blacksmith shop",
+        "label": "entrance to Rusty Nail blacksmith shop",
         "target_scene": "blacksmith_shop",
         "blocked": {
           "active": true,
@@ -88,7 +90,7 @@
     "items": [
       {
         "id": "busted_statue",
-        "name": "Ode to ...",
+        "name": "The Great ...",
         "description": "Toppled marble statue of a robed man. Broken and defaced — the plaque only reads 'Ode to'.",
         "is_interactable": true,
         "is_loot": false

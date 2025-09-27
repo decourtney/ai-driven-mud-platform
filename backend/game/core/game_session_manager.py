@@ -257,19 +257,21 @@ class GameSessionManager:
                 self.send_message_to_session(session_id=session_id, message=message)
             )
 
-            action_result, player_state = await engine.execute_player_action(action)
-            print("[DEBUG] action result in session manager", action_result)
-            message = {
-                "speaker": "narrator",
-                "action": action_result.action_type.value,
-                "content": action_result.narration,
-                "player_id": player_state["id"],
-            }
+            asyncio.create_task(engine.execute_player_action(action))
+            # action_result, player_state = await engine.execute_player_action(action)
+            # print("[DEBUG] action result in session manager", action_result)
+            # message = {
+            #     "speaker": "narrator",
+            #     "action": action_result.action_type.value,
+            #     "content": action_result.narration,
+            #     "player_id": player_state["id"],
+            # }
 
-            # Send the action result and player state to the session
-            await self.send_player_action_to_session(
-                session_id=session_id, message=message, player_state=player_state
-            )
+            # # Send the action result and player state to the session
+            # await self.send_player_action_to_session(
+            #     session_id=session_id, message=message, player_state=player_state
+            # )
+            return
 
         except Exception as e:
             if hasattr(self, "connection_manager"):
