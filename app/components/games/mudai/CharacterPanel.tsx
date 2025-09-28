@@ -226,22 +226,28 @@ export default function CharacterPanel({
             <h3 className="text-green-400 font-mono font-bold text-center mb-4">
               INVENTORY
             </h3>
-            {playerState.inventory.map((item) => (
-              <div
-                key={item.id}
-                className="bg-gray-800 border border-gray-600 rounded p-3 hover:bg-gray-700 transition-colors cursor-pointer"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="text-white font-mono">{item.name}</span>
-                  <span className="text-green-400 font-mono">
-                    x (item quantity)
-                  </span>
+            {playerState.inventory && playerState.inventory.length > 0 ? (
+              playerState.inventory.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-gray-800 border border-gray-600 rounded p-3 hover:bg-gray-700 transition-colors cursor-pointer"
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-white font-mono">{item.name}</span>
+                    {/* <span className="text-green-400 font-mono">
+                      x{item.quantity || 1}
+                    </span> */}
+                  </div>
+                  <div className="text-xs text-gray-400 capitalize">
+                    {item.item_type}
+                  </div>
                 </div>
-                <div className="text-xs text-gray-400 capitalize">
-                  {item.item_type}
-                </div>
+              ))
+            ) : (
+              <div className="text-center text-gray-500 font-mono">
+                No items in inventory
               </div>
-            ))}
+            )}
             {/* {(playerState.inventory || playerState.inventory.length === 0) && (
               <div className="text-center text-gray-500 font-mono">
                 No items in inventory

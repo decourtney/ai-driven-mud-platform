@@ -117,6 +117,7 @@ export interface ChatMessage {
   speaker: string;
   content: string;
   timestamp: string;
+  typing: boolean;
 }
 
 export interface GameMessage {

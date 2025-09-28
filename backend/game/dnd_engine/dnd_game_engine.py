@@ -34,6 +34,7 @@ class DnDGameEngine(BaseGameEngine):
         session_manager: GameSessionManager,
         event_bus: EventBus,
         game_id: str,
+        session_id:str,
         **kwargs,
     ):
         scenemanager_root_path = Path(__file__).parent / "scenes" / game_id
@@ -43,6 +44,7 @@ class DnDGameEngine(BaseGameEngine):
             session_manager=session_manager,
             event_bus=event_bus,
             game_id=game_id,
+            session_id=session_id,
             scenemanager_root_path=scenemanager_root_path,
             **kwargs,
         )

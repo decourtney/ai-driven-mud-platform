@@ -58,12 +58,17 @@ export default function ChatPanel({
     }
   };
 
-  const formatTimestamp = (timestamp: string) => {
-    const time = new Date(timestamp);
-    return time.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const formatTimestamp = (timestamp: string | undefined) => {
+    if (!timestamp) return "";
+    try {
+      const time = new Date(timestamp);
+      return time.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (error) {
+      return "";
+    }
   };
 
   const getPlaceholder = () => {
@@ -114,7 +119,7 @@ export default function ChatPanel({
       <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
         {chatHistory.map((message, index) => (
           <div
-            key={`${message.timestamp}-${index}`}
+            key={message.id || `${message.timestamp || Date.now()}-${index}`}
             className={`font-mono text-sm p-3 rounded transition-all duration-300 ${getMessageStyle(
               message.speaker
             )}`}
@@ -123,12 +128,19 @@ export default function ChatPanel({
               <span className="font-bold text-xs uppercase tracking-wide opacity-70">
                 {getSenderDisplay(message.speaker)}
               </span>
-              <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
-                {formatTimestamp(message.timestamp)}
-              </span>
+              {message.timestamp && (
+                <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+                  {formatTimestamp(message.timestamp)}
+                </span>
+              )}
             </div>
             <div className="leading-relaxed whitespace-pre-wrap">
-              {message.content}
+              {typeof message.content === "string"
+                ? message.content
+                : String(message.content)}
+              {message.typing && (
+                <span className="animate-pulse ml-2">...</span>
+              )}
             </div>
           </div>
         ))}
@@ -151,12 +163,10 @@ export default function ChatPanel({
         {/* Enhanced Command Hints */}
         <div className="mb-3 space-y-1">
           <div className="text-xs font-mono text-gray-500">
-            {isConnected && !gameState.is_player_input_locked ? (
+            {isConnected && !gameState?.is_player_input_locked ? (
               <span className="text-green-400 ml-2">Ready for commands</span>
             ) : (
-              <span className="text-red-400 animate-pulse">
-                Processing...
-              </span>
+              <span className="text-red-400 animate-pulse">Processing...</span>
             )}
           </div>
           {!isConnected && (
@@ -174,7 +184,7 @@ export default function ChatPanel({
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={getPlaceholder()}
-              disabled={!isConnected || gameState.is_player_input_locked}
+              disabled={!isConnected || gameState?.is_player_input_locked}
               className={`w-full bg-gray-900 border text-green-400 font-mono px-4 py-3 focus:outline-none transition-all duration-200 ${
                 !isConnected || gameState.is_player_input_locked
                   ? "border-red-500 opacity-50 cursor-not-allowed"
@@ -190,7 +200,7 @@ export default function ChatPanel({
             disabled={
               !inputValue.trim() ||
               !isConnected ||
-              gameState.is_player_input_locked
+              gameState?.is_player_input_locked
             }
             className={`font-mono font-bold px-6 py-3 transition-all duration-200 flex items-center ${
               !isConnected || gameState.is_player_input_locked

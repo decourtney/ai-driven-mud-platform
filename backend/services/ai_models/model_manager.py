@@ -1,7 +1,5 @@
-import torch
-
+import torch, asyncio
 from typing import Optional, Dict, List, Any
-
 from backend.game.core.interfaces import ActionParser, ActionNarrator
 from backend.models import (
     ParsedAction,
@@ -10,7 +8,7 @@ from backend.models import (
     ParseActionRequest,
     GenerateActionRequest,
     SceneExitRequest,
-    SceneExitResult
+    SceneExitResult,
 )
 from backend.game.parsers.action_parser.codellama_parser import CodeLlamaParser
 from backend.game.parsers.narrator_parser.mistral_narrator import GGUFMistralNarrator
@@ -82,7 +80,7 @@ class ModelManager:
             if not self.load_all_models():
                 raise RuntimeError("Failed to load models")
         return self.parser.parse_action(request)
-    
+
     def determine_scene_exit(self, request: SceneExitRequest) -> SceneExitResult:
         """Determine scene exit based on action and available exits"""
         if not self.is_parser_ready():
@@ -104,6 +102,35 @@ class ModelManager:
             if not self.load_all_models():
                 raise RuntimeError("Failed to load models")
         return self.narrator.generate_scene_narration(request)
+
+    async def stream_scene_narration(self, request: GenerateSceneRequest):
+        """Yield narration chunks instead of full string"""
+        if not self.is_narrator_ready():
+            if not self.load_all_models():
+                raise RuntimeError("Failed to load models")
+
+        try:
+            # Check if narrator supports streaming
+            if hasattr(self.narrator, "stream_scene_narration"):
+                async for chunk in self.narrator.stream_scene_narration(request):
+                    # print(f"\033[33m[MODEL_MANAGER]\033[0m Forwarding chunk: {chunk}")
+                    yield chunk
+            else:
+                # Fallback: generate full text and yield it as one chunk
+                narration = self.narrator.generate_scene_narration(request)
+                yield {"narration": narration}
+
+        except Exception as e:
+            print(f"\033[33m[MODEL_MANAGER]\033[0m Streaming failed: {e}")
+            # Final fallback
+            try:
+                narration = self.narrator.generate_scene_narration(request)
+                yield {"narration": narration}
+            except Exception as fallback_error:
+                print(f"\033[33m[MODEL_MANAGER]\033[0m Fallback also failed: {fallback_error}")
+                yield {
+                    "narration": f"You find yourself in {request.scene.get('label', 'an unknown location')}."
+                }
 
     def generate_invalid_action_narration(
         self, request: GenerateInvalidActionRequest

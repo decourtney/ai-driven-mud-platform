@@ -5,16 +5,10 @@ Runs AI models as a separate HTTP service for the D&D game engine.
 This decouples models from the main API server for better scalability.
 """
 
-import os
-import time
-import psutil
-import GPUtil
-import uvicorn
-
-from fastapi import FastAPI, HTTPException, Body
+import os, time, psutil, GPUtil, uvicorn, json, asyncio
+from fastapi import FastAPI, HTTPException, Body, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, List
-
 from .model_manager import ModelManager
 from backend.models import (
     ParsedAction,
@@ -25,7 +19,7 @@ from backend.models import (
     HealthResponse,
     GenerateInvalidActionRequest,
     SceneExitRequest,
-    SceneExitResult
+    SceneExitResult,
 )
 
 
@@ -211,7 +205,7 @@ class ModelServer:
 
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Parse failed: {e}")
-            
+
         @app.post("/determine_scene_exit", response_model=SceneExitResult)
         def determine_scene_exit(request: SceneExitRequest = Body(...)):
             """Determine which scene exit the player intends to use"""
@@ -227,7 +221,9 @@ class ModelServer:
                 return self.model_manager.determine_scene_exit(request)
 
             except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Determine scene exit failed: {e}")
+                raise HTTPException(
+                    status_code=400, detail=f"Determine scene exit failed: {e}"
+                )
 
         @app.post("/generate_action", response_model=GeneratedNarration)
         def generate_action_narration(request: GenerateActionRequest):
@@ -295,38 +291,159 @@ class ModelServer:
                 )
 
         # ==========================================
+        # WEBSOCKET INFERENCE METHODS
+        # ==========================================
+
+        @app.websocket("/ws/scene_generation")
+        async def ws_scene_generation(websocket: WebSocket):
+            print(f"\033[34m[MODEL_SERVER]\033[0m New WebSocket connection from {websocket.client}")
+            await websocket.accept()
+            print("\033[34m[MODEL_SERVER]\033[0m WebSocket connection accepted")
+
+            try:
+                # Receive the request data
+                print("\033[34m[MODEL_SERVER]\033[0m Waiting for request data...")
+                data = await websocket.receive_text()
+                print(f"\033[34m[MODEL_SERVER]\033[0m Received data: {data}")
+
+                request_dict = json.loads(data)
+                print(f"\033[34m[MODEL_SERVER]\033[0m Parsed request: {request_dict}")
+
+                # Convert to GenerateSceneRequest object
+                request = GenerateSceneRequest(**request_dict)
+                print(f"\033[34m[MODEL_SERVER]\033[0m Created request object: {request}")
+
+                # Ensure narrator ready (sync calls, not async)
+                if not self.model_manager.is_narrator_ready():
+                    print("\033[34m[MODEL_SERVER]\033[0m Narrator not ready, attempting to load models...")
+                    loaded = self.model_manager.load_all_models()
+                    if not loaded:
+                        error_msg = {"type": "error", "error": "Narrator not ready"}
+                        print(f"\033[34m[MODEL_SERVER]\033[0m Sending error: {error_msg}")
+                        await websocket.send_json(error_msg)
+                        await websocket.close()
+                        return
+
+                try:
+                    # Check if your model_manager has an async streaming method
+                    if hasattr(self.model_manager, "stream_scene_narration"):
+                        print("\033[34m[MODEL_SERVER]\033[0m Starting streaming generation...")
+
+                        chunk_count = 0
+                        # Stream from model
+                        async for chunk in self.model_manager.stream_scene_narration(request):
+                            chunk_count += 1
+                            # print(
+                            #     f"\033[34m[MODEL_SERVER]\033[0m Processing chunk #{chunk_count}: {type(chunk)} - {chunk}"
+                            # )
+
+                            # Ensure chunk is serializable
+                            if hasattr(chunk, "model_dump"):
+                                chunk_data = chunk.model_dump()
+                            elif isinstance(chunk, dict):
+                                chunk_data = chunk
+                            else:
+                                # Convert to dict if it's not already
+                                chunk_data = {"narration": str(chunk)}
+
+                            message_to_send = {"type": "chunk", "data": chunk_data}
+                            # print(f"\033[34m[MODEL_SERVER]\033[0m Sending message: {message_to_send}")
+
+                            try:
+                                await websocket.send_json(message_to_send)
+                                await asyncio.sleep(0)
+                                # print(
+                                #     f"[{time.time()}]\033[34m[MODEL_SERVER]\033[0m Successfully sent chunk #{chunk_count}"
+                                # )
+                            except Exception as send_error:
+                                print(f"\033[34m[MODEL_SERVER]\033[0m Error sending chunk #{chunk_count}: {send_error}")
+                                break
+
+                        print(f"\033[34m[MODEL_SERVER]\033[0m Finished processing {chunk_count} chunks")
+
+                    else:
+                        print("\033[34m[MODEL_SERVER]\033[0m Streaming not available, using fallback...")
+                        # Fallback to regular generation if streaming not available
+                        narration = self.model_manager.generate_scene_narration(request)
+                        fallback_msg = {"type": "chunk", "data": {"narration": narration}}
+                        print(f"\033[34m[MODEL_SERVER]\033[0m Sending fallback: {fallback_msg}")
+                        await websocket.send_json(fallback_msg)
+
+                    # Send completion signal
+                    done_msg = {"type": "done"}
+                    print(f"\033[34m[MODEL_SERVER]\033[0m Sending completion signal: {done_msg}")
+                    await websocket.send_json(done_msg)
+                    print("\033[34m[MODEL_SERVER]\033[0m Streaming complete, done signal sent")
+
+                except Exception as e:
+                    print(f"\033[34m[MODEL_SERVER]\033[0m Error during generation: {e}")
+                    import traceback
+
+                    print(f"\033[34m[MODEL_SERVER]\033[0m Full traceback: {traceback.format_exc()}")
+
+                    try:
+                        error_msg = {"type": "error", "error": str(e)}
+                        print(f"\033[34m[MODEL_SERVER]\033[0m Sending error message: {error_msg}")
+                        await websocket.send_json(error_msg)
+                    except:
+                        print("\033[34m[MODEL_SERVER]\033[0m Failed to send error message - WebSocket might be closed")
+
+            except WebSocketDisconnect:
+                print("\033[34m[MODEL_SERVER]\033[0m Client disconnected")
+            except json.JSONDecodeError as e:
+                print(f"\033[34m[MODEL_SERVER]\033[0m Invalid JSON received: {e}")
+                try:
+                    await websocket.send_json({"type": "error", "error": "Invalid JSON"})
+                    await websocket.close()
+                except:
+                    pass
+            except Exception as e:
+                print(f"\033[34m[MODEL_SERVER]\033[0m Unexpected error: {e}")
+                import traceback
+
+                print(f"\033[34m[MODEL_SERVER]\033[0m Full traceback: {traceback.format_exc()}")
+
+                try:
+                    await websocket.send_json({"type": "error", "error": str(e)})
+                    await websocket.close()
+                except:
+                    pass
+            finally:
+                print("\033[34m[MODEL_SERVER]\033[0m WebSocket connection cleanup complete")
+
+        # ==========================================
         # BATCH ENDPOINTS (for efficiency)
         # ==========================================
 
-        @app.post("/batch/parse_actions")
-        def batch_parse_actions(requests: List[ParseActionRequest]):
-            """Parse multiple actions in one request"""
-            if not self.model_manager.is_parser_ready():
-                raise HTTPException(
-                    status_code=503, detail="Parser model not available"
-                )
+        # @app.post("/batch/parse_actions")
+        # def batch_parse_actions(requests: List[ParseActionRequest]):
+        #     """Parse multiple actions in one request"""
+        #     if not self.model_manager.is_parser_ready():
+        #         raise HTTPException(
+        #             status_code=503, detail="Parser model not available"
+        #         )
 
-            results = []
-            for req in requests:
-                try:
-                    result = self.model_manager.parse_action(
-                        req.text, context=req.context
-                    )
-                    results.append(
-                        ParsedAction(
-                            success=True,
-                            action_type=result.get("action_type", "unknown"),
-                            target=result.get("target"),
-                            damage_roll=result.get("damage_roll"),
-                            difficulty=result.get("difficulty"),
-                        )
-                    )
-                except Exception as e:
-                    results.append(
-                        ParsedAction(success=False, action_type="error", error=str(e))
-                    )
+        #     results = []
+        #     for req in requests:
+        #         try:
+        #             result = self.model_manager.parse_action(
+        #                 req.text, context=req.context
+        #             )
+        #             results.append(
+        #                 ParsedAction(
+        #                     success=True,
+        #                     action_type=result.get("action_type", "unknown"),
+        #                     target=result.get("target"),
+        #                     damage_roll=result.get("damage_roll"),
+        #                     difficulty=result.get("difficulty"),
+        #                 )
+        #             )
+        #         except Exception as e:
+        #             results.append(
+        #                 ParsedAction(success=False, action_type="error", error=str(e))
+        #             )
 
-            return {"results": results}
+        #     return {"results": results}
 
         return app
 

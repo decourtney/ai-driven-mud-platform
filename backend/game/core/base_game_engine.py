@@ -1,4 +1,4 @@
-import re, asyncio
+import re, asyncio, uuid
 from difflib import SequenceMatcher
 from typing import List, Optional, Tuple, Generator, Dict, Any, Callable
 from pathlib import Path
@@ -43,10 +43,12 @@ class BaseGameEngine(ABC):
         model_client: AsyncModelServiceClient,
         session_manager: GameSessionManager,
         event_bus: EventBus,
+        session_id: str,
         scenemanager_root_path: Optional[Path] = None,
         dice_roller: Optional[BaseDiceRoller] = None,
         **kwargs,
     ):
+        self.session_id = session_id
         self.model_client = model_client
         self.session_manager = session_manager
         self.event_bus = event_bus
@@ -154,6 +156,7 @@ class BaseGameEngine(ABC):
         if self.game_state.loaded_scene.id != self.player_state.current_scene:
             self.player_state.current_scene = self.game_state.loaded_scene.id
             # We should narrate the scene since the player is arriving on scene
+            # NOTE: Not sure this is correct place to change the turn phase - works for now
             self.game_state.current_turn_phase = TurnPhase.scene_narration
         print(
             "\033[93m[DEBUG]\033[0m CURRENT LOADED SCENE:",
@@ -162,12 +165,11 @@ class BaseGameEngine(ABC):
 
         return
 
-    async def present_scene(self) -> GeneratedNarration:
+    async def present_scene(self):
         """Generate and return scene description for player"""
         if not self.game_state:
             raise RuntimeError("Game state not initialized")
 
-        # Hot reload check: skip generation during reload
         if getattr(self, "_reloading", False):
             return GeneratedNarration(
                 narration="", action_type="unknown", details="Skipped during reload"
@@ -182,20 +184,116 @@ class BaseGameEngine(ABC):
         )
 
         try:
-            # Serialize calls to prevent concurrent requests from crashing model server
-            if not hasattr(self.model_client, "_model_lock"):
-                self.model_client._model_lock = asyncio.Semaphore(1)
+            message_id = str(uuid.uuid4())  # Generate UUID once for this message
 
-            async with self.model_client._model_lock:
-                scene_description = await self.model_client.generate_scene(request)
+            # Stream the generation with proper chunk handling
+            async for chunk in self.model_client.stream_scene_generation(request):
+                chunk_type = chunk.get("type")
 
-            return scene_description
+                if chunk_type == "chunk":
+                    chunk_data = chunk.get("data", {})
+                    text_chunk = (
+                        chunk_data.get("narration", "")
+                        or chunk_data.get("text", "")
+                        or chunk_data.get("content", "")
+                    )
+
+                    if text_chunk:
+                        # narration_text += text_chunk
+                        # print(
+                        #     "\033[32m[PRESENT_SCENE]\033[0m Sending Stream Message:",
+                        #     text_chunk,
+                        # )
+                        # Send streaming update with consistent UUID
+                        await self.session_manager.send_streaming_message(
+                            message={
+                                "speaker": "narrator",
+                                "action": "narrate",
+                                "content": text_chunk,
+                                "typing": True,
+                            },
+                            session_id=self.session_id,
+                            message_id=message_id,
+                        )
+
+                elif chunk_type == "done":
+                    message = {
+                        "speaker": "narrator",
+                        "action": "narrate",
+                        "content": text_chunk,
+                    }
+
+                    # Save final to DB
+                    chatmessage_record = (
+                        await self.session_manager.save_streamed_message(
+                            message=message,
+                            session_id=self.session_id,
+                            message_id=message_id,
+                        )
+                    )
+
+                    await self.session_manager.send_streaming_message(
+                        message={"typing": False, **message},
+                        session_id=self.session_id,
+                        message_id=message_id,
+                        timestamp=chatmessage_record.updated_at.isoformat(),
+                    )
+                elif chunk_type == "error":
+                    error_msg = chunk.get("error", "Unknown error")
+                    raise RuntimeError(f"Generation failed: {error_msg}")
+
+            return
 
         except Exception as e:
-            print(f"[ENGINE] Failed to generate scene: {e}")
-            return GeneratedNarration(
-                narration="", action_type="unknown", details=str(e)
-            )
+            print(f"[ENGINE] WebSocket streaming failed: {e}")
+            import traceback
+
+            print(f"[ENGINE] Full traceback: {traceback.format_exc()}")
+
+            # Fallback to REST API
+            print("[ENGINE] Falling back to REST API...")
+            try:
+                # Serialize calls to prevent concurrent requests
+                if not hasattr(self.model_client, "_model_lock"):
+                    self.model_client._model_lock = asyncio.Semaphore(1)
+
+                async with self.model_client._model_lock:
+                    scene_description = await self.model_client.generate_scene(request)
+
+                # Send the complete narration via WebSocket
+                await self.session_manager.send_message_to_session(
+                    session_id=self.session_id,
+                    message={
+                        "speaker": "narrator",
+                        "action": "narrate",
+                        "content": scene_description.narration,
+                        "typing": False,
+                    },
+                )
+
+                return scene_description
+
+            except Exception as fallback_error:
+                print(f"[ENGINE] REST API fallback also failed: {fallback_error}")
+
+                # Final fallback with minimal narration
+                fallback_text = f"You find yourself in {self.game_state.loaded_scene.label or 'an unknown location'}."
+
+                await self.session_manager.send_message_to_session(
+                    session_id=self.session_id,
+                    message={
+                        "speaker": "narrator",
+                        "action": "narrate",
+                        "content": fallback_text,
+                        "typing": False,
+                    },
+                )
+
+                return GeneratedNarration(
+                    narration=fallback_text,
+                    action_type="unknown",
+                    details=str(fallback_error),
+                )
 
     async def on_scene_diff_update(self, scene_id: str, diff: Dict[str, Any]):
         print(f"[EngineManager] Received scene diff for {scene_id}")
@@ -250,17 +348,17 @@ class BaseGameEngine(ABC):
             is_locked=self.game_state.is_player_input_locked,
         )
 
-        scene_narration = await self.present_scene()
+        await self.present_scene()
 
-        message = {
-            "speaker": "narrator",
-            "action": "narrate",
-            "content": scene_narration.narration,
-        }
+        # message = {
+        #     "speaker": "narrator",
+        #     "action": "narrate",
+        #     "content": scene_narration.narration,
+        # }
 
-        await self.session_manager.send_message_to_session(
-            game_state_id=self.game_state.id, message=message
-        )
+        # await self.session_manager.send_message_to_session(
+        #     game_state_id=self.game_state.id, message=message
+        # )
 
         # TODO After narration determine next phase - Player / NPC / End Turn or Game Over
         await self.determine_next_phase()

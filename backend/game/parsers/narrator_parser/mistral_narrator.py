@@ -1,10 +1,7 @@
-import torch
+import torch, gc, re, os, json
 from typing import Optional, Dict, Any, List
-import gc
-import re
-import os
-import json
 from pathlib import Path
+from transformers import TextIteratorStreamer
 
 try:
     from llama_cpp import Llama
@@ -326,6 +323,46 @@ class GGUFMistralNarrator(ActionNarrator):
             print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
             return f"You find yourself in {request.scene['label']}."
 
+    async def stream_scene_narration(self, request: GenerateSceneRequest):
+        """Stream scene narration generation"""
+        print("\033[91m[DEBUG]\033[0m Streaming scene narration...")
+
+        if not self.is_loaded():
+            print("\033[91m[-]\033[0m Narrator model not loaded")
+            yield {"narration": f"You find yourself in {request.scene.get('label', 'an unknown location')}."}
+            return
+
+        try:
+            # Create the prompt for scene description
+            scene_prompt = self._create_scene_prompt(request)
+
+            if self.verbose:
+                print(f"\033[93m[DEBUG]\033[0m Scene prompt: {scene_prompt}")
+
+            # Stream the scene description
+            accumulated_text = ""
+            for token in self._stream_text(
+                scene_prompt,
+                max_tokens=25,
+                temperature=0.1,
+            ):
+                accumulated_text += token
+
+                # Yield the accumulated text so far
+                yield {"narration": accumulated_text}
+
+            if self.verbose:
+                print(f"\033[93m[DEBUG]\033[0m Final streamed scene: '{accumulated_text}'")
+
+        except Exception as e:
+            print(f"\033[91m[-]\033[0m Scene streaming failed: {e}")
+            import traceback
+            print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
+
+            # Fallback to regular generation
+            fallback_text = self.generate_scene_narration(request)
+            yield {"narration": fallback_text}
+
     def _create_scene_prompt(self, request: GenerateSceneRequest):
         """Create the prompt for scene description generation"""
         # Load config from JSON file
@@ -487,6 +524,44 @@ class GGUFMistralNarrator(ActionNarrator):
 
             print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
             return "The action occurs."
+
+    def _stream_text(self, input: str, max_tokens: int = 200, temperature: float = 0.1):
+        """Stream text generation using llama-cpp-python's streaming capabilities"""
+        try:
+            print("\033[93m[DEBUG]\033[0m Starting text streaming...")
+            print("\033[93m[DEBUG]\033[0m Prompt length:", len(input))
+
+            # Reset model state
+            self.model.reset()
+
+            # Create streaming generator using llama-cpp-python's streaming API
+            stream = self.model(
+                input,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                top_p=0.9,
+                top_k=50,
+                repeat_penalty=1.15,
+                frequency_penalty=0.2,
+                stop=["[/INST]"],
+                echo=False,
+                stream=True,  # Enable streaming
+            )
+
+            # Yield tokens as they come
+            for output in stream:
+                token = output["choices"][0]["text"]
+                if token:
+                    yield token
+
+        except Exception as e:
+            print(f"\033[91m[-]\033[0m Error in _stream_text: {e}")
+            import traceback
+
+            print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
+            # Fallback to non-streaming generation
+            fallback_text = self._generate_text(input, max_tokens, temperature)
+            yield fallback_text
 
     def _clean_action_narration(
         self,

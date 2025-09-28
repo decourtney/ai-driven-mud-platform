@@ -209,6 +209,38 @@ export const useGameWebSocket = ({
               ...message.data.player_state,
             }));
             break;
+
+          case "streaming_message":
+            setChatHistory((prev) => {
+              const messageId = message.data.narration.id;
+              const idx = prev.findIndex((msg) => msg.id === messageId);
+
+              if (idx !== -1) {
+                // Update existing
+                const updated = [...prev];
+                const updatedMessage = {
+                  ...updated[idx],
+                  content: message.data.narration.content,
+                  timestamp: message.data.timestamp || new Date().toISOString(),
+                  typing: message.data.narration.typing,
+                };
+                updated[idx] = updatedMessage;
+                return updated;
+              } else {
+                // Create new
+                const newMessage = {
+                  id: messageId,
+                  speaker: message.data.speaker || "narrator",
+                  content: message.data.narration.content,
+                  timestamp: message.data.timestamp || new Date().toISOString(),
+                  typing: message.data.narration.typing,
+                };
+                const newHistory = [...prev, newMessage];
+                return newHistory;
+              }
+            });
+            break;
+
           case "error":
             setLastError(message.data.message);
             onError?.(message.data.message);
