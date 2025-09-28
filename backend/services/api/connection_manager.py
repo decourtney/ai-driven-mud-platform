@@ -147,6 +147,7 @@ class MessageType:
     action_result = "action_result"
     session_state_update = "session_state_update"
     chat_message = "chat_message"
+    streaming_message = "streaming_message"
     error = "error"
     pong = "pong"
 
@@ -170,7 +171,7 @@ class WebSocketMessage:
             },
             # "timestamp": datetime.now().isoformat(),
         }
-        
+
     @staticmethod
     def lock_player_input(is_locked: bool) -> Dict[str, Any]:
         """Create lock player input message"""
@@ -191,7 +192,7 @@ class WebSocketMessage:
 
     @staticmethod
     def chat_message(
-        id: str, speaker: str, content: str, timestamp: str
+        id: str, speaker: str, content: str, timestamp: str, typing: bool
     ) -> Dict[str, Any]:
         """Create chat message"""
         return {
@@ -201,6 +202,7 @@ class WebSocketMessage:
                 "speaker": speaker,
                 "content": content,
                 "timestamp": timestamp,
+                "typing": typing,
             },
         }
 
@@ -223,6 +225,24 @@ class WebSocketMessage:
                     "timestamp": timestamp,
                 },
                 "player_state": player_state,
+            },
+        }
+
+    @staticmethod
+    def streaming_message(
+        id: str, speaker: str, content: str, timestamp: str, typing: bool
+    ) -> Dict[str, Any]:
+
+        return {
+            "type": MessageType.streaming_message,
+            "data": {
+                "narration": {
+                    "id": id,
+                    "speaker": speaker,
+                    "content": content,
+                    "timestamp": timestamp,
+                    "typing": typing,
+                },
             },
         }
 

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, Optional, Callable, Any
 from dataclasses import dataclass, field
 from backend.game.core.event_bus import EventBus
-from backend.models import (
+from backend.scene_models import (
     Scene,
     SceneDiff,
     Exit,
@@ -13,6 +13,8 @@ from backend.models import (
     NPC,
     Item,
     Discovery,
+    BlockedState,
+    LockedState,
 )
 
 
@@ -35,7 +37,7 @@ class SceneManager:
         if self.loaded_zone == zone_name:
             return  # already loaded
 
-        self._unload_current_zone()  # unload previous
+        self.unload_current_zone()  # unload previous
 
         file_path = self.scenemanager_root_path / f"{zone_name}.json"
         if not file_path.exists():
@@ -47,15 +49,21 @@ class SceneManager:
 
         self.loaded_scenes = {}
         for scene_id, scene_data in data.items():
-            # Build exits
-            exits = [Exit(**exit_data) for exit_data in scene_data.get("exits", [])]
-
             # Build Scene object
             scene = Scene(
                 id=scene_data["id"],
                 label=scene_data["label"],
                 description=scene_data["description"],
-                exits=[Exit(**exit) for exit in scene_data["exits"]],
+                exits=[
+                    Exit(
+                        id=exit["id"],
+                        label=exit["label"],
+                        target_scene=exit["target_scene"],
+                        blocked=BlockedState(**exit.get("blocked", {"active": False})),
+                        locked=LockedState(**exit.get("locked", {"active": False})),
+                    )
+                    for exit in scene_data["exits"]
+                ],
                 structures=[
                     Structure(**struct) for struct in scene_data.get("structures", [])
                 ],
@@ -74,7 +82,7 @@ class SceneManager:
         print("[DEBUG] SCENE MANAGER LOADED WITH ZONES AND SCENES")
         return
 
-    def _unload_current_zone(self):
+    def unload_current_zone(self):
         if self.loaded_zone and self.persist_callback:
             # Persist diffs before unloading
             for scene_id, diff in self.scene_diffs.items():
@@ -90,9 +98,11 @@ class SceneManager:
         if zone and self.loaded_zone != zone:
             await self.load_zone(zone)
         if scene_id not in self.loaded_scenes:
-            raise KeyError(f"Scene {scene_id} not found in zone {zone}")
+            raise KeyError(
+                f"\033[91m[DEBUG]\033[0mScene {scene_id} not found in zone {zone}"
+            )
 
-        # TODO: need to add diff process here before returning scene
+        # TODO: need to add getting diff process here before returning scene
         return self.loaded_scenes[scene_id]
 
     def move_to_scene(self, current_scene: Scene, exit_id: str) -> Scene:

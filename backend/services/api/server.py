@@ -3,8 +3,7 @@ FastAPI server for D&D Streaming Game Engine.
 Now uses decoupled model service instead of direct model management.
 """
 
-import json
-import logging
+import json, logging
 from fastapi import (
     FastAPI,
     HTTPException,

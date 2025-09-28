@@ -1,10 +1,7 @@
-import torch
+import torch, gc, re, os, json
 from typing import Optional, Dict, Any, List
-import gc
-import re
-import os
-import json
 from pathlib import Path
+from transformers import TextIteratorStreamer
 
 try:
     from llama_cpp import Llama
@@ -17,7 +14,14 @@ except ImportError:
     )
 
 from backend.game.core.interfaces import ActionNarrator
-from backend.models import ParsedAction, ActionType, GenerateSceneRequest, GenerateActionRequest
+from backend.models import (
+    ParsedAction,
+    ActionType,
+    ValidationResult,
+    GenerateSceneRequest,
+    GenerateActionRequest,
+    GenerateInvalidActionRequest,
+)
 
 
 class GGUFMistralNarrator(ActionNarrator):
@@ -133,6 +137,10 @@ class GGUFMistralNarrator(ActionNarrator):
     def is_loaded(self) -> bool:
         return self._is_loaded and self.model is not None
 
+    # --------------------------------------------------------------------------------
+    # GENERATE ACTION NARRATION
+    # --------------------------------------------------------------------------------
+
     def generate_action_narration(self, request: GenerateActionRequest) -> str:
         print("\033[91m[DEBUG]\033[0m Generating action narration...")
         if not self.is_loaded():
@@ -140,7 +148,9 @@ class GGUFMistralNarrator(ActionNarrator):
             return f"{request.parsed_action.actor} performs {request.parsed_action.action}."
 
         try:
-            input_prompt = self._create_input_prompt(request.parsed_action, request.hit, request.damage_type)
+            input_prompt = self._create_input_prompt(
+                request.parsed_action, request.hit, request.damage_type
+            )
 
             # Debug the prompt if needed
             if self.verbose:
@@ -172,46 +182,6 @@ class GGUFMistralNarrator(ActionNarrator):
             return f"{request.parsed_action.actor} performs {request.parsed_action.action}."
 
         # NOTE: parameters for this are not even close!
-
-    def generate_scene_narration(self, request: GenerateSceneRequest):
-        print("\033[91m[DEBUG]\033[0m Generating scene narration...")
-        """Generate a scene description using the narrator model"""
-        if not self.is_loaded():
-            print("\033[91m[-]\033[0m Narrator model not loaded")
-            return f"You find yourself in {request.scene.get('label', 'an unknown location')}."
-
-        try:
-            # Create the prompt for scene description
-            scene_prompt = self._create_scene_prompt(request)
-
-            if self.verbose:
-                print(f"\033[93m[DEBUG]\033[0m Scene prompt: {scene_prompt}")
-
-            # Generate the scene description
-            raw_text = self._generate_text(
-                # NOTE: 200 tokens is for building and testing - will need to be much higher
-                # NOTE: Temp of 0.1 is to keep it very focused on description - may need to adjust
-                scene_prompt,
-                max_tokens=200,
-                temperature=0.1,
-            )
-
-            # Clean and format the description
-            # cleaned_description = self._clean_scene_description(raw_text, scene['label'], player['name'])
-            cleaned_description = raw_text
-
-            if self.verbose:
-                print(f"\033[93m[DEBUG]\033[0m Raw scene: '{raw_text}'")
-                print(f"\033[93m[DEBUG]\033[0m Cleaned scene: '{cleaned_description}'")
-
-            return cleaned_description
-
-        except Exception as e:
-            print(f"\033[91m[-]\033[0m Scene description generation failed: {e}")
-            import traceback
-
-            print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
-            return f"You find yourself in {request.scene['label']}."
 
     def _create_input_prompt(
         self, parsed_action: ParsedAction, hit: bool, damage_type: str
@@ -309,6 +279,90 @@ class GGUFMistralNarrator(ActionNarrator):
 
         Narration: [/INST]"""
 
+    # --------------------------------------------------------------------------------
+    # GENERATE SCENE NARRATION
+    # --------------------------------------------------------------------------------
+
+    def generate_scene_narration(self, request: GenerateSceneRequest):
+        print("\033[91m[DEBUG]\033[0m Generating scene narration...")
+        """Generate a scene description using the narrator model"""
+        if not self.is_loaded():
+            print("\033[91m[-]\033[0m Narrator model not loaded")
+            return f"You find yourself in {request.scene.get('label', 'an unknown location')}."
+
+        try:
+            # Create the prompt for scene description
+            scene_prompt = self._create_scene_prompt(request)
+
+            if self.verbose:
+                print(f"\033[93m[DEBUG]\033[0m Scene prompt: {scene_prompt}")
+
+            # Generate the scene description
+            raw_text = self._generate_text(
+                # NOTE: 200 tokens is for building and testing - will need to be much higher
+                # NOTE: Temp of 0.1 is to keep it very focused on description - may need to adjust
+                scene_prompt,
+                max_tokens=200,
+                temperature=0.1,
+            )
+
+            # Clean and format the description
+            # cleaned_description = self._clean_scene_description(raw_text, scene['label'], player['name'])
+            cleaned_description = raw_text
+
+            if self.verbose:
+                print(f"\033[93m[DEBUG]\033[0m Raw scene: '{raw_text}'")
+                print(f"\033[93m[DEBUG]\033[0m Cleaned scene: '{cleaned_description}'")
+
+            return cleaned_description
+
+        except Exception as e:
+            print(f"\033[91m[-]\033[0m Scene description generation failed: {e}")
+            import traceback
+
+            print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
+            return f"You find yourself in {request.scene['label']}."
+
+    async def stream_scene_narration(self, request: GenerateSceneRequest):
+        """Stream scene narration generation"""
+        print("\033[91m[DEBUG]\033[0m Streaming scene narration...")
+
+        if not self.is_loaded():
+            print("\033[91m[-]\033[0m Narrator model not loaded")
+            yield {"narration": f"You find yourself in {request.scene.get('label', 'an unknown location')}."}
+            return
+
+        try:
+            # Create the prompt for scene description
+            scene_prompt = self._create_scene_prompt(request)
+
+            if self.verbose:
+                print(f"\033[93m[DEBUG]\033[0m Scene prompt: {scene_prompt}")
+
+            # Stream the scene description
+            accumulated_text = ""
+            for token in self._stream_text(
+                scene_prompt,
+                max_tokens=25,
+                temperature=0.1,
+            ):
+                accumulated_text += token
+
+                # Yield the accumulated text so far
+                yield {"narration": accumulated_text}
+
+            if self.verbose:
+                print(f"\033[93m[DEBUG]\033[0m Final streamed scene: '{accumulated_text}'")
+
+        except Exception as e:
+            print(f"\033[91m[-]\033[0m Scene streaming failed: {e}")
+            import traceback
+            print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
+
+            # Fallback to regular generation
+            fallback_text = self.generate_scene_narration(request)
+            yield {"narration": fallback_text}
+
     def _create_scene_prompt(self, request: GenerateSceneRequest):
         """Create the prompt for scene description generation"""
         # Load config from JSON file
@@ -346,13 +400,96 @@ class GGUFMistralNarrator(ActionNarrator):
 
         return re.sub(r"\{([^}]+)\}", replacer, system_prompt_template)
 
+    # --------------------------------------------------------------------------------
+    # GENERATE INVALID ACTION NARRATION
+    # --------------------------------------------------------------------------------
+
+    def generate_invalid_action_narration(
+        self, request: GenerateInvalidActionRequest
+    ) -> str:
+        print("\033[91m[DEBUG]\033[0m Generating invalid action narration...")
+        if not self.is_loaded():
+            print("\033[91m[-]\033[0m Narrator model not loaded")
+            return "The action cannot be performed."
+
+        try:
+            input_prompt = self._create_invalid_action_prompt(
+                request.validation_result, request.parsed_action
+            )
+
+            # Debug the prompt if needed
+            if self.verbose:
+                print(f"\033[93m[DEBUG]\033[0m Input Prompt: {input_prompt}")
+
+            raw_text = self._generate_text(
+                input_prompt, max_tokens=150, temperature=0.1
+            )
+
+            # Check if generation failed
+            if len(raw_text.strip()) < 5:
+                print(f"[!] Generation failed, raw text: '{raw_text}'")
+                return "The action cannot be performed."
+
+            cleaned = self._clean_action_narration(
+                raw_text, request.parsed_action.actor, request.parsed_action.target
+            )
+
+            if self.verbose:
+                # print(f"\033[93m[DEBUG]\033[0m Raw: '{raw_text}'")
+                print(f"\033[93m[DEBUG]\033[0m Cleaned: '{cleaned}'")
+
+            return cleaned
+        except Exception as e:
+            print(f"\033[91m[-]\033[0m Invalid action narration generation failed: {e}")
+            import traceback
+
+            print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
+            return "The action cannot be performed."
+
+    def _create_invalid_action_prompt(
+        self, validation_result: ValidationResult, parsed_action: ParsedAction
+    ) -> str:
+        # Build the base prompt
+        actor = parsed_action.actor
+        action_desc = parsed_action.action
+
+        scenario = f"{actor} attempts to {action_desc}, but the action is invalid."
+
+        reason_context = ""
+        if validation_result.reason:
+            reason_context = f" Reason: {validation_result.reason}."
+
+        # Build the full prompt
+        full_scenario = scenario + reason_context
+
+        # Balanced prompt with contextual information
+        return f"""[INST] <<SYS>>
+        You are a Dungeon Master generating narration for an invalid D&D action.
+        Rules:
+        - Use third person narration (e.g., "The rogue tries to swing their blade...").
+        - Explain briefly why the action cannot be performed.
+        - Keep it concise.
+        - Do not mention dice, mechanics, or game terms like "roll", "DC", "invalid".
+        <</SYS>>
+
+        Scene context: {full_scenario}
+
+        Actor: {parsed_action.actor} ({parsed_action.actor_type})
+        Action: {parsed_action.action}
+
+        Narration: [/INST]"""
+
+    # --------------------------------------------------------------------------------
+    # TEXT GENERATION AND CLEANING
+    # --------------------------------------------------------------------------------
+
     def _generate_text(
         self, input: str, max_tokens: int = 200, temperature: float = 0.1
     ) -> str:
         try:
             print("\033[93m[DEBUG]\033[0m Model:", self.model)
             print("\033[93m[DEBUG]\033[0m Prompt length:", len(input))
-            
+
             # Generate with llama-cpp-python
             self.model.reset()
             response = self.model(
@@ -372,9 +509,9 @@ class GGUFMistralNarrator(ActionNarrator):
 
             # Debug output
             if self.verbose or len(generated_text.strip()) < 5:
-                print(
-                    f"\033[93m[DEBUG]\033[0m Generated text: '{generated_text.strip()}'"
-                )
+                # print(
+                #     f"\033[93m[DEBUG]\033[0m Generated text: '{generated_text.strip()}'"
+                # )
                 print(
                     f"\033[93m[DEBUG]\033[0m Text length: {len(generated_text.strip())}"
                 )
@@ -387,6 +524,44 @@ class GGUFMistralNarrator(ActionNarrator):
 
             print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
             return "The action occurs."
+
+    def _stream_text(self, input: str, max_tokens: int = 200, temperature: float = 0.1):
+        """Stream text generation using llama-cpp-python's streaming capabilities"""
+        try:
+            print("\033[93m[DEBUG]\033[0m Starting text streaming...")
+            print("\033[93m[DEBUG]\033[0m Prompt length:", len(input))
+
+            # Reset model state
+            self.model.reset()
+
+            # Create streaming generator using llama-cpp-python's streaming API
+            stream = self.model(
+                input,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                top_p=0.9,
+                top_k=50,
+                repeat_penalty=1.15,
+                frequency_penalty=0.2,
+                stop=["[/INST]"],
+                echo=False,
+                stream=True,  # Enable streaming
+            )
+
+            # Yield tokens as they come
+            for output in stream:
+                token = output["choices"][0]["text"]
+                if token:
+                    yield token
+
+        except Exception as e:
+            print(f"\033[91m[-]\033[0m Error in _stream_text: {e}")
+            import traceback
+
+            print(f"\033[91m[-]\033[0m Full traceback: {traceback.format_exc()}")
+            # Fallback to non-streaming generation
+            fallback_text = self._generate_text(input, max_tokens, temperature)
+            yield fallback_text
 
     def _clean_action_narration(
         self,

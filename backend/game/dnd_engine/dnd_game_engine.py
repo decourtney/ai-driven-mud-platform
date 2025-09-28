@@ -1,5 +1,7 @@
 # Example D&D-specific implementation
-from typing import Optional, Callable
+import re
+from difflib import SequenceMatcher
+from typing import Optional, Callable, Any
 from pathlib import Path
 from backend.game.core.base_game_engine import BaseGameEngine
 from backend.models import (
@@ -8,7 +10,9 @@ from backend.models import (
     DamageType,
     GameCondition,
     ValidationResult,
+    StatusEffect,
 )
+from backend.scene_models import Exit
 from backend.game.core.character_state import CharacterState
 from backend.game.core.game_state import GameState
 from backend.game.core.dice_system import DiceRollerFactory, BaseDiceRoller
@@ -30,6 +34,7 @@ class DnDGameEngine(BaseGameEngine):
         session_manager: GameSessionManager,
         event_bus: EventBus,
         game_id: str,
+        session_id:str,
         **kwargs,
     ):
         scenemanager_root_path = Path(__file__).parent / "scenes" / game_id
@@ -39,6 +44,7 @@ class DnDGameEngine(BaseGameEngine):
             session_manager=session_manager,
             event_bus=event_bus,
             game_id=game_id,
+            session_id=session_id,
             scenemanager_root_path=scenemanager_root_path,
             **kwargs,
         )
@@ -95,49 +101,120 @@ class DnDGameEngine(BaseGameEngine):
 
     #     return ValidationResult(is_valid=True)
 
-    def validate_action(self, parsed_action: ParsedAction) -> ValidationResult:
-        """Validate action against D&D rules and current game state"""
-        if not self.game_state:
-            return ValidationResult(is_valid=False, reason="Game state not initialized")
+    # def validate_action(self, parsed_action: ParsedAction) -> ValidationResult:
+    #     """Validate action against D&D rules and current game state"""
+    #     base_validation = super().validate_action(parsed_action)
 
-            # Check if actor exists and is alive
-        if parsed_action.actor == "player":
-            if not self.player_state.check_is_alive():
-                return ValidationResult(
-                    is_valid=False, reason=f"{parsed_action.actor} is dead."
-                )
-        else:
-            npc = self.game_state.get_npc_by_name(parsed_action.actor)
-            if npc and not npc.is_alive():
-                return ValidationResult(
-                    is_valid=False, reason=f"{parsed_action.actor} is dead."
-                )
+    #     if not base_validation.is_valid:
+    #         return base_validation
 
-        method_name = f"validate_{parsed_action.action_type.value}_constraints"
-        validator = getattr(self, method_name, None)
+    #     # Dynamic dispatch to specific validator
+    #     method_name = f"validate_{parsed_action.action_type.value}_constraints"
+    #     validator = getattr(self, method_name, None)
 
-        if validator is None:
-            return ValidationResult(
-                is_valid=False,
-                reason=f"No validator for {parsed_action.action_type.value}",
-            )
+    #     if validator is None:
+    #         return ValidationResult(
+    #             is_valid=False,
+    #             reason=f"No validator for {parsed_action.action_type.value}",
+    #         )
 
-        return validator()
+    #     return validator(parsed_action)
 
-    def validate_attack_constraints(self):
-        return ValidationResult(is_valid=True)
+    # def validate_interact_constraints(
+    #     sel, parsed_action: ParsedAction
+    # ) -> ValidationResult:
+    #     return ValidationResult(is_valid=True)
 
-    def validate_spell_constraints(self):
-        return ValidationResult(is_valid=True)
+    # def validate_attack_constraints(
+    #     self, parsed_action: ParsedAction
+    # ) -> ValidationResult:
+    #     return ValidationResult(is_valid=True)
 
-    def validate_social_constraints(self):
-        return ValidationResult(is_valid=True)
+    # def validate_spell_constraints(
+    #     self, parsed_action: ParsedAction
+    # ) -> ValidationResult:
+    #     return ValidationResult(is_valid=True)
 
-    def validate_movement_constraints(self):
-        return ValidationResult(is_valid=True)
+    # def validate_social_constraints(
+    #     self, parsed_action: ParsedAction
+    # ) -> ValidationResult:
+    #     return ValidationResult(is_valid=True)
 
-    def validate_interact_constraints(self):
-        return ValidationResult(is_valid=True)
+    # def validate_movement_constraints(
+    #     self, parsed_action: ParsedAction
+    # ) -> ValidationResult:
+    #     return ValidationResult(is_valid=True)
+
+    def normalize_string(self, text: Any) -> list[str]:
+        """Lowercase, remove punctuation, split into words, remove stopwords."""
+        STOPWORDS = {"to", "the", "a", "an", "run", "walk", "go", "move", "goto"}
+
+        if text is None:
+            return []
+        if isinstance(text, list):
+            # flatten list of tokens into string
+            text = " ".join(map(str, text))
+        elif not isinstance(text, str):
+            # coerce anything else (e.g. int, dict) to string
+            text = str(text)
+
+        text = re.sub(r"[^\w\s]", "", text.lower())
+        words = text.split()
+        return [w for w in words if w not in STOPWORDS]
+
+    # -------------------------------------------------------------------------------------------------------
+    # -------------------------------------------------------------------------------------------------------
+
+    def best_exit_match_fuzzy(
+        self, parsed_action: ParsedAction, scene_exits: list[Exit]
+    ):
+        candidates = [parsed_action.action, parsed_action.target, parsed_action.subject]
+        candidates = [c for c in candidates if c]
+
+        best_match, best_score = None, 0.0
+        for exit in scene_exits:
+            exit_text = f"{exit.label} {exit.target_scene}".lower()
+            for candidate in candidates:
+                score = SequenceMatcher(
+                    None,
+                    self.normalize_string(candidate),
+                    # candidate,
+                    self.normalize_string(exit_text),
+                    # exit_text,
+                ).ratio()
+                if score > best_score:
+                    best_match, best_score = exit, score
+
+        # tune threshold (0.5–0.7 works well)
+        return best_match if best_score > 0.6 else None
+
+    # -------------------------------------------------------------------------------------------------------
+    # -------------------------------------------------------------------------------------------------------
+
+    def token_similarity(self, a: str, b: str) -> float:
+        set_a, set_b = set(self.normalize_string(a)), set(self.normalize_string(b))
+        # set_a, set_b = set(a.lower().split()), set(b.lower().split())
+        return len(set_a & set_b) / len(set_a | set_b) if set_a or set_b else 0.0
+
+    def best_exit_match_tokens(
+        self, parsed_action: ParsedAction, scene_exits: list[Exit]
+    ):
+        candidates = [parsed_action.action, parsed_action.target, parsed_action.subject]
+        candidates = [c for c in candidates if c]
+
+        best_match, best_score = None, 0.0
+        for exit in scene_exits:
+            exit_text = f"{exit.label} {exit.target_scene}"
+            for candidate in candidates:
+                score = self.token_similarity(candidate, exit_text)
+                if score > best_score:
+                    best_match, best_score = exit, score
+
+        # tune threshold (0.3–0.5 is usually enough)
+        return best_match if best_score > 0.3 else None
+
+    # -------------------------------------------------------------------------------------------------------
+    # -------------------------------------------------------------------------------------------------------
 
     # def validate_action_constraints(
     #     self, parsed_action: ParsedAction

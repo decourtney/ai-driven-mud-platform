@@ -4,11 +4,9 @@ Handles communication with the standalone model service.
 Replaces direct ModelManager usage in the main API server.
 """
 
-import time
-import httpx
-import asyncio
-from typing import Optional, Dict, Any, List
-
+import time, json, websockets, httpx, asyncio
+from typing import Optional, Dict, Any, List, AsyncGenerator
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from backend.models import (
     ParsedAction,
     ParseActionRequest,
@@ -16,7 +14,9 @@ from backend.models import (
     GenerateSceneRequest,
     GeneratedNarration,
     ParsedAction,
-    ValidationResult,
+    GenerateInvalidActionRequest,
+    SceneExitRequest,
+    SceneExitResult,
 )
 
 
@@ -24,7 +24,7 @@ class AsyncModelServiceClient:
     """Async version of model service client"""
 
     def __init__(
-        self, model_service_url: str = "http://localhost:8001", timeout: float = 30.0
+        self, model_service_url: str = "http://localhost:8001", timeout: float = 45.0
     ):
         self.base_url = model_service_url.rstrip("/")
         self.timeout = timeout
@@ -217,6 +217,30 @@ class AsyncModelServiceClient:
             print(f"[CLIENT] Parse request failed: {e}")
             return ParsedAction(action_type="unknown", details=str(e))
 
+    async def determine_scene_exit(self, request: SceneExitRequest) -> SceneExitResult:
+        try:
+            response = await self.client.post(
+                f"{self.base_url}/determine_scene_exit",
+                content=request.model_dump_json(),
+                headers={"Content-Type": "application/json"},
+            )
+            response.raise_for_status()
+
+            result_dict = response.json()
+            return SceneExitResult(**result_dict)
+
+        except httpx.HTTPError as http_err:
+            try:
+                error_detail = response.json().get("detail", str(http_err))
+            except Exception:
+                error_detail = str(http_err)
+            print(f"[CLIENT] Scene exit determination request failed: {error_detail}")
+            return SceneExitResult(target_scene="unknown")
+
+        except Exception as e:
+            print(f"[CLIENT] Scene exit determination request failed: {e}")
+            return SceneExitResult(target_scene="unknown")
+
     async def generate_action(
         self, request: GenerateActionRequest
     ) -> GeneratedNarration:
@@ -229,9 +253,12 @@ class AsyncModelServiceClient:
             response.raise_for_status()
 
             result_dict = response.json()
-            result = GeneratedNarration(**result_dict)
 
-            return result
+            # Ensure 'narration' is always present for Pydantic
+            if "narration" not in result_dict or not result_dict["narration"]:
+                result_dict["narration"] = ""
+
+            return GeneratedNarration(**result_dict)
 
         except httpx.HTTPError as http_err:
             try:
@@ -274,21 +301,29 @@ class AsyncModelServiceClient:
 
         except Exception as e:
             print(f"[CLIENT] Generation request failed: {e}")
-            return GeneratedNarration(narration="", action_type="unknown", details=str(e))
+            return GeneratedNarration(
+                narration="", action_type="unknown", details=str(e)
+            )
 
     async def generate_invalid_action(
-        self, request: ValidationResult
+        self, request: GenerateInvalidActionRequest
     ) -> GeneratedNarration:
         try:
             response = await self.client.post(
-                f"{self.base_url}/generate_invalid_action", json=request.model_dump()
+                f"{self.base_url}/generate_invalid_action",
+                content=request.model_dump_json(),
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 
             result_dict = response.json()
-            result = GeneratedNarration(**result_dict)
 
-            return result
+            # Ensure 'narration' is always present for Pydantic
+            if "narration" not in result_dict or not result_dict["narration"]:
+                result_dict["narration"] = ""
+
+            return GeneratedNarration(**result_dict)
+
         except httpx.HTTPError as http_err:
             try:
                 error_detail = response.json().get("detail", str(http_err))
@@ -318,3 +353,94 @@ class AsyncModelServiceClient:
         except Exception as e:
             print(f"[CLIENT] Batch parse failed: {e}")
             return [{"action_type": "unknown", "error": str(e)} for _ in requests]
+
+    # ==========================================
+    # WEBSOCKET INFERENCE METHODS
+    # ==========================================
+
+    async def stream_scene_generation(
+        self, request: GenerateSceneRequest
+    ) -> AsyncGenerator[dict, None]:
+        """Stream scene narration chunks from model_server WebSocket."""
+        if self.base_url.startswith("https://"):
+            ws_url = (
+                self.base_url.replace("https://", "wss://") + "/ws/scene_generation"
+            )
+        else:
+            ws_url = self.base_url.replace("http://", "ws://") + "/ws/scene_generation"
+
+        print("\033[32m[MODEL_CLIENT]\033[0m Stream Scene Request:", request)
+        print(f"\033[32m[MODEL_CLIENT]\033[0m WebSocket URL: {ws_url}")
+
+        try:
+            print(f"\033[32m[MODEL_CLIENT]\033[0m Attempting to connect to {ws_url}...")
+            async with websockets.connect(ws_url) as ws:
+                print(f"\033[32m[MODEL_CLIENT]\033[0m Connected successfully!")
+
+                # Send the request
+                request_json = request.model_dump_json()
+                print(f"\033[32m[MODEL_CLIENT]\033[0m Sending request: {request_json}")
+                await ws.send(request_json)
+                print(
+                    f"\033[32m[MODEL_CLIENT]\033[0m Request sent, waiting for messages..."
+                )
+
+                message_count = 0
+                while True:
+                    try:
+                        # print(f"\033[32m[MODEL_CLIENT]\033[0m Waiting for message #{message_count + 1}...")
+                        # Add timeout to prevent hanging
+                        message = await asyncio.wait_for(ws.recv(), timeout=30.0)
+                        message_count += 1
+                        # print(
+                        #     f"[{time.time()}]\033[32m[MODEL_CLIENT]\033[0m Received message #{message_count}"
+                        # )
+
+                        try:
+                            msg = json.loads(message)
+                            # print(
+                            #     f"[{time.time()}]\033[32m[MODEL_CLIENT]\033[0m Parsed message #{message_count}"
+                            # )
+                            yield msg
+
+                            # Check for completion or error
+                            if msg.get("type") == "done":
+                                print(
+                                    f"\033[32m[MODEL_CLIENT]\033[0m Stream completed normally after {message_count} messages"
+                                )
+                                break
+                            elif msg.get("type") == "error":
+                                print(
+                                    f"\033[32m[MODEL_CLIENT]\033[0m Stream error: {msg.get('error')}"
+                                )
+                                break
+                        except json.JSONDecodeError as json_error:
+                            print(
+                                f"\033[32m[MODEL_CLIENT]\033[0m Invalid JSON received: {message}, error: {json_error}"
+                            )
+                            continue
+
+                    except asyncio.TimeoutError:
+                        print(
+                            f"\033[32m[MODEL_CLIENT]\033[0m Timeout waiting for message #{message_count + 1}, breaking"
+                        )
+                        break
+
+                print(
+                    f"\033[32m[MODEL_CLIENT]\033[0m Finished receiving {message_count} messages total"
+                )
+
+        except websockets.InvalidStatus as e:
+            print(f"[WS] Connection failed with status: {e.status_code}")
+            if hasattr(e, "response_headers"):
+                print(f"[WS] Response headers: {e.response_headers}")
+            raise
+        except websockets.ConnectionClosed as e:
+            print(f"[WS] Connection closed: code={e.code}, reason={e.reason}")
+            raise
+        except Exception as e:
+            print(f"[WS] Unexpected error: {e}")
+            import traceback
+
+            print(f"[WS] Full traceback: {traceback.format_exc()}")
+            raise
