@@ -3,18 +3,12 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from enum import Enum
 from dataclasses import dataclass, field
+from backend.character_models import Disposition
 
 
 # -------------------------
 # Scene and Exit structures
 # -------------------------
-
-
-class Disposition(Enum):
-    friendly = "friendly"
-    neutral = "neutral"
-    aggresive = "aggresive"
-
 
 @dataclass
 class Exit:

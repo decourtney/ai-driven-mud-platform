@@ -8,62 +8,16 @@ from backend.models import (
     ActionResult,
     DamageType,
     ActionType,
+)
+from backend.character_models import (
     CharacterType,
-    StatusEffect,
+    ConditionEffect,
+    ConditionEffectInstance,
+    Item,
+    Spell
 )
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class StatusEffectInstance:
-    """Represents an active status effect on a character"""
-
-    effect: StatusEffect
-    duration: int  # turns remaining, -1 for permanent
-    intensity: int = 1  # for effects that can stack or have varying intensity
-    source: Optional[str] = None  # what caused this effect
-
-
-@dataclass
-class Item:
-    """Represents an item in inventory or equipment"""
-
-    id: str
-    name: str
-    item_type: str  # "weapon", "armor", "consumable", "tool", etc.
-    description: str = ""
-    damage_dice: Optional[str] = None  # "1d8", "2d6", etc.
-    armor_class: Optional[int] = None
-    # properties: Set[str] = field(default_factory=set)  # "magical", "heavy", "finesse", etc.
-    gold_value: int = 0  # gold value
-    weight: float = 0.0
-
-    def is_weapon(self) -> bool:
-        return self.item_type == "weapon"
-
-    def is_armor(self) -> bool:
-        return self.item_type == "armor"
-
-    def is_consumable(self) -> bool:
-        return self.item_type == "consumable"
-
-
-@dataclass
-class Spell:
-    """Represents a spell that can be cast"""
-
-    name: str
-    level: int
-    school: str  # "evocation", "illusion", etc.
-    casting_time: str = "1 action"
-    range_str: str = "60 feet"
-    duration: str = "Instantaneous"
-    # components: Set[str] = field(default_factory=set)  # "V", "S", "M"
-    description: str = ""
-    damage_dice: Optional[str] = None
-    save_type: Optional[str] = None  # "Dexterity", "Wisdom", etc.
-    attack_roll: bool = False
 
 
 class CharacterState:
@@ -136,7 +90,7 @@ class CharacterState:
         self.abilities: List[str] = []  # Special abilities, feats, etc.
 
         # Status effects
-        self.status_effects: List[StatusEffectInstance] = []
+        self.status_effects: List[ConditionEffectInstance] = []
 
         # Combat state
         self.is_surprised = False
@@ -190,7 +144,9 @@ class CharacterState:
 
     def is_conscious(self) -> bool:
         """Check if character is conscious"""
-        return self.check_is_alive() and not self.has_status(StatusEffect.UNCONSCIOUS)
+        return self.check_is_alive() and not self.has_status(
+            ConditionEffect.UNCONSCIOUS
+        )
 
     def is_enemy(self) -> bool:
         """Check if this character is an enemy"""
@@ -212,12 +168,12 @@ class CharacterState:
         """Check if character can move"""
         for instance in self.status_effects:
             if instance.effect in {
-                StatusEffect.paralyzed,
-                StatusEffect.stunned,
-                StatusEffect.unconscious,
-                StatusEffect.grappled,
-                StatusEffect.restrained,
-                StatusEffect.incapaciatated,
+                ConditionEffect.paralyzed,
+                ConditionEffect.stunned,
+                ConditionEffect.unconscious,
+                ConditionEffect.grappled,
+                ConditionEffect.restrained,
+                ConditionEffect.incapaciatated,
             }:
                 return False
         return True
@@ -260,7 +216,7 @@ class CharacterState:
 
         # Remove unconscious status if healed
         if self.current_hp > 0:
-            self.remove_status_effect(StatusEffect.UNCONSCIOUS)
+            self.remove_status_effect(ConditionEffect.UNCONSCIOUS)
 
         # self.last_updated = datetime.now(timezone.utc)
         return actual_healing
@@ -270,55 +226,7 @@ class CharacterState:
         self.temporary_hp = max(self.temporary_hp, amount)
         # self.last_updated = datetime.now(timezone.utc)
 
-    # ------------------------------
-    # Status effect management
-    # ------------------------------
-    def has_status(self, effect: StatusEffect) -> bool:
-        """Check if character has a specific status effect"""
-        return any(se.effect == effect for se in self.status_effects)
 
-    def get_status_effect(self, effect: StatusEffect) -> Optional[StatusEffectInstance]:
-        """Get specific status effect instance"""
-        for se in self.status_effects:
-            if se.effect == effect:
-                return se
-        return None
-
-    def add_status_effect(
-        self,
-        effect: StatusEffect,
-        duration: int,
-        intensity: int = 1,
-        source: str = None,
-    ):
-        """Add a status effect"""
-        # Remove existing instance of same effect
-        self.remove_status_effect(effect)
-
-        # Add new effect
-        effect_instance = StatusEffectInstance(
-            effect=effect, duration=duration, intensity=intensity, source=source
-        )
-        self.status_effects.append(effect_instance)
-        # self.last_updated = datetime.now(timezone.utc)
-
-    def remove_status_effect(self, effect: StatusEffect):
-        """Remove a status effect"""
-        self.status_effects = [se for se in self.status_effects if se.effect != effect]
-        # self.last_updated = datetime.now(timezone.utc)
-
-    def update_status_effects(self):
-        """Update status effect durations (call at end of turn)"""
-        effects_to_remove = []
-
-        for effect in self.status_effects:
-            if effect.duration > 0:
-                effect.duration -= 1
-                if effect.duration == 0:
-                    effects_to_remove.append(effect.effect)
-
-        for effect_type in effects_to_remove:
-            self.remove_status_effect(effect_type)
 
     # ------------------------------
     # Combat state methods
@@ -326,20 +234,20 @@ class CharacterState:
     def is_immobilized(self) -> bool:
         """Check if character cannot move"""
         immobilizing_effects = {
-            StatusEffect.PARALYZED,
-            StatusEffect.STUNNED,
-            StatusEffect.UNCONSCIOUS,
-            StatusEffect.GRAPPLED,
-            StatusEffect.RESTRAINED,
+            ConditionEffect.PARALYZED,
+            ConditionEffect.STUNNED,
+            ConditionEffect.UNCONSCIOUS,
+            ConditionEffect.GRAPPLED,
+            ConditionEffect.RESTRAINED,
         }
         return any(self.has_status(effect) for effect in immobilizing_effects)
 
     def update_can_act(self) -> bool:
         """Update whether character can take actions and store in attribute."""
         incapacitating_effects = {
-            StatusEffect.STUNNED,
-            StatusEffect.UNCONSCIOUS,
-            StatusEffect.INCAPACITATED,
+            ConditionEffect.STUNNED,
+            ConditionEffect.UNCONSCIOUS,
+            ConditionEffect.INCAPACITATED,
         }
         self.can_act = not any(
             self.has_status(effect) for effect in incapacitating_effects
@@ -352,7 +260,7 @@ class CharacterState:
             self.can_act()
             and self.current_mp > 0
             and len(self.known_spells) > 0
-            and not self.has_status(StatusEffect.PARALYZED)
+            and not self.has_status(ConditionEffect.PARALYZED)
         )
 
     def reset_turn_actions(self):
@@ -409,12 +317,11 @@ class CharacterState:
         self.inventory.append(item)
         # self.last_updated = datetime.now(timezone.utc)
 
-    def remove_item(self, item_name: str) -> Optional[Item]:
+    def remove_item(self, item_id: str) -> Optional[Item]:
         """Remove item from inventory by name"""
         for item in self.inventory:
-            if item.name.lower() == item_name.lower():
+            if item.id == item_id:
                 self.inventory.remove(item)
-                # self.last_updated = datetime.now(timezone.utc)
                 return item
         return None
 
@@ -527,7 +434,7 @@ class CharacterState:
         if result.hit and "fireball" in result.parsed_action.action.lower():
             # Fire damage might cause burning
             if result.damage_type == DamageType.critical:
-                self.add_status_effect(StatusEffect.CURSED, 3, source="fireball")
+                self.add_status_effect(ConditionEffect.CURSED, 3, source="fireball")
 
     # ------------------------------
     # DB CONVERSION

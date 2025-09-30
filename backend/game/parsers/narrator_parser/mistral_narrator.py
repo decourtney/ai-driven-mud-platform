@@ -343,7 +343,7 @@ class GGUFMistralNarrator(ActionNarrator):
             accumulated_text = ""
             for token in self._stream_text(
                 scene_prompt,
-                max_tokens=25,
+                max_tokens=200,
                 temperature=0.1,
             ):
                 accumulated_text += token

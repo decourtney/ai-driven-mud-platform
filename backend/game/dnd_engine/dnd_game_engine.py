@@ -10,8 +10,8 @@ from backend.models import (
     DamageType,
     GameCondition,
     ValidationResult,
-    StatusEffect,
 )
+from backend.character_models import ConditionEffect
 from backend.scene_models import Exit
 from backend.game.core.character_state import CharacterState
 from backend.game.core.game_state import GameState
@@ -34,7 +34,7 @@ class DnDGameEngine(BaseGameEngine):
         session_manager: GameSessionManager,
         event_bus: EventBus,
         game_id: str,
-        session_id:str,
+        session_id: str,
         **kwargs,
     ):
         scenemanager_root_path = Path(__file__).parent / "scenes" / game_id

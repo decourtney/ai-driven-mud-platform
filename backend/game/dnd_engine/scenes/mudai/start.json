@@ -91,7 +91,7 @@
       {
         "id": "busted_statue",
         "name": "The Great ...",
-        "description": "Toppled marble statue of a robed man. Broken and defaced — the plaque only reads 'Ode to'.",
+        "description": "Toppled marble statue of a robed man. Broken and defaced — the plaque only reads 'The Great'.",
         "is_interactable": true,
         "is_loot": false
       }

@@ -7,7 +7,8 @@ from datetime import datetime
 from typing import Dict, Any, Optional, Tuple
 from fastapi import HTTPException
 from backend.services.api.server import prisma
-from backend.models import GenerateSceneRequest, CharacterType
+from backend.models import GenerateSceneRequest
+from backend.character_models import CharacterType
 from backend.services.api.connection_manager import (
     ConnectionManager,
     WebSocketMessage,

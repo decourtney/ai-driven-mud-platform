@@ -9,31 +9,32 @@ from typing import Optional, List, Dict, Any
 from enum import Enum
 from dataclasses import dataclass, field
 from backend.scene_models import Exit
+from backend.character_models import CharacterType
 
 
-class CharacterType(Enum):
-    player = "player"
-    npc = "npc"
-    enemy = "enemy"  # Hostile NPC
-    ally = "ally"
+# class CharacterType(Enum):
+#     player = "player"
+#     npc = "npc"
+#     enemy = "enemy"  # Hostile NPC
+#     ally = "ally"
 
 
-class StatusEffect(Enum):
-    poisoned = "poisoned"
-    paralyzed = "paralyzed"
-    stunned = "stunned"
-    blessed = "blessed"
-    cursed = "cursed"
-    invisible = "invisible"
-    haste = "haste"
-    slow = "slow"
-    charmed = "charmed"
-    frightened = "frightened"
-    prone = "prone"
-    grappled = "grappled"
-    restrained = "restrained"
-    incapaciatated = "incapacitated"
-    unconscious = "unconscious"
+# class StatusEffect(Enum):
+#     poisoned = "poisoned"
+#     paralyzed = "paralyzed"
+#     stunned = "stunned"
+#     blessed = "blessed"
+#     cursed = "cursed"
+#     invisible = "invisible"
+#     haste = "haste"
+#     slow = "slow"
+#     charmed = "charmed"
+#     frightened = "frightened"
+#     prone = "prone"
+#     grappled = "grappled"
+#     restrained = "restrained"
+#     incapaciatated = "incapacitated"
+#     unconscious = "unconscious"
 
 
 class GameCondition(Enum):

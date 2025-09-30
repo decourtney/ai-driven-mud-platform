@@ -10,16 +10,15 @@ from backend.models import (
     ActionType,
     GameCondition,
     ValidationResult,
-    CharacterType,
     ParseActionRequest,
     GenerateSceneRequest,
     GeneratedNarration,
     TurnPhase,
     GenerateActionRequest,
-    StatusEffect,
     GenerateInvalidActionRequest,
     SceneExitRequest,
 )
+from backend.character_models import CharacterType, ConditionEffect
 from backend.scene_models import Scene, Exit
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.game.core.game_session_manager import GameSessionManager
@@ -70,19 +69,57 @@ class BaseGameEngine(ABC):
             self.dice_roller = self.get_default_dice_roller()
 
         self.game_state = None
-        self.player_state = None
+        self.player_state = None  # NOTE: Player and NPC States might be better suited for mem store on Game State
         self.npc_states: Dict[str, CharacterState] = {}
         self.is_processing = False
         self.max_invalid_attempts = kwargs.get("max_invalid_attempts", 3)
+
+    # --------------------------------------------------------------------------------
+    # Abstract Methods
+    # --------------------------------------------------------------------------------
 
     @abstractmethod
     def get_default_dice_roller(self) -> BaseDiceRoller:
         """Each game system provides its dice roller"""
         pass
 
-    # ----------------------------
+    @abstractmethod
+    def convert_outcome_to_damage_type(self, outcome: str):
+        """
+        Convert dice system outcome to damage type.
+        Must be implemented by subclasses for game-specific mappings.
+        """
+        pass
+
+    @abstractmethod
+    def get_action_difficulty(
+        self, action_type: ActionType, context: Optional[GameState] = None
+    ) -> int:
+        """
+        Get difficulty/DC for an action type.
+        Must be implemented by subclasses to define game-specific difficulty scaling.
+        """
+        pass
+
+    @abstractmethod
+    def check_game_condition(self) -> GameCondition:
+        """
+        Check if game should continue, end in victory, or defeat.
+        Must be implemented by subclasses to define win/lose conditions.
+        """
+        pass
+
+    @abstractmethod
+    def ai_decide_npc_action(self, npc: CharacterState) -> ParsedAction:
+        """
+        AI logic to decide NPC action.
+        Must be implemented by subclasses to define game-specific NPC behavior.
+        """
+        pass
+
+    # --------------------------------------------------------------------------------
     # Game State Management
-    # ----------------------------
+    # --------------------------------------------------------------------------------
 
     async def load_game_state(self, game_state, player_state):
         print("[DEBUG] LOADING GAME STATE INTO ENGINE")
@@ -111,6 +148,8 @@ class BaseGameEngine(ABC):
         print("\033[91m[DEBUG]\033[0m STARTING TURN AFTER LOADING GAME STATE")
         asyncio.create_task(self.take_turn())
 
+    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    # NOTE: not currently in-use
     def get_serialized_game_state(self) -> Tuple[Dict, Dict]:
         print("[DEBUG] RETURNING SERIALIZED GAME STATE")
         serialized_game_state = self.game_state.to_db()
@@ -140,9 +179,11 @@ class BaseGameEngine(ABC):
         else:
             self.player_state.apply_action_result(result)
 
-    # ----------------------------
+    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+    # --------------------------------------------------------------------------------
     # Scene Management
-    # ----------------------------
+    # --------------------------------------------------------------------------------
 
     async def load_scene(
         self,
@@ -155,7 +196,7 @@ class BaseGameEngine(ABC):
 
         if self.game_state.loaded_scene.id != self.player_state.current_scene:
             self.player_state.current_scene = self.game_state.loaded_scene.id
-            # We should narrate the scene since the player is arriving on scene
+            # We should narrate the scene since the player is arriving
             # NOTE: Not sure this is correct place to change the turn phase - works for now
             self.game_state.current_turn_phase = TurnPhase.scene_narration
         print(
@@ -165,6 +206,7 @@ class BaseGameEngine(ABC):
 
         return
 
+    # Using websocket as primary and rest as fallback
     async def present_scene(self):
         """Generate and return scene description for player"""
         if not self.game_state:
@@ -199,11 +241,6 @@ class BaseGameEngine(ABC):
                     )
 
                     if text_chunk:
-                        # narration_text += text_chunk
-                        # print(
-                        #     "\033[32m[PRESENT_SCENE]\033[0m Sending Stream Message:",
-                        #     text_chunk,
-                        # )
                         # Send streaming update with consistent UUID
                         await self.session_manager.send_streaming_message(
                             message={
@@ -301,9 +338,9 @@ class BaseGameEngine(ABC):
         # Engine decides whether to persist immediately or batch
         await self.session_manager.save_scene_diff(scene_id, diff)
 
-    # ----------------------------
+    # --------------------------------------------------------------------------------
     # GAME ORCHESTRATION
-    # ----------------------------
+    # --------------------------------------------------------------------------------
 
     async def take_turn(self):
         """
@@ -336,9 +373,10 @@ class BaseGameEngine(ABC):
         self.game_state.current_turn_phase = TurnPhase.player_turn.value
         pass
 
-    # --------------------------
+    # --------------------------------------------------------------------------------
     # Scene Narration
-    # --------------------------
+    # --------------------------------------------------------------------------------
+
     async def handle_scene_narration(self):
         self.is_processing = True
         self.game_state.current_actor = None
@@ -350,25 +388,16 @@ class BaseGameEngine(ABC):
 
         await self.present_scene()
 
-        # message = {
-        #     "speaker": "narrator",
-        #     "action": "narrate",
-        #     "content": scene_narration.narration,
-        # }
-
-        # await self.session_manager.send_message_to_session(
-        #     game_state_id=self.game_state.id, message=message
-        # )
-
         # TODO After narration determine next phase - Player / NPC / End Turn or Game Over
         await self.determine_next_phase()
         self.is_processing = False
 
         asyncio.create_task(self.take_turn())
 
-    # --------------------------
+    # --------------------------------------------------------------------------------
     # Player Turn
-    # --------------------------
+    # --------------------------------------------------------------------------------
+
     async def handle_player_turn(self):
         """
         This method unlocks the player input then
@@ -382,9 +411,10 @@ class BaseGameEngine(ABC):
             is_locked=self.game_state.is_player_input_locked,
         )
 
-    # --------------------------
+    # --------------------------------------------------------------------------------
     # NPC Turn
-    # --------------------------
+    # --------------------------------------------------------------------------------
+
     async def handle_npc_turn(self):
         # self.game_state.current_turn_phase = TurnPhase.npc_turn.value
         self.game_state.current_actor = None
@@ -403,11 +433,18 @@ class BaseGameEngine(ABC):
                 return
 
         # After NPCs, update scene
-        await self._update_scene_after_actions()
+        # await self._update_scene_after_actions()
 
-    # --------------------------
+    def get_living_npcs(self) -> List[CharacterState]:
+        """Get list of NPCs that can act this turn"""
+        if not self.game_state:
+            return []
+        return [npc for npc in self.game_state.npcs if npc.is_alive()]
+
+    # --------------------------------------------------------------------------------
     # Scene update
-    # --------------------------
+    # --------------------------------------------------------------------------------
+
     async def _update_scene_after_actions(self):
         updated_scene, condition = await self.get_updated_scene_after_actions()
         await self.session_manager.send_narration(
@@ -431,6 +468,10 @@ class BaseGameEngine(ABC):
 
         # Ready for next turn: start scene narration for next turn
         await self.take_turn()
+
+    # --------------------------------------------------------------------------------
+    # Player Turn Execution
+    # --------------------------------------------------------------------------------
 
     async def execute_player_action(self, action: str):
         """
@@ -523,9 +564,9 @@ class BaseGameEngine(ABC):
             "message": "Unable to process action after multiple attempts.",
         }, GameCondition.game_on
 
-    # ----------------------------
+    # --------------------------------------------------------------------------------
     # NPC Turn Processing
-    # ----------------------------
+    # --------------------------------------------------------------------------------
 
     async def execute_npc_action_with_validation(
         self, npc: CharacterState
@@ -568,7 +609,7 @@ class BaseGameEngine(ABC):
             return f"Error updating scene: {str(e)}", GameCondition.game_over
 
     # ------------------------------------------------------------------------------------
-    # Action Validations - will need to be abstract eventually
+    # Action Validations - will need to be abstract eventually... maybe
     # ------------------------------------------------------------------------------------
 
     async def validate_action(self, parsed_action: ParsedAction) -> ValidationResult:
@@ -628,6 +669,20 @@ class BaseGameEngine(ABC):
                 suggested_action="wait until you can move again",
             )
 
+        """
+        This snippet is for determing valid exits using codellama.
+        It works but a bit overkill and still uses sequence similiarity check.
+        """
+        # check if exit exists
+        # scene_exit_request = SceneExitRequest(
+        #     target=parsed_action.target, scene_exits=self.game_state.loaded_scene.exits
+        # )
+        # print("\033[91m[DEBUG]\033[0m Scene Exit Result:", scene_exit_request)
+        # scene_exit_result = await self.model_client.determine_scene_exit(
+        #     scene_exit_request
+        # )
+        # print("\033[91m[DEBUG]\033[0m Scene Exit Result:", scene_exit_result)
+
         valid_exit = self.exit_validator.validate(
             target=parsed_action.target, exits=self.game_state.loaded_scene.exits
         )
@@ -639,17 +694,6 @@ class BaseGameEngine(ABC):
             return ValidationResult(is_valid=False, reason="Location doesn't exist")
 
         await self.load_scene(scene_id=valid_exit)
-
-        # This is for using Codellama to determine the target exit
-        # check if exit exists
-        # scene_exit_request = SceneExitRequest(
-        #     target=parsed_action.target, scene_exits=self.game_state.loaded_scene.exits
-        # )
-        # print("\033[91m[DEBUG]\033[0m Scene Exit Result:", scene_exit_request)
-        # scene_exit_result = await self.model_client.determine_scene_exit(
-        #     scene_exit_request
-        # )
-        # print("\033[91m[DEBUG]\033[0m Scene Exit Result:", scene_exit_result)
 
         return ValidationResult(is_valid=True)
 
@@ -673,32 +717,10 @@ class BaseGameEngine(ABC):
     ) -> ValidationResult:
         return ValidationResult(is_valid=True)
 
-    # ----------------------------
-    # Abstract Game Condition Checking
-    # ----------------------------
-
-    @abstractmethod
-    def check_game_condition(self) -> GameCondition:
-        """
-        Check if game should continue, end in victory, or defeat.
-        Must be implemented by subclasses to define win/lose conditions.
-        """
-        pass
-
-    # ----------------------------
-    # Abstract AI Decision Making
-    # ----------------------------
-    @abstractmethod
-    def ai_decide_npc_action(self, npc: CharacterState) -> ParsedAction:
-        """
-        AI logic to decide NPC action.
-        Must be implemented by subclasses to define game-specific NPC behavior.
-        """
-        pass
-
-    # ----------------------------
+    # --------------------------------------------------------------------------------
     # Action Processing
-    # ----------------------------
+    # --------------------------------------------------------------------------------
+
     async def process_parsed_action(self, parsed_action: ParsedAction) -> ActionResult:
         """
         Process a validated action and return the result.
@@ -801,14 +823,6 @@ class BaseGameEngine(ABC):
 
         return modifiers
 
-    @abstractmethod
-    def convert_outcome_to_damage_type(self, outcome: str):
-        """
-        Convert dice system outcome to damage type.
-        Must be implemented by subclasses for game-specific mappings.
-        """
-        pass
-
     def get_actor_state(self, actor_type: CharacterType, actor_name: str):
         """Helper to get actor state from game state"""
         # This wont work well using player name - should use character_type
@@ -824,35 +838,10 @@ class BaseGameEngine(ABC):
         """
         pass
 
-    @abstractmethod
-    def get_action_difficulty(
-        self, action_type: ActionType, context: Optional[GameState] = None
-    ) -> int:
-        """
-        Get difficulty/DC for an action type.
-        Must be implemented by subclasses to define game-specific difficulty scaling.
-        """
-        pass
+    # --------------------------------------------------------------------------------
+    # # Utility Methods
+    # --------------------------------------------------------------------------------
 
-    # ----------------------------
-    # Orchestration Methods for UI
-    # ----------------------------
-    # def get_current_scene(self) -> str:
-    #     """Get current scene description (for turn start)"""
-    #     try:
-    #         return self.present_scene()
-    #     except Exception as e:
-    #         return f"Error presenting scene: {str(e)}"
-
-    def get_living_npcs(self) -> List[CharacterState]:
-        """Get list of NPCs that can act this turn"""
-        if not self.game_state:
-            return []
-        return [npc for npc in self.game_state.npcs if npc.is_alive()]
-
-    # ----------------------------
-    # Utility Methods
-    # ----------------------------
     async def is_ready(self) -> bool:
         """Check if all components are ready"""
         return (
@@ -874,9 +863,10 @@ class BaseGameEngine(ABC):
             "scene": self.game_state.scene.get("name", "unknown"),
         }
 
-    # ----------------------------
+    # --------------------------------------------------------------------------------
     # Hook Methods for Extensibility
-    # ----------------------------
+    # --------------------------------------------------------------------------------
+
     def on_turn_start(self):
         """Called at the start of each turn. Override for game-specific logic."""
         pass
