@@ -94,6 +94,7 @@ class GameSessionManager:
             character_type=CharacterType(character_config["character_type"]),
             bio=character_config["bio"],
         )
+        new_playerCharacter
 
         print("\033[93m[DEBUG] New PlayerCharacter:\033[0m", PlayerCharacter)
 

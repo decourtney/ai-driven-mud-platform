@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Any
 from backend.core.items.item_models import Item
 from backend.core.items.item_models import Inventory
 from backend.core.spells.spell_models import Spell
+from backend.core.abilities.ability import Ability
 from backend.core.characters.character_models import (
     ConditionEffectInstance,
     ConditionEffect,
@@ -15,6 +16,7 @@ class BaseCharacter(BaseModel):
     # Identity
     id: Optional[str] = None
     name: Optional[str] = None
+    bio: str = ""
     character_type: CharacterType = CharacterType.NPC
     creature_type: CreatureType = CreatureType.HUMANOID
     level: int = 1
@@ -38,13 +40,15 @@ class BaseCharacter(BaseModel):
     # Equipment
     gold: int = 0
     inventory: Inventory = Inventory()
+    
+    # Skills
+    known_abilities: List[Ability] = []
+    known_spells: List[Spell] = []
 
     # Status effects
     condition_effects: List[ConditionEffectInstance] = Field(default_factory=list)
 
-    # Location
-    current_zone: Optional[str] = None
-    current_scene: Optional[str] = None
+
 
     # ------------------------------
     # Core status methods

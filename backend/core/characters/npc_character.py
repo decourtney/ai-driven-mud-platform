@@ -8,15 +8,11 @@ from backend.core.spells.spell_models import Spell
 from backend.core.spells.spell_slots import SpellSlots
 
 
-class NPCCharacter(BaseCharacter):
+class NpcCharacter(BaseCharacter):
     """
     Base NPC class for all non-player characters including monsters.
     """
 
-    description: str = ""
     disposition: Disposition = Disposition.NEUTRAL
-    equipment: Equipment = Equipment()
-    known_abilities: List[Ability] = []
-    known_spells: List[Spell] = []
     loot_table: Optional[List[str]] = None  # list of item IDs for randomized loot
-    quest_giver: Optional[List[str]] = None
+    available_quests: Optional[List[str]] = None # quest definition ids

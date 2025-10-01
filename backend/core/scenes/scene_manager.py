@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, Optional, Any
 from backend.core.game_engine.event_bus import EventBus
 from backend.core.characters.npc_library import NPC_LIBRARY
-from backend.core.characters.npc_character import NPCCharacter
+from backend.core.characters.npc_character import NpcCharacter
 from backend.core.scenes.scene_models import (
     Scene,
     SceneDiff,
@@ -70,7 +70,7 @@ class SceneManager:
                 notable_npcs=[
                     NotableNPC(**nnpc) for nnpc in scene_data.get("notable_npcs", [])
                 ],
-                npcs=[NPCCharacter(**npc) for npc in scene_data.get("npcs", [])],
+                npcs=[NpcCharacter(**npc) for npc in scene_data.get("npcs", [])],
                 scene_items=[SceneItem(**item) for item in scene_data.get("items", [])],
                 discoveries=[
                     Discovery(**disc) for disc in scene_data.get("discoveries", [])
@@ -114,7 +114,7 @@ class SceneManager:
             dynamic_npcs = []
             for npc_id in ["rabid_wolf"]:  # could pull from spawn tables later
                 npc_template = NPC_LIBRARY[npc_id]
-                dynamic_npcs.append(NPCCharacter(**npc_template))
+                dynamic_npcs.append(NpcCharacter(**npc_template))
             scene_data["npcs"] = dynamic_npcs
 
         return Scene(**scene_data)

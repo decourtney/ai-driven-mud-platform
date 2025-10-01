@@ -12,7 +12,14 @@ class QuestStatus(str, Enum):
 
 class Objective(BaseModel):
     description: str
+    required: int = 1  # e.g., 10 wolves to kill
+
+
+class ObjectiveState(BaseModel):
+    index: int
     is_completed: bool = False
+    progress: int = 0
+    required: int = 1  # e.g., 10 wolves to kill
 
 
 class QuestReward(BaseModel):
@@ -22,18 +29,22 @@ class QuestReward(BaseModel):
 
 
 class QuestDefinition(BaseModel):
-    """Immutable definition of a quest"""
-
+    """Immutable quest template (shared for all players)."""
     id: str
     name: str
     description: str
     objectives: List[Objective]
     rewards: QuestReward
+    prerequisites: List[str] = []
+    level_requirement: int = 0
+    quest_type: str = "side"  # later: Enum
+    repeatable: bool = False
 
 
 class QuestState(BaseModel):
-    """Per-player quest progress"""
-
+    """Per-player quest progress."""
     quest_id: str
     status: QuestStatus = QuestStatus.NOT_STARTED
-    completed_objectives: List[int] = []
+    objectives: List[ObjectiveState] = []
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None

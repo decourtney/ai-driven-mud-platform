@@ -9,15 +9,20 @@ class CharacterType(Enum):
 
 
 class CreatureType(Enum):
-    HUMANOID = "humanoid"
+    ABERRATION = "aberration"
     BEAST = "beast"
-    UNDEAD = "undead"
-    CONSTRUCT = "construct"
-    ELEMENTAL = "elemental"
-    DRAGON = "dragon"
-    GIANT = "giant"
     CELESTIAL = "celestial"
+    CONSTRUCT = "construct"
+    DRAGON = "dragon"
+    ELEMENTAL = "elemental"
+    FEY = "fey"
     FIEND = "fiend"
+    GIANT = "giant"
+    HUMANOID = "humanoid"
+    MONSTROSITY = "monstrosity"
+    OOZE = "ooze"
+    PLANT = "plant"
+    UNDEAD = "undead"
 
 
 class ConditionEffect(Enum):

@@ -19,11 +19,11 @@ class SpellSchool(str, Enum):
 class Spell(BaseModel):
     id: str
     name: str
+    description: str
     level: int  # 0 = cantrip, 1-9 = spell level
+    cooldown: int
     school: Optional[SpellSchool] = None
-    casting_time: Optional[str] = None
     range: Optional[int] = None  # not sure about distance rn
-    duration: Optional[str] = None
     damage_dice: Optional[str] = None
     description: str = ""
 

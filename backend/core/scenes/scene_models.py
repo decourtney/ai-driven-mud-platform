@@ -1,18 +1,12 @@
 from enum import Enum
 from typing import Optional, List, Dict, Union, Any
 from pydantic import BaseModel
-from backend.core.characters.character_models import Disposition
+from backend.core.characters.npc_character import NpcCharacter
 
 
 class SceneDiff(BaseModel):
     scene_id: str
     changes: Dict[str, Any] = {}
-
-
-class Status(BaseModel):
-    is_alive: bool = True
-    is_hostile: bool = False
-    health: int = 10
 
 
 class Structure(BaseModel):
@@ -35,7 +29,7 @@ class BlockedState(BaseModel):
 
 class LockedState(BaseModel):
     active: bool
-    requirement: Optional[Union[Requirement, str]] = None
+    requirement: Optional[str] = None
     can_lockpick: Optional[Dict] = None
 
 
@@ -66,20 +60,6 @@ class Discovery(BaseModel):
     is_discovered: bool = False
 
 
-class NPC(BaseModel):
-    id: str
-    name: str
-    description: str
-    status: Status
-    disposition: Disposition = Disposition.NEUTRAL
-
-
-class NotableNPC(NPC):
-    """For special dialogue or quest-related NPCs"""
-
-    pass
-
-
 # -------------------------
 # Scene
 # -------------------------
@@ -91,8 +71,8 @@ class Scene(BaseModel):
     description: str
     exits: List[Exit] = []
     structures: List[Structure] = []
-    notable_npcs: List[NotableNPC] = []
-    npcs: List[NPC] = []
+    notable_npcs: List[NpcCharacter] = []
+    npcs: List[NpcCharacter] = []
     items: List[SceneItem] = []
     discoveries: List[Discovery] = []
 

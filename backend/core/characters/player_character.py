@@ -1,7 +1,7 @@
 from backend.core.characters.base_character import BaseCharacter
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any
-from backend.core.items.item_models import Equipment, Slot, Inventory, Item
+from backend.core.items.item_models import Equipment, Slot, Item
 from backend.core.spells.spell_slots import SpellSlots
 from backend.core.spells.spell_models import Spell
 from backend.core.abilities.ability import Ability
@@ -9,13 +9,13 @@ from backend.core.quests.quest_models import QuestState
 
 
 class PlayerCharacter(BaseCharacter):
-    bio: str = ""
+    experience: int = 0
     equipment: Equipment = Equipment()
     natural_heal: str = ""  # not sure this will be implemented
-    known_abilities: List[Ability] = []
-    known_spells: List[Spell] = []
     spell_slots: SpellSlots = SpellSlots()
     active_quests: Dict[str, QuestState] = {}
+    current_zone: Optional[str] = None
+    current_scene: Optional[str] = None
 
     # ------------------------------
     # Inventory methods - thin wrappers but could be useful for effects on item pickup/drop
