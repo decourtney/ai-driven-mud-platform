@@ -21,24 +21,30 @@ from datetime import datetime
 from prisma import Prisma
 from contextlib import asynccontextmanager
 from backend.services.api.database import prisma
+from backend.services.api.models.action_models import ActionType
 from backend.services.api.connection_manager import (
     ConnectionManager,
     MessageType,
     WebSocketMessage,
 )
-from backend.game.game_registry import GAME_REGISTRY
-from backend.game.core.game_session_manager import GameSessionManager
-from backend.game.core.character_state import CharacterState
-from backend.game.core.event_bus import EventBus
+from backend.game_registry import GAME_REGISTRY
+from backend.core.game_engine.game_session_manager import GameSessionManager
+from backend.core.characters.character_state import CharacterState
+from backend.core.game_engine.event_bus import EventBus
 from backend.services.ai_models.model_client import AsyncModelServiceClient
-from backend.models import (
-    GameInfo,
-    GameSessionResponse,
+from backend.services.api.models.health_models import GameInfo
+from backend.services.api.models.scene_models import (
+    GeneratedNarration,
+    GenerateSceneRequest,
+    SceneExitRequest,
+    SceneExitResult,
+)
+from backend.services.api.models.action_models import (
+    ParsedAction,
     ParseActionRequest,
     GenerateActionRequest,
-    GenerateSceneRequest,
     ParsedAction,
-    ActionType,
+    GenerateInvalidActionRequest,
 )
 
 

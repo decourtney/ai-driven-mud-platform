@@ -5,18 +5,19 @@ Replaces direct ModelManager usage in the main API server.
 """
 
 import time, json, websockets, httpx, asyncio
-from typing import Optional, Dict, Any, List, AsyncGenerator
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from backend.models import (
+from typing import Dict, Any, List, AsyncGenerator
+from backend.services.api.models.scene_models import (
+    GeneratedNarration,
+    GenerateSceneRequest,
+    SceneExitRequest,
+    SceneExitResult,
+)
+from backend.services.api.models.action_models import (
     ParsedAction,
     ParseActionRequest,
     GenerateActionRequest,
-    GenerateSceneRequest,
-    GeneratedNarration,
     ParsedAction,
     GenerateInvalidActionRequest,
-    SceneExitRequest,
-    SceneExitResult,
 )
 
 
@@ -379,11 +380,11 @@ class AsyncModelServiceClient:
 
                 # Send the request
                 request_json = request.model_dump_json()
-                print(f"\033[32m[MODEL_CLIENT]\033[0m Sending request: {request_json}")
+                # print(f"\033[32m[MODEL_CLIENT]\033[0m Sending request: {request_json}")
                 await ws.send(request_json)
-                print(
-                    f"\033[32m[MODEL_CLIENT]\033[0m Request sent, waiting for messages..."
-                )
+                # print(
+                #     f"\033[32m[MODEL_CLIENT]\033[0m Request sent, waiting for messages..."
+                # )
 
                 message_count = 0
                 while True:

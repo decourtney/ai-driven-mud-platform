@@ -4,10 +4,9 @@ Handles real-time communication between clients and the game server.
 """
 
 from websockets.exceptions import ConnectionClosedError
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 from typing import Dict, List, Optional, Any
 import json
-import uuid
 from datetime import datetime
 import logging
 
