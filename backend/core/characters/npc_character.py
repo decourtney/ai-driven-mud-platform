@@ -8,7 +8,7 @@ from backend.core.spells.spell_models import Spell
 from backend.core.spells.spell_slots import SpellSlots
 
 
-class NPC(BaseCharacter):
+class NPCCharacter(BaseCharacter):
     """
     Base NPC class for all non-player characters including monsters.
     """

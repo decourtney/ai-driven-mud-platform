@@ -47,7 +47,7 @@ class Exit(BaseModel):
     locked: Optional[LockedState] = None
 
 
-class Item(BaseModel):
+class SceneItem(BaseModel):
     id: str
     name: str
     description: str
@@ -93,7 +93,7 @@ class Scene(BaseModel):
     structures: List[Structure] = []
     notable_npcs: List[NotableNPC] = []
     npcs: List[NPC] = []
-    items: List[Item] = []
+    items: List[SceneItem] = []
     discoveries: List[Discovery] = []
 
     def to_dict(self) -> dict:

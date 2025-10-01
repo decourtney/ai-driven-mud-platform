@@ -1,17 +1,17 @@
 import json
 import aiofiles
 from pathlib import Path
-from typing import Dict, Optional, Callable, Any
-from dataclasses import dataclass, field
+from typing import Dict, Optional, Any
 from backend.core.game_engine.event_bus import EventBus
+from backend.core.characters.npc_library import NPC_LIBRARY
+from backend.core.characters.npc_character import NPCCharacter
 from backend.core.scenes.scene_models import (
     Scene,
     SceneDiff,
     Exit,
     Structure,
     NotableNPC,
-    NPC,
-    Item,
+    SceneItem,
     Discovery,
     BlockedState,
     LockedState,
@@ -70,8 +70,8 @@ class SceneManager:
                 notable_npcs=[
                     NotableNPC(**nnpc) for nnpc in scene_data.get("notable_npcs", [])
                 ],
-                npcs=[NPC(**npc) for npc in scene_data.get("npcs", [])],
-                items=[Item(**item) for item in scene_data.get("items", [])],
+                npcs=[NPCCharacter(**npc) for npc in scene_data.get("npcs", [])],
+                scene_items=[SceneItem(**item) for item in scene_data.get("items", [])],
                 discoveries=[
                     Discovery(**disc) for disc in scene_data.get("discoveries", [])
                 ],
@@ -99,16 +99,23 @@ class SceneManager:
         if zone and self.loaded_zone != zone:
             await self.load_zone(zone)
         if scene_id not in self.loaded_scenes:
-            raise KeyError(
-                f"\033[91m[DEBUG]\033[0mScene {scene_id} not found in zone {zone}"
-            )
+            raise KeyError(f"Scene {scene_id} not found in zone {zone}")
 
         base_scene = self.loaded_scenes[scene_id]
-        scene_data = base_scene.model_dump() 
+        scene_data = base_scene.model_dump()
 
+        # Apply diffs if any
         if scene_id in self.scene_diffs:
             diff = self.scene_diffs[scene_id].changes
             scene_data = self.deep_merge(scene_data, diff)
+
+        # Instantiate dynamic NPCs if none yet
+        if not scene_data.get("npcs"):
+            dynamic_npcs = []
+            for npc_id in ["rabid_wolf"]:  # could pull from spawn tables later
+                npc_template = NPC_LIBRARY[npc_id]
+                dynamic_npcs.append(NPCCharacter(**npc_template))
+            scene_data["npcs"] = dynamic_npcs
 
         return Scene(**scene_data)
 
