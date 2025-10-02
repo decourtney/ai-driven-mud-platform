@@ -1,0 +1,111 @@
+{
+  "start": {
+    "id": "start",
+    "label": "Waking Up",
+    "description": "You awaken on a bed of leaves, the cool morning air brushing against your face. The scent of damp earth and pine surrounds you. The sun peeks through the canopy above, casting soft light over your small campsite.",
+    "exits": [
+      {
+        "id": "village_arrival",
+        "label": "path to village",
+        "target_scene": "village_arrival",
+        "blocked": { "active": false },
+        "locked": { "active": false }
+      }
+    ]
+  },
+  "village_arrival": {
+    "id": "village_arrival",
+    "label": "The Forgotten Village",
+    "description": "A shabby village square, eerily quiet.",
+
+    "exits": [
+      {
+        "id": "start",
+        "label": "path up hill",
+        "target_scene": "hill_path",
+        "blocked": { "active": false },
+        "locked": { "active": false }
+      },
+      {
+        "id": "village_road",
+        "label": "road to village",
+        "target_scene": "village_road",
+        "blocked": { "active": false },
+        "locked": { "active": false }
+      },
+      {
+        "id": "inn_entrance",
+        "label": "entrance to Spork Inn",
+        "target_scene": "inn",
+        "blocked": { "active": false },
+        "locked": { "active": false }
+      },
+      {
+        "id": "blacksmith_shop_entrance",
+        "label": "entrance to Rusty Nail blacksmith shop",
+        "target_scene": "blacksmith_shop",
+        "blocked": {
+          "active": true,
+          "reason": "The door is jammed shut.",
+          "can_unblock": {
+            "active": true,
+            "requirement": { "strength_dc": 18 }
+          }
+        },
+        "locked": {
+          "active": true,
+          "requirement": "blacksmith_key",
+          "can_lockpick": {
+            "active": true,
+            "requirement": { "dexterity_dc": 22 }
+          }
+        }
+      }
+    ],
+
+    "structures": [
+      {
+        "id": "inn",
+        "name": "Spork Inn",
+        "description": "Ugly shack with a faded sign — could be a fork, could be a spoon."
+      },
+      {
+        "id": "blacksmith_shop",
+        "name": "Rusty Nail",
+        "description": "Run down building with a cold hearth."
+      }
+    ],
+
+    "notable_npcs": [],
+    "npcs": [],
+
+    "scene_items": [
+      {
+        "id": "busted_statue",
+        "name": "The Great ...",
+        "description": "Toppled marble statue of a robed man. Broken and defaced — the plaque only reads 'The Great'.",
+        "is_interactable": true,
+        "is_loot": false
+      }
+    ],
+
+    "discoveries": [
+      {
+        "id": "no_footprints",
+        "type": "environment",
+        "observation": "No recent footprints in the dust on doorsteps",
+        "implication": "The village has been empty for some time",
+        "is_discovered": false,
+        "perception_dc": 12
+      },
+      {
+        "id": "quest_hint_bandits",
+        "type": "quest_hook",
+        "observation": "Scraps of cloth with a bandit insignia caught on a broken fence.",
+        "quest": "bandit_hideout",
+        "is_discovered": false,
+        "perception_dc": 15
+      }
+    ]
+  }
+}

@@ -5,21 +5,24 @@ Runs AI models as a separate HTTP service for the D&D game engine.
 This decouples models from the main API server for better scalability.
 """
 
-import os, time, psutil, GPUtil, uvicorn, json, asyncio
+import time, psutil, GPUtil, uvicorn, json, asyncio
 from fastapi import FastAPI, HTTPException, Body, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, Any, List
-from .model_manager import ModelManager
-from backend.models import (
+from typing import Dict, Any
+from backend.services.ai_models.model_manager import ModelManager
+from backend.services.api.models.health_models import HealthResponse
+from backend.services.api.models.scene_models import (
+    GeneratedNarration,
+    GenerateSceneRequest,
+    SceneExitRequest,
+    SceneExitResult,
+)
+from backend.services.api.models.action_models import (
     ParsedAction,
     ParseActionRequest,
     GenerateActionRequest,
-    GenerateSceneRequest,
-    GeneratedNarration,
-    HealthResponse,
+    ParsedAction,
     GenerateInvalidActionRequest,
-    SceneExitRequest,
-    SceneExitResult,
 )
 
 
@@ -302,16 +305,16 @@ class ModelServer:
 
             try:
                 # Receive the request data
-                print("\033[34m[MODEL_SERVER]\033[0m Waiting for request data...")
+                # print("\033[34m[MODEL_SERVER]\033[0m Waiting for request data...")
                 data = await websocket.receive_text()
-                print(f"\033[34m[MODEL_SERVER]\033[0m Received data: {data}")
+                # print(f"\033[34m[MODEL_SERVER]\033[0m Received data: {data}")
 
                 request_dict = json.loads(data)
-                print(f"\033[34m[MODEL_SERVER]\033[0m Parsed request: {request_dict}")
+                # print(f"\033[34m[MODEL_SERVER]\033[0m Parsed request: {request_dict}")
 
                 # Convert to GenerateSceneRequest object
                 request = GenerateSceneRequest(**request_dict)
-                print(f"\033[34m[MODEL_SERVER]\033[0m Created request object: {request}")
+                # print(f"\033[34m[MODEL_SERVER]\033[0m Created request object: {request}")
 
                 # Ensure narrator ready (sync calls, not async)
                 if not self.model_manager.is_narrator_ready():
@@ -327,7 +330,7 @@ class ModelServer:
                 try:
                     # Check if your model_manager has an async streaming method
                     if hasattr(self.model_manager, "stream_scene_narration"):
-                        print("\033[34m[MODEL_SERVER]\033[0m Starting streaming generation...")
+                        # print("\033[34m[MODEL_SERVER]\033[0m Starting streaming generation...")
 
                         chunk_count = 0
                         # Stream from model

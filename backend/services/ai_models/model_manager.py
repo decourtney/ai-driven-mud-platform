@@ -1,17 +1,19 @@
-import torch, asyncio
-from typing import Optional, Dict, List, Any
-from backend.game.core.interfaces import ActionParser, ActionNarrator
-from backend.models import (
-    ParsedAction,
-    GenerateInvalidActionRequest,
+import torch
+from typing import Optional
+from backend.services.api.models.scene_models import (
     GenerateSceneRequest,
-    ParseActionRequest,
-    GenerateActionRequest,
     SceneExitRequest,
     SceneExitResult,
 )
-from backend.game.parsers.action_parser.codellama_parser import CodeLlamaParser
-from backend.game.parsers.narrator_parser.mistral_narrator import GGUFMistralNarrator
+from backend.services.api.models.action_models import (
+    ParsedAction,
+    ParseActionRequest,
+    GenerateActionRequest,
+    ParsedAction,
+    GenerateInvalidActionRequest,
+)
+from backend.parsers.action_parser.codellama_parser import CodeLlamaParser
+from backend.parsers.narrator_parser.mistral_narrator import GGUFMistralNarrator
 
 
 class ModelManager:

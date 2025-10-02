@@ -139,7 +139,7 @@ export default function ChatPanel({
                 ? message.content
                 : String(message.content)}
               {message.typing && (
-                <span className="animate-pulse ml-2">...</span>
+                <span className="animate-pulse ml-2">|</span>
               )}
             </div>
           </div>
