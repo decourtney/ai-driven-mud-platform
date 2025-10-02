@@ -57,22 +57,34 @@ class Equipment(BaseModel):
         setattr(self, slot.value, None)
 
 
+class InventoryItem(BaseModel):
+    id: Optional[str] = None  # ID of the inventory row in DB
+    item_id: str  # references Item.id
+    quantity: int = 1
+    equipped: bool = False
+    slot: Optional[Slot] = None
+
+
 class Inventory(BaseModel):
-    items: List[Item] = []
+    items: List[InventoryItem] = []
 
-    def add(self, item: Item):
-        self.items.append(item)
+    def add(self, inv_item: InventoryItem):
+        self.items.append(inv_item)
 
-    def remove(self, item_id: str) -> Optional[Item]:
-        for i, item in enumerate(self.items):
-            if item.id == item_id:
+    def remove(self, inventory_id: str) -> Optional[InventoryItem]:
+        for i, inv_item in enumerate(self.items):
+            if inv_item.id == inventory_id:
                 return self.items.pop(i)
         return None
 
-    def find(self, item_id: str) -> Optional[Item]:
-        for item in self.items:
-            if item.id == item_id:
-                return item
+    def find(self, inventory_id: str) -> Optional[InventoryItem]:
+        for inv_item in self.items:
+            if inv_item.id == inventory_id:
+                return inv_item
         return None
 
-
+    def find_by_item_id(self, item_id: str) -> Optional[InventoryItem]:
+        for inv_item in self.items:
+            if inv_item.item_id == item_id:
+                return inv_item
+        return None

@@ -77,15 +77,7 @@
     ],
 
     "notable_npcs": [],
-    "npcs": [
-      {
-        "id": "rabid_wolf",
-        "name": "Rabid Wolf",
-        "description": "A disease-maddened wolf with glowing red eyes",
-        "status": { "is_alive": true, "is_hostile": true, "health": 8 },
-        "disposition": "aggressive"
-      }
-    ],
+    "npcs": [],
 
     "scene_items": [
       {

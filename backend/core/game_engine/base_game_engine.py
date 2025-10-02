@@ -67,7 +67,7 @@ class BaseGameEngine(ABC):
             self.dice_roller = self.get_default_dice_roller()
 
         self.game_state = None
-        self.player_state = None  # NOTE: Player and NPC States might be better suited for mem store on Game State
+        self.player_character = None  # NOTE: Player and NPC States might be better suited for mem store on Game State
         self.npc_states: Dict[str, CharacterState] = {}
         self.is_processing = False
         self.max_invalid_attempts = kwargs.get("max_invalid_attempts", 3)
@@ -119,7 +119,7 @@ class BaseGameEngine(ABC):
     # Game State Management
     # --------------------------------------------------------------------------------
 
-    async def load_game_state(self, game_state, player_state):
+    async def load_game_state(self, game_state, player_character):
         print("[DEBUG] LOADING GAME STATE INTO ENGINE")
         try:
             self.game_state = GameState.from_db(game_state)
@@ -129,19 +129,19 @@ class BaseGameEngine(ABC):
             raise
 
         try:
-            self.player_state = CharacterState.from_db(player_state)
+            self.player_character = PlayerCharacter.from_db(player_character)
             # print("[DEBUG] raw player_state record:", player_state)
         except Exception as e:
             print("[ERROR] while loading CharacterState:", e)
             raise
 
         await self.session_manager.send_initial_state_to_session(
-            self.game_state.to_dict(), self.player_state.to_dict()
+            self.game_state.to_dict(), self.player_character.model_dump(mode="json")
         )
 
         await self.load_scene(
-            scene_id=self.player_state.current_scene,
-            zone=self.player_state.current_zone,
+            scene_id=self.player_character.current_scene,
+            zone=self.player_character.current_zone,
         )
         print("\033[91m[DEBUG]\033[0m STARTING TURN AFTER LOADING GAME STATE")
         asyncio.create_task(self.take_turn())
@@ -151,7 +151,7 @@ class BaseGameEngine(ABC):
     def get_serialized_game_state(self) -> Tuple[Dict, Dict]:
         print("[DEBUG] RETURNING SERIALIZED GAME STATE")
         serialized_game_state = self.game_state.to_db()
-        serialized_player_state = self.player_state.to_db()
+        serialized_player_state = self.player_character.to_db()
         return serialized_game_state, serialized_player_state
 
     def update_game_state(self, results: List[ActionResult]):
@@ -168,14 +168,14 @@ class BaseGameEngine(ABC):
         """Apply a single action result to the game state"""
         # Update player or NPC based on who acted
         if (
-            result.parsed_action.actor == self.player_state.name
+            result.parsed_action.actor == self.player_character.name
             or result.parsed_action.actor == "player"
         ):
             npc = self.game_state.get_npc_by_name(result.parsed_action.target)
             if npc:
                 npc.apply_action_result(result)
         else:
-            self.player_state.apply_action_result(result)
+            self.player_character.apply_action_result(result)
 
     # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -192,8 +192,8 @@ class BaseGameEngine(ABC):
             scene_id=scene_id, zone=zone
         )
 
-        if self.game_state.loaded_scene.id != self.player_state.current_scene:
-            self.player_state.current_scene = self.game_state.loaded_scene.id
+        if self.game_state.loaded_scene.id != self.player_character.current_scene:
+            self.player_character.current_scene = self.game_state.loaded_scene.id
             # We should narrate the scene since the player is arriving
             # NOTE: Not sure this is correct place to change the turn phase - works for now
             self.game_state.current_turn_phase = TurnPhase.scene_narration
@@ -219,8 +219,8 @@ class BaseGameEngine(ABC):
             raise RuntimeError("Narrator not loaded")
 
         request = GenerateSceneRequest(
-            scene=self.game_state.loaded_scene.to_dict(),
-            player=self.player_state.to_dict(),
+            scene=self.game_state.loaded_scene.model_dump(),
+            player=self.player_character.model_dump(),
         )
 
         try:
@@ -514,14 +514,14 @@ class BaseGameEngine(ABC):
                         "speaker": "error",
                         "action": invalid_action_result.action_type.value,
                         "content": invalid_action_result.narration,
-                        "player_id": self.player_state.id,
+                        "player_id": self.player_character.id,
                     }
 
                     # Send the action result and player state to the session
                     await self.session_manager.send_player_action_to_session(
                         game_state_id=self.game_state.id,
                         message=invalid_action_message,
-                        player_state=self.player_state.to_dict(),
+                        player_state=self.player_character.to_dict(),
                     )
 
                     self.is_processing = False
@@ -534,14 +534,14 @@ class BaseGameEngine(ABC):
                     "speaker": "narrator",
                     "action": action_result.action_type.value,
                     "content": action_result.narration,
-                    "player_id": self.player_state.id,
+                    "player_id": self.player_character.id,
                 }
 
                 # Send the action result and player state to the session
                 await self.session_manager.send_player_action_to_session(
                     game_state_id=self.game_state.id,
                     message=action_message,
-                    player_state=self.player_state.to_dict(),
+                    player_state=self.player_character.to_dict(),
                 )
 
                 # TODO: need to apply results of valid action to game state and player state
@@ -617,7 +617,7 @@ class BaseGameEngine(ABC):
 
             # Check if actor exists and is alive
         if parsed_action.actor == "player":
-            if not self.player_state.check_is_alive():
+            if not self.player_character.check_is_alive():
                 return ValidationResult(
                     is_valid=False, reason=f"{parsed_action.actor} is dead."
                 )
@@ -825,7 +825,7 @@ class BaseGameEngine(ABC):
         """Helper to get actor state from game state"""
         # This wont work well using player name - should use character_type
         if actor_type.value == "player":
-            return self.player_state
+            return self.player_character
         else:
             return self.npc_states.get(actor_name, None)
 
@@ -856,7 +856,7 @@ class BaseGameEngine(ABC):
         return {
             "status": "active",
             "turn": self.game_state.turn_counter,
-            "player_alive": self.player_state.is_alive(),
+            "player_alive": self.player_character.is_alive(),
             "npcs_alive": sum(1 for npc in self.game_state.npcs if npc.is_alive()),
             "scene": self.game_state.scene.get("name", "unknown"),
         }

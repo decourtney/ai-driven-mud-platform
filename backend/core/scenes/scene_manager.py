@@ -10,7 +10,6 @@ from backend.core.scenes.scene_models import (
     SceneDiff,
     Exit,
     Structure,
-    NotableNPC,
     SceneItem,
     Discovery,
     BlockedState,
@@ -68,7 +67,7 @@ class SceneManager:
                     Structure(**struct) for struct in scene_data.get("structures", [])
                 ],
                 notable_npcs=[
-                    NotableNPC(**nnpc) for nnpc in scene_data.get("notable_npcs", [])
+                    NpcCharacter(**nnpc) for nnpc in scene_data.get("notable_npcs", [])
                 ],
                 npcs=[NpcCharacter(**npc) for npc in scene_data.get("npcs", [])],
                 scene_items=[SceneItem(**item) for item in scene_data.get("items", [])],
@@ -114,6 +113,7 @@ class SceneManager:
             dynamic_npcs = []
             for npc_id in ["rabid_wolf"]:  # could pull from spawn tables later
                 npc_template = NPC_LIBRARY[npc_id]
+                print("",npc_template)
                 dynamic_npcs.append(NpcCharacter(**npc_template))
             scene_data["npcs"] = dynamic_npcs
 

@@ -3,7 +3,8 @@ generator client {
 }
 
 generator py {
-  provider = "prisma-client-py"
+  provider             = "prisma-client-py"
+  recursive_type_depth = -1
 }
 
 datasource db {
@@ -104,11 +105,26 @@ model GameState {
 }
 
 model BaseCharacter {
-  id               String        @id @default(cuid())
-  name             String
-  bio              String?
-  character_type   CharacterType
-  creatureType     CreatureType
+  id             String        @id @default(cuid())
+  name           String
+  bio            String?
+  character_type CharacterType
+  creatureType   CreatureType
+
+  condition_effects ConditionEffectInstance[]
+  inventory         Inventory[]
+  abilities         AbilityOnCharacter[]
+  spells            SpellOnCharacter[]
+
+  player PlayerCharacter?
+  npc    NpcCharacter[]
+}
+
+model PlayerCharacter {
+  id      String        @id @default(cuid())
+  base_id String        @unique
+  base    BaseCharacter @relation(fields: [base_id], references: [id])
+
   level            Int
   max_hp           Int
   current_hp       Int
@@ -123,29 +139,14 @@ model BaseCharacter {
   wisdom           Int
   charisma         Int
   gold             Int
+  experience       Int    @default(0)
+  natural_heal     String
+  current_zone     String
+  current_scene    String
 
-  condition_effects ConditionEffectInstance[]
-  inventory         Inventory[]
-  abilities         AbilityOnCharacter[]
-  spells            SpellOnCharacter[]
-
-  // One-to-one extensions
-  player PlayerCharacter?
-  npc    NpcCharacter[]
-}
-
-model PlayerCharacter {
-  id      String        @id @default(cuid())
-  base_id String        @unique
-  base    BaseCharacter @relation(fields: [base_id], references: [id])
-
-  experience    Int           @default(0)
-  natural_heal  String
-  current_zone  String
-  current_scene String
   spell_slots   SpellSlot[]
   chat_message  ChatMessage[]
-  active_quests  QuestState[]
+  active_quests QuestState[]
 
   user_id       String
   user          User         @relation(fields: [user_id], references: [id])
@@ -158,9 +159,25 @@ model NpcCharacter {
   base_id String
   base    BaseCharacter @relation(fields: [base_id], references: [id])
 
-  disposition      Disposition @default(NEUTRAL)
-  loot_table       LootEntry[]
+  level            Int
+  max_hp           Int
+  current_hp       Int
+  temporary_hp     Int
+  armor_class      Int
+  initiative       Int
+  initiative_bonus Int
+  strength         Int
+  dexterity        Int
+  constitution     Int
+  intelligence     Int
+  wisdom           Int
+  charisma         Int
+  gold             Int
+  damage           String
   available_quests String[]
+  disposition      Disposition @default(NEUTRAL)
+
+  loot_table LootEntry[]
 
   scene_diff_id String?
   scene_diff    SceneDiff? @relation(fields: [scene_diff_id], references: [id])
@@ -176,15 +193,15 @@ model AbilityOnCharacter {
 }
 
 model Ability {
-  id           String      @id @default(cuid())
+  id           String             @id @default(cuid())
   name         String
   description  String?
   cooldown     Int?
   damage_dice  Int?
   ability_type AbilityType
+  effect_type  AbilityEffectType?
 
-  effect_type AbilityEffectType?
-  characters  AbilityOnCharacter[]
+  characters AbilityOnCharacter[]
 }
 
 model SpellSlot {
@@ -206,7 +223,7 @@ model SpellOnCharacter {
 }
 
 model Spell {
-  id          String             @id @default(cuid())
+  id          String      @id @default(cuid())
   name        String
   description String?
   level       Int
@@ -214,7 +231,8 @@ model Spell {
   range       String?
   damage_dice Int?
   school      SpellSchool
-  characters  SpellOnCharacter[]
+
+  characters SpellOnCharacter[]
 }
 
 model Inventory {
@@ -240,13 +258,14 @@ model LootEntry {
 }
 
 model Item {
-  id          String      @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
   description String?
   base_damage Int? // if weapon
   base_armor  Int? // if armor
-  Inventory   Inventory[]
-  LootEntry   LootEntry[]
+
+  Inventory Inventory[]
+  LootEntry LootEntry[]
 }
 
 model ConditionEffectInstance {
@@ -315,9 +334,10 @@ model SceneDiff {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
+  NpcCharacter NpcCharacter[]
+
   game_session_id String
-  game_session    GameSession    @relation(fields: [game_session_id], references: [id], onDelete: Cascade)
-  NpcCharacter    NpcCharacter[]
+  game_session    GameSession @relation(fields: [game_session_id], references: [id], onDelete: Cascade)
 }
 
 model ChatMessage {

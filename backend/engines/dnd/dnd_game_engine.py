@@ -283,7 +283,7 @@ class DnDGameEngine(BaseGameEngine):
             scene_rules.get("stealth_required", False)
             and parsed_action.action_type == ActionType.attack
         ):
-            if not self.player_state.has_status("stealth"):
+            if not self.player_character.has_status("stealth"):
                 return ValidationResult(
                     is_valid=False,
                     reason="You must remain stealthy here",
@@ -298,7 +298,7 @@ class DnDGameEngine(BaseGameEngine):
             return GameCondition.game_over
 
         # Check player defeat
-        if not self.player_state.check_is_alive():
+        if not self.player_character.check_is_alive():
             return GameCondition.player_defeat
 
         # D&D-specific victory conditions could be added here
@@ -308,11 +308,11 @@ class DnDGameEngine(BaseGameEngine):
     def ai_decide_npc_action(self, npc: CharacterState) -> ParsedAction:
         """D&D-specific AI decision making for NPCs"""
         # Simple aggressive behavior for now
-        if self.player_state.is_alive():
+        if self.player_character.is_alive():
             return ParsedAction(
                 actor=npc.name,
                 action="attacks",
-                target=self.player_state.name,
+                target=self.player_character.name,
                 action_type=ActionType.attack,
                 weapon=npc.equipped_weapon,
                 subject=None,

@@ -39,16 +39,14 @@ class BaseCharacter(BaseModel):
 
     # Equipment
     gold: int = 0
-    inventory: Inventory = Inventory()
-    
+    inventory: List[Inventory] = Field(default_factory=list)
+
     # Skills
-    known_abilities: List[Ability] = []
-    known_spells: List[Spell] = []
+    known_abilities: List[Ability] = Field(default_factory=list)
+    known_spells: List[Spell] = Field(default_factory=list)
 
     # Status effects
     condition_effects: List[ConditionEffectInstance] = Field(default_factory=list)
-
-
 
     # ------------------------------
     # Core status methods
