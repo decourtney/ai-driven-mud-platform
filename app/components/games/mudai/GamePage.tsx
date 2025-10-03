@@ -5,7 +5,7 @@ import ChatPanel from "./ChatPanel";
 import { useGameWebSocket } from "@/app/hooks/useGameWebSocket";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { CharacterState } from "@/app/types/game";
+import { PlayerCharacter } from "@/app/types/game";
 
 interface GamePageProps {
   slug: string;
@@ -21,7 +21,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
     sendAction,
     chatHistory,
     gameState,
-    playerState,
+    playerCharacter,
     lastError,
     reconnect,
   } = useGameWebSocket({
@@ -115,7 +115,7 @@ export default function GamePage({ slug, id }: GamePageProps) {
           activeTab !== "character" ? "hidden md:flex" : ""
         }`}
       >
-        <CharacterPanel playerState={playerState} />
+        <CharacterPanel playerCharacter={playerCharacter} />
       </div>
 
       {/* Chat Interface */}

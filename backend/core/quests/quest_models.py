@@ -1,13 +1,13 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel
 from enum import Enum
 
 
 class QuestStatus(str, Enum):
-    NOT_STARTED = "not_started"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    NOT_STARTED = "NOT_STARTED"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
 
 
 class Objective(BaseModel):
@@ -48,3 +48,26 @@ class QuestState(BaseModel):
     objectives: List[ObjectiveState] = []
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
+
+    @classmethod
+    def from_db(cls, record: dict):
+        # Parse objectives JSON into ObjectiveState objects
+        objectives = []
+        raw_objectives = record.get("objectives") or []
+        for obj in raw_objectives:
+            if isinstance(obj, dict):
+                objectives.append(ObjectiveState(**obj))
+            else:
+                # if Prisma returns JSON as string
+                import json
+
+                obj_data = json.loads(obj)
+                objectives.append(ObjectiveState(**obj_data))
+
+        return cls(
+            quest_id=record["quest_id"],
+            status=QuestStatus(record["status"]),
+            objectives=objectives,
+            started_at=record.get("created_at"),
+            completed_at=record.get("completed_at"),
+        )

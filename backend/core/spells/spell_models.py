@@ -6,14 +6,14 @@ from backend.core.spells.spell_slots import SpellSlots
 
 # maybe at some point?
 class SpellSchool(str, Enum):
-    EVOCATION = "Evocation"
-    NECROMANCY = "Necromancy"
-    ILLUSION = "Illusion"
-    CONJURATION = "Conjuration"
-    TRANSMUTATION = "Transmutation"
-    ABJURATION = "Abjuration"
-    DIVINATION = "Divination"
-    ENCHANTMENT = "Enchantment"
+    EVOCATION = "EVOCATION"
+    NECROMANCY = "NECROMANCY"
+    ILLUSION = "ILLUSION"
+    CONJURATION = "CONJURATION"
+    TRANSMUTATION = "TRANSMUTATION"
+    ABJURATION = "ABJURATION"
+    DIVINATION = "DIVINATION"
+    ENCHANTMENT = "ENCHANTMENT"
 
 
 class Spell(BaseModel):

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Dict, List, Optional, Any
 from backend.core.items.item_models import Item
 from backend.core.items.item_models import Inventory
@@ -13,6 +13,8 @@ from backend.core.characters.character_models import (
 
 
 class BaseCharacter(BaseModel):
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+
     # Identity
     id: Optional[str] = None
     name: Optional[str] = None

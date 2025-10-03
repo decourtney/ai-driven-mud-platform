@@ -13,7 +13,7 @@ from backend.services.api.models.action_models import (
 )
 from backend.core.characters.character_models import ConditionEffect
 from backend.core.scenes.scene_models import Exit
-from backend.core.characters.character_state import CharacterState
+from backend.core.characters.npc_character import NpcCharacter
 from backend.core.game_engine.game_state import GameState
 from backend.core.game_engine.dice_system import DiceRollerFactory, BaseDiceRoller
 from backend.core.game_engine.game_session_manager import GameSessionManager
@@ -303,9 +303,9 @@ class DnDGameEngine(BaseGameEngine):
 
         # D&D-specific victory conditions could be added here
         # For now, just continue the game
-        return GameCondition.game_on
+        return GameCondition.GAME_ON
 
-    def ai_decide_npc_action(self, npc: CharacterState) -> ParsedAction:
+    def ai_decide_npc_action(self, npc: NpcCharacter) -> ParsedAction:
         """D&D-specific AI decision making for NPCs"""
         # Simple aggressive behavior for now
         if self.player_character.is_alive():
@@ -375,11 +375,11 @@ class DnDGameEngine(BaseGameEngine):
     ) -> int:
         """D&D difficulty/DC values by action type with context modifiers"""
         difficulty_map = {
-            ActionType.attack: 14,  # AC
-            ActionType.spell: 13,  # Spell save DC
-            ActionType.social: 11,  # Persuasion/Deception DC
-            ActionType.movement: 8,  # Movement check DC
-            ActionType.interact: 10,  # Investigation/Perception DC
+            ActionType.ATTACK: 14,  # AC
+            ActionType.SPELL: 13,  # Spell save DC
+            ActionType.SOCIAL: 11,  # Persuasion/Deception DC
+            ActionType.MOVEMENT: 8,  # Movement check DC
+            ActionType.INTERACT: 10,  # Investigation/Perception DC
         }
         base = difficulty_map.get(action_type, 12)
 

@@ -1,10 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from backend.core.characters.base_character import BaseCharacter
 from backend.core.characters.character_models import Disposition
 
 
 class NpcCharacter(BaseCharacter):
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+
     npc_id: Optional[str] = None
     base_id: Optional[str] = None
     damage: str

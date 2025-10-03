@@ -34,3 +34,16 @@ class SpellSlots(BaseModel):
 
     def restore_all(self):
         self.current_slots = self.max_slots.copy()
+
+    @classmethod
+    def from_db(cls, records: list[dict]) -> "SpellSlots":
+        max_slots: dict[int, int] = {}
+        current_slots: dict[int, int] = {}
+
+        for r in records:
+            lvl = r["level"]
+            max_slots[lvl] = max_slots.get(lvl, 0) + 1
+            if not r["used"]:
+                current_slots[lvl] = current_slots.get(lvl, 0) + 1
+
+        return cls(max_slots=max_slots, current_slots=current_slots)

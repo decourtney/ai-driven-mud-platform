@@ -239,27 +239,27 @@ class DnDDiceRoller(BaseDiceRoller):
         if hit:
             if roll == 20:
                 return True, (
-                    DamageType.critical
-                    if action_type in ["attack", "spell"]
-                    else DamageType.outstanding_success
+                    DamageType.CRITICAL
+                    if action_type in ["ATTACK", "SPELL"]
+                    else DamageType.OUTSTANDING_SUCCESS
                 )
             elif roll >= 18:
                 return True, (
-                    DamageType.wound
-                    if action_type in ["attack", "spell"]
-                    else DamageType.great_success
+                    DamageType.WOUND
+                    if action_type in ["ATTACK", "SPELL"]
+                    else DamageType.GREAT_SUCCESS
                 )
             else:
                 return True, (
-                    DamageType.wound
-                    if action_type in ["attack", "spell"]
-                    else DamageType.success
+                    DamageType.WOUND
+                    if action_type in ["ATTACK", "SPELL"]
+                    else DamageType.SUCCESS
                 )
         else:
             return False, (
-                DamageType.miss
-                if action_type in ["attack", "spell"]
-                else DamageType.failure
+                DamageType.MISS
+                if action_type in ["ATTACK", "SPELL"]
+                else DamageType.FAILURE
             )
 
     def is_critical(
@@ -267,8 +267,8 @@ class DnDDiceRoller(BaseDiceRoller):
     ) -> bool:
         """D&D critical hit on natural 20"""
         if isinstance(raw_roll, list):
-            return max(raw_roll) == 20 and action_type in ["attack", "spell"]
-        return raw_roll == 20 and action_type in ["attack", "spell"]
+            return max(raw_roll) == 20 and action_type in ["ATTACK", "SPELL"]
+        return raw_roll == 20 and action_type in ["ATTACK", "SPELL"]
 
     def is_fumble(self, raw_roll: int | List[int], hit: bool, action_type: str) -> bool:
         """D&D critical miss on natural 1"""

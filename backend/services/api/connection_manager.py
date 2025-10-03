@@ -157,7 +157,7 @@ class WebSocketMessage:
     @staticmethod
     def initial_state(
         game_state: Dict[str, Any],
-        player_state: Dict[str, Any],
+        player_character: Dict[str, Any],
         chat_history: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """Create initial state message"""
@@ -165,7 +165,7 @@ class WebSocketMessage:
             "type": "initial_state",
             "data": {
                 "game_state": game_state,
-                "player_state": player_state,
+                "player_character": player_character,
                 "chat_history": chat_history,
             },
             # "timestamp": datetime.now().isoformat(),
@@ -211,7 +211,7 @@ class WebSocketMessage:
         speaker: str,
         content: str,
         timestamp: str,
-        player_state: Dict[str, Any],
+        player_character: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Create action result message"""
         return {
@@ -223,7 +223,7 @@ class WebSocketMessage:
                     "content": content,
                     "timestamp": timestamp,
                 },
-                "player_state": player_state,
+                "player_character": player_character,
             },
         }
 
@@ -261,10 +261,10 @@ class WebSocketMessage:
 
     @staticmethod
     def session_state_update(
-        game_state: Dict[str, Any], player_state: Dict[str, Any]
+        game_state: Dict[str, Any], player_character: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Create game state update message"""
         return {
             "type": MessageType.session_state_update,
-            "data": {"game_state": game_state, "player_state": player_state},
+            "data": {"game_state": game_state, "player_character": player_character},
         }

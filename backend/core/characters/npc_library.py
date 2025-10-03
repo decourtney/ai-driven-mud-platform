@@ -1,8 +1,8 @@
 NPC_LIBRARY = {
     "rabid_wolf": {
         "name": "Rabid Wolf",
-        "character_type": "npc",
-        "creature_type": "beast",
+        "character_type": "NPC",
+        "creature_type": "BEAST",
         "description": "Disease-maddened wolf",
         "max_hp": 8,
         "current_hp": 8,
@@ -13,6 +13,6 @@ NPC_LIBRARY = {
         "intelligence": 10,
         "wisdom": 10,
         "charisma": 10,
-        "disposition": "aggresive"
+        "disposition": "AGGRESIVE"
     },
 }

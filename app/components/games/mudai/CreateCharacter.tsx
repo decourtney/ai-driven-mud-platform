@@ -45,7 +45,7 @@ export default function CreateCharacter({ slug }: CreateCharacterProps) {
     intelligence: 10,
     wisdom: 10,
     charisma: 10,
-    character_type: "player",
+    character_type: "PLAYER",
     bio: "",
     inventory: [],
   });
