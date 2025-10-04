@@ -432,46 +432,20 @@ class GameSessionManager:
                 await prisma.spelloncharacter.delete(where={"id": sp.id})
 
     async def save_spell_slots(self, player_character: PlayerCharacter):
-        print("[DEBUG] SAVING PLAYER SPELL SLOTS")
+        # Blow away old slots
+        await prisma.spellslot.delete_many(where={"player_id": player_character.player_id})
 
-        # Get the IDs currently in the player's spell slots
-        current_slots = {
-            (slot.level, slot.id) for slot in player_character.spell_slots if slot.id
-        }
+        # Recreate from aggregate counts
+        for level, max_count in player_character.spell_slots.max_slots.items():
+            # Determine how many are used vs available
+            available = player_character.spell_slots.current_slots.get(level, 0)
+            used = max_count - available
+            # Create rows for each slot
+            for _ in range(available):
+                await prisma.spellslot.create(data={"player_id": player_character.player_id, "level": level, "used": False})
+            for _ in range(used):
+                await prisma.spellslot.create(data={"player_id": player_character.player_id, "level": level, "used": True})
 
-        # Fetch existing spell slot links from DB
-        existing_slots = await prisma.spellslot.find_many(
-            where={"player_id": player_character.player_id}
-        )
-        existing_slots_map = {(slot.level, slot.id): slot for slot in existing_slots}
-
-        # Insert new slots
-        for slot in player_character.spell_slots:
-            key = (slot.level, slot.id)
-            if key not in existing_slots_map:
-                await prisma.spellslot.create(
-                    data={
-                        "player_id": player_character.player_id,
-                        "level": slot.level,
-                        "used": slot.used,
-                    }
-                )
-
-        # Delete removed slots
-        for slot in existing_slots:
-            key = (slot.level, slot.id)
-            if key not in {(s.level, s.id) for s in player_character.spell_slots}:
-                await prisma.spellslot.delete(where={"id": slot.id})
-
-        # Update existing slots
-        for slot in player_character.spell_slots:
-            if slot.id in [s.id for s in existing_slots]:
-                await prisma.spellslot.update(
-                    where={"id": slot.id},
-                    data={"used": slot.used},
-                )
-
-        return
 
     async def save_active_quests(self, player_character: PlayerCharacter):
         print("[DEBUG] SAVING PLAYER QUESTS")
