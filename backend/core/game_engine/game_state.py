@@ -1,11 +1,12 @@
 import uuid
 import json
 import logging
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Set, Union
 from prisma import Json
 from datetime import datetime, timezone
-from backend.core.characters.character_state import CharacterState
 from backend.core.scenes.scene_models import Scene
+from backend.core.characters.npc_character import NpcCharacter
+from backend.core.characters.player_character import PlayerCharacter
 
 logger = logging.getLogger(__name__)
 
@@ -50,14 +51,14 @@ class GameState:
         self.save_version = "1.0"
 
     # Character management - TODO: Method of getting npc by name will probably not work later
-    def get_npc_by_name(self, name: str) -> Optional[CharacterState]:
+    def get_npc_by_name(self, name: str) -> Optional[NpcCharacter]:
         """Find NPC by name"""
         for npc in self.npcs:
             if npc.name.lower() == name.lower():
                 return npc
         return None
 
-    def add_npc(self, npc: CharacterState):
+    def add_npc(self, npc: NpcCharacter):
         """Add new NPC to the game"""
         self.npcs.append(npc)
         self.last_updated = datetime.now(timezone.utc)
@@ -71,11 +72,11 @@ class GameState:
                 return True
         return False
 
-    def get_all_characters(self) -> List[CharacterState]:
+    def get_all_characters(self) -> List[Union[PlayerCharacter, NpcCharacter]]:
         """Get all characters (player + NPCs)"""
         return [self.player] + self.npcs
 
-    def get_living_characters(self) -> List[CharacterState]:
+    def get_living_characters(self) -> List[Union[PlayerCharacter, NpcCharacter]]:
         """Get all living characters"""
         return [char for char in self.get_all_characters() if char.is_alive()]
 

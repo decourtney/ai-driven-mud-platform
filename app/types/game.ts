@@ -33,7 +33,7 @@ export interface GameState {
   save_version: string;
 }
 
-export interface CharacterState {
+export interface PlayerCharacter {
   character_id: string;
   name: string;
   character_type: string;

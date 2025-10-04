@@ -4,51 +4,51 @@ from enum import Enum
 
 
 class CharacterType(Enum):
-    PLAYER = "player"
-    NPC = "npc"
+    PLAYER = "PLAYER"
+    NPC = "NPC"
 
 
 class CreatureType(Enum):
-    ABERRATION = "aberration"
-    BEAST = "beast"
-    CELESTIAL = "celestial"
-    CONSTRUCT = "construct"
-    DRAGON = "dragon"
-    ELEMENTAL = "elemental"
-    FEY = "fey"
-    FIEND = "fiend"
-    GIANT = "giant"
-    HUMANOID = "humanoid"
-    MONSTROSITY = "monstrosity"
-    OOZE = "ooze"
-    PLANT = "plant"
-    UNDEAD = "undead"
+    ABERRATION = "ABERRATION"
+    BEAST = "BEAST"
+    CELESTIAL = "CELESTIAL"
+    CONSTRUCT = "CONSTRUCT"
+    DRAGON = "DRAGON"
+    ELEMENTAL = "ELEMENTAL"
+    FEY = "FEY"
+    FIEND = "FIEND"
+    GIANT = "GIANT"
+    HUMANOID = "HUMANOID"
+    MONSTROSITY = "MONSTROSITY"
+    OOZE = "OOZE"
+    PLANT = "PLANT"
+    UNDEAD = "UNDEAD"
 
 
 class ConditionEffect(Enum):
-    BLEEDING = "bleeding"  # stackable
-    BLINDING = "blinded"
-    CHARMED = "charmed"
+    BLEEDING = "BLEEDING"  # stackable
+    BLINDING = "BLINDED"
+    CHARMED = "CHARMED"
     DEAFENED = "deafened"
-    FRIGHTENED = "frightened"
-    GRAPPLED = "grappled"
-    INCAPACITATED = "incapacitated"
-    INVISIBLE = "invisible"
-    PARALYZED = "paralyzed"
-    PETRIFIED = "petrified"
-    POISONED = "poisoned"  # stackable
-    PRONE = "prone"
-    RESTRAINED = "restrained"
-    SILENCED = "silenced"
-    STUNNED = "stunned"
-    UNCONSCIOUS = "unconscious"
-    EXHAUSTION = "exhaustion"  # stackable - Eh? may or may not be used
+    FRIGHTENED = "FRIGHTENED"
+    GRAPPLED = "GRAPPLED"
+    INCAPACITATED = "INCAPACITATED"
+    INVISIBLE = "INVISIBLE"
+    PARALYZED = "PARALYZED"
+    PETRIFIED = "PETRIFIED"
+    POISONED = "POISONED"  # stackable
+    PRONE = "PRONE"
+    RESTRAINED = "RESTRAINED"
+    SILENCED = "SILENCED"
+    STUNNED = "STUNNED"
+    UNCONSCIOUS = "UNCONSCIOUS"
+    EXHAUSTION = "EXHAUSTION"  # stackable - Eh? may not be used
 
 
 class Disposition(Enum):
-    FRIENDLY = "friendly"
-    NEUTRAL = "neutral"
-    AGGRESIVE = "aggresive"
+    FRIENDLY = "FRIENDLY"
+    NEUTRAL = "NEUTRAL"
+    AGGRESIVE = "AGGRESIVE"
 
 
 class ConditionEffectInstance(BaseModel):

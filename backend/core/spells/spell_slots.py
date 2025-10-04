@@ -8,6 +8,7 @@ class SpellSlots(BaseModel):
     max_slots: Dict[int, int] = Field(default_factory=dict)
     current_slots: Dict[int, int] = Field(default_factory=dict)
 
+    # run this before current slots is assigned
     @field_validator("current_slots", mode="before")
     def init_current_slots(cls, v, info):
         """Initialize current_slots to match max_slots if not provided"""
@@ -34,3 +35,26 @@ class SpellSlots(BaseModel):
 
     def restore_all(self):
         self.current_slots = self.max_slots.copy()
+
+    @classmethod
+    def from_db(cls, records: list[dict]) -> "SpellSlots":
+        """
+        Spell slot records are stored as slot-per-row
+        example records:
+            {"level": 1, "used": False},
+            {"level": 1, "used": True},
+            {"level": 2, "used": False}
+        result:
+            max_slots = {1: 2, 2: 1}
+            current_slots = {1: 1, 2: 1}
+        """
+        max_slots: dict[int, int] = {}
+        current_slots: dict[int, int] = {}
+
+        for r in records:
+            lvl = r["level"]
+            max_slots[lvl] = max_slots.get(lvl, 0) + 1
+            if not r["used"]:
+                current_slots[lvl] = current_slots.get(lvl, 0) + 1
+
+        return cls(max_slots=max_slots, current_slots=current_slots)

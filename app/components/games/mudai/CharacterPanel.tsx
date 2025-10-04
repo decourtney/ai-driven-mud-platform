@@ -10,7 +10,7 @@ import {
   Shirt,
 } from "lucide-react";
 import { Item, Quest } from "@/app/types/game";
-import { CharacterState } from "@/app/types/game";
+import { PlayerCharacter } from "@/app/types/game";
 
 const quests: Quest[] = [
   { id: 1, name: "Rescue the Princess", status: "active", progress: "2/3" },
@@ -18,9 +18,9 @@ const quests: Quest[] = [
 ];
 
 export default function CharacterPanel({
-  playerState,
+  playerCharacter,
 }: {
-  playerState: CharacterState | null;
+  playerCharacter: PlayerCharacter | null;
 }) {
   const [activeTab, setActiveTab] = useState("gear");
 
@@ -83,7 +83,7 @@ export default function CharacterPanel({
   );
 
   // Show loading until we have game state
-  if (!playerState) {
+  if (!playerCharacter) {
     return (
       <div className="flex items-center justify-center flex-1 text-white">
         <div className="text-center">
@@ -155,12 +155,12 @@ export default function CharacterPanel({
                   <div className="flex justify-between text-sm font-mono">
                     <span className="text-red-400">HP</span>
                     <span className="text-white">
-                      {playerState.current_hp}/{playerState.max_hp}
+                      {playerCharacter.current_hp}/{playerCharacter.max_hp}
                     </span>
                   </div>
                   <StatBar
-                    current={playerState.current_hp || 0}
-                    max={playerState.max_hp || 1}
+                    current={playerCharacter.current_hp || 0}
+                    max={playerCharacter.max_hp || 1}
                     color="#ef4444"
                   />
                 </div>
@@ -168,12 +168,12 @@ export default function CharacterPanel({
                   <div className="flex justify-between text-sm font-mono">
                     <span className="text-blue-400">MP</span>
                     <span className="text-white">
-                      {playerState.current_mp}/{playerState.max_mp}
+                      {playerCharacter.current_mp}/{playerCharacter.max_mp}
                     </span>
                   </div>
                   <StatBar
-                    current={playerState.current_mp || 0}
-                    max={playerState.max_mp || 1}
+                    current={playerCharacter.current_mp || 0}
+                    max={playerCharacter.max_mp || 1}
                     color="#3b82f6"
                   />
                 </div>
@@ -184,35 +184,35 @@ export default function CharacterPanel({
                 <div className="flex justify-between">
                   <span className="text-gray-300">STR</span>
                   <span className="text-white">
-                    {playerState.strength || 0}
+                    {playerCharacter.strength || 0}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">DEX</span>
                   <span className="text-white">
-                    {playerState.dexterity || 0}
+                    {playerCharacter.dexterity || 0}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">CON</span>
                   <span className="text-white">
-                    {playerState.constitution || 0}
+                    {playerCharacter.constitution || 0}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">INT</span>
                   <span className="text-white">
-                    {playerState.intelligence || 0}
+                    {playerCharacter.intelligence || 0}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">WIS</span>
-                  <span className="text-white">{playerState.wisdom || 0}</span>
+                  <span className="text-white">{playerCharacter.wisdom || 0}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">CHA</span>
                   <span className="text-white">
-                    {playerState.charisma || 0}
+                    {playerCharacter.charisma || 0}
                   </span>
                 </div>
               </div>
@@ -226,8 +226,8 @@ export default function CharacterPanel({
             <h3 className="text-green-400 font-mono font-bold text-center mb-4">
               INVENTORY
             </h3>
-            {playerState.inventory && playerState.inventory.length > 0 ? (
-              playerState.inventory.map((item) => (
+            {playerCharacter.inventory && playerCharacter.inventory.length > 0 ? (
+              playerCharacter.inventory.map((item) => (
                 <div
                   key={item.id}
                   className="bg-gray-800 border border-gray-600 rounded p-3 hover:bg-gray-700 transition-colors cursor-pointer"
@@ -248,7 +248,7 @@ export default function CharacterPanel({
                 No items in inventory
               </div>
             )}
-            {/* {(playerState.inventory || playerState.inventory.length === 0) && (
+            {/* {(playerCharacter.inventory || playerCharacter.inventory.length === 0) && (
               <div className="text-center text-gray-500 font-mono">
                 No items in inventory
               </div>
@@ -309,10 +309,10 @@ export default function CharacterPanel({
           </div>
           <div>
             <h2 className="text-green-400 font-mono font-bold text-lg">
-              {playerState.name || "Loading..."}
+              {playerCharacter.name || "Loading..."}
             </h2>
             <p className="text-gray-300 font-mono text-sm">
-              Level {playerState.level || 0}
+              Level {playerCharacter.level || 0}
             </p>
           </div>
         </div>

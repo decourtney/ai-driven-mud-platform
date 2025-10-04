@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
-  CharacterState,
+  PlayerCharacter,
   ChatMessage,
   GameMessage,
   GameState,
@@ -22,7 +22,7 @@ interface UseGameWebSocketReturn {
   sendAction: (action: string) => void;
   chatHistory: ChatMessage[];
   gameState: GameState | null;
-  playerState: CharacterState | null;
+  playerCharacter: PlayerCharacter | null;
   lastError: string | null;
   reconnect: () => void;
 }
@@ -47,8 +47,8 @@ export const useGameWebSocket = ({
     [] as ChatMessage[]
   );
   const [gameState, setGameState] = useState<GameState>({} as GameState);
-  const [playerState, setPlayerState] = useState<CharacterState>(
-    {} as CharacterState
+  const [playerCharacter, setPlayerCharacter] = useState<PlayerCharacter>(
+    {} as PlayerCharacter
   );
   const [lastError, setLastError] = useState<string | null>(null);
 
@@ -180,9 +180,9 @@ export const useGameWebSocket = ({
             break;
           case "initial_state":
             setGameState((prev) => ({ ...prev, ...message.data.game_state }));
-            setPlayerState((prev) => ({
+            setPlayerCharacter((prev) => ({
               ...prev,
-              ...message.data.player_state,
+              ...message.data.player_character,
             }));
             setChatHistory(message.data.chat_history);
             break;
@@ -197,16 +197,16 @@ export const useGameWebSocket = ({
             break;
           case "session_state_update":
             setGameState((prev) => ({ ...prev, ...message.data.game_state }));
-            setPlayerState((prev) => ({
+            setPlayerCharacter((prev) => ({
               ...prev,
-              ...message.data.player_state,
+              ...message.data.player_character,
             }));
             break;
           case "action_result":
             setChatHistory((prev) => [...prev, message.data.narration]);
-            setPlayerState((prev) => ({
+            setPlayerCharacter((prev) => ({
               ...prev,
-              ...message.data.player_state,
+              ...message.data.player_character,
             }));
             break;
 
@@ -327,7 +327,7 @@ export const useGameWebSocket = ({
     sendAction,
     chatHistory,
     gameState,
-    playerState,
+    playerCharacter,
     lastError,
     reconnect,
   };

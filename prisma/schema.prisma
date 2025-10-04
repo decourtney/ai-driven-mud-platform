@@ -63,15 +63,16 @@ model VerificationToken {
 // ====================================================================================
 
 model GameSession {
-  id               String            @id @default(cuid())
-  is_active        Boolean           @default(false)
-  created_at       DateTime          @default(now())
-  updated_at       DateTime          @updatedAt
-  game_id          String
-  messages         ChatMessage[]
-  game_state       GameState?
-  player_character PlayerCharacter[]
-  scene_state      SceneDiff[]
+  id                String            @id @default(cuid())
+  is_active         Boolean           @default(false)
+  created_at        DateTime          @default(now())
+  updated_at        DateTime          @updatedAt
+  game_id           String
+  chat_messages     ChatMessage[]
+  game_state        GameState?
+  player_characters PlayerCharacter[]
+  scene_diffs       SceneDiff[]
+  base_characters   BaseCharacter[]
 
   user_id String
   user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -104,26 +105,41 @@ model GameState {
   game_session    GameSession @relation(fields: [game_session_id], references: [id], onDelete: Cascade)
 }
 
-model BaseCharacter {
-  id             String        @id @default(cuid())
-  name           String
-  bio            String?
-  character_type CharacterType
-  creatureType   CreatureType
+model ChatMessage {
+  id         String      @id @default(cuid())
+  content    String
+  created_at DateTime    @default(now())
+  updated_at DateTime    @updatedAt
+  speaker    SpeakerType
+  action     ActionType
 
+  player_id       String?
+  player          PlayerCharacter? @relation(fields: [player_id], references: [id])
+  game_session_id String
+  game_session    GameSession      @relation(fields: [game_session_id], references: [id], onDelete: Cascade)
+}
+
+model BaseCharacter {
+  id                String                    @id @default(cuid())
+  name              String
+  bio               String?
+  character_type    CharacterType
+  creature_type     CreatureType
   condition_effects ConditionEffectInstance[]
   inventory         Inventory[]
   abilities         AbilityOnCharacter[]
   spells            SpellOnCharacter[]
+  player            PlayerCharacter?
+  npcs              NpcCharacter[]
 
-  player PlayerCharacter?
-  npc    NpcCharacter[]
+  game_session_id String?
+  game_session    GameSession? @relation(fields: [game_session_id], references: [id], onDelete: Cascade)
 }
 
 model PlayerCharacter {
   id      String        @id @default(cuid())
   base_id String        @unique
-  base    BaseCharacter @relation(fields: [base_id], references: [id])
+  base    BaseCharacter @relation(fields: [base_id], references: [id], onDelete: Cascade)
 
   level            Int
   max_hp           Int
@@ -139,25 +155,24 @@ model PlayerCharacter {
   wisdom           Int
   charisma         Int
   gold             Int
-  experience       Int    @default(0)
+  experience       Int           @default(0)
   natural_heal     String
   current_zone     String
   current_scene    String
+  spell_slots      SpellSlot[]
+  chat_messages    ChatMessage[]
+  active_quests    QuestState[]
 
-  spell_slots   SpellSlot[]
-  chat_message  ChatMessage[]
-  active_quests QuestState[]
-
-  user_id       String
-  user          User         @relation(fields: [user_id], references: [id])
-  gameSessionId String?
-  GameSession   GameSession? @relation(fields: [gameSessionId], references: [id])
+  user_id         String
+  user            User         @relation(fields: [user_id], references: [id])
+  game_session_id String?
+  game_session    GameSession? @relation(fields: [game_session_id], references: [id])
 }
 
 model NpcCharacter {
   id      String        @id @default(cuid())
   base_id String
-  base    BaseCharacter @relation(fields: [base_id], references: [id])
+  base    BaseCharacter @relation(fields: [base_id], references: [id], onDelete: Cascade)
 
   level            Int
   max_hp           Int
@@ -176,8 +191,7 @@ model NpcCharacter {
   damage           String
   available_quests String[]
   disposition      Disposition @default(NEUTRAL)
-
-  loot_table LootEntry[]
+  loot_table       LootEntry[]
 
   scene_diff_id String?
   scene_diff    SceneDiff? @relation(fields: [scene_diff_id], references: [id])
@@ -187,21 +201,20 @@ model AbilityOnCharacter {
   id String @id @default(cuid())
 
   ability_id   String
-  ability      Ability       @relation(fields: [ability_id], references: [id])
+  ability      Ability       @relation(fields: [ability_id], references: [id], onDelete: Cascade)
   character_id String
-  character    BaseCharacter @relation(fields: [character_id], references: [id])
+  character    BaseCharacter @relation(fields: [character_id], references: [id], onDelete: Cascade)
 }
 
 model Ability {
-  id           String             @id @default(cuid())
-  name         String
-  description  String?
-  cooldown     Int?
-  damage_dice  Int?
-  ability_type AbilityType
-  effect_type  AbilityEffectType?
-
-  characters AbilityOnCharacter[]
+  id                      String               @id @default(cuid())
+  name                    String
+  description             String?
+  cooldown                Int?
+  damage_dice             Int?
+  ability_type            AbilityType
+  effect_type             AbilityEffectType?
+  characters_with_ability AbilityOnCharacter[]
 }
 
 model SpellSlot {
@@ -210,29 +223,28 @@ model SpellSlot {
   used  Boolean @default(false)
 
   player_id String
-  player    PlayerCharacter @relation(fields: [player_id], references: [id])
+  player    PlayerCharacter @relation(fields: [player_id], references: [id], onDelete: Cascade)
 }
 
 model SpellOnCharacter {
   id String @id @default(cuid())
 
   spell_id     String
-  spell        Spell         @relation(fields: [spell_id], references: [id])
+  spell        Spell         @relation(fields: [spell_id], references: [id], onDelete: Cascade)
   character_id String
-  character    BaseCharacter @relation(fields: [character_id], references: [id])
+  character    BaseCharacter @relation(fields: [character_id], references: [id], onDelete: Cascade)
 }
 
 model Spell {
-  id          String      @id @default(cuid())
-  name        String
-  description String?
-  level       Int
-  cooldown    Int?
-  range       String?
-  damage_dice Int?
-  school      SpellSchool
-
-  characters SpellOnCharacter[]
+  id                    String             @id @default(cuid())
+  name                  String
+  description           String?
+  level                 Int
+  cooldown              Int?
+  range                 String?
+  damage_dice           Int?
+  school                SpellSchool
+  characters_with_spell SpellOnCharacter[]
 }
 
 model Inventory {
@@ -242,9 +254,9 @@ model Inventory {
   slot     EquipSlot?
 
   item_id      String
-  item         Item          @relation(fields: [item_id], references: [id])
+  item         Item          @relation(fields: [item_id], references: [id], onDelete: Cascade)
   character_id String
-  character    BaseCharacter @relation(fields: [character_id], references: [id])
+  character    BaseCharacter @relation(fields: [character_id], references: [id], onDelete: Cascade)
 }
 
 model LootEntry {
@@ -252,20 +264,19 @@ model LootEntry {
   drop_rate Float  @default(1.0)
 
   item_id String
-  item    Item         @relation(fields: [item_id], references: [id])
+  item    Item         @relation(fields: [item_id], references: [id], onDelete: Cascade)
   npc_id  String
-  npc     NpcCharacter @relation(fields: [npc_id], references: [id])
+  npc     NpcCharacter @relation(fields: [npc_id], references: [id], onDelete: Cascade)
 }
 
 model Item {
-  id          String  @id @default(cuid())
+  id          String      @id @default(cuid())
   name        String
   description String?
   base_damage Int? // if weapon
   base_armor  Int? // if armor
-
-  Inventory Inventory[]
-  LootEntry LootEntry[]
+  inventory   Inventory[]
+  loot_entry  LootEntry[]
 }
 
 model ConditionEffectInstance {
@@ -276,7 +287,7 @@ model ConditionEffectInstance {
   effect    ConditionEffect
 
   character_id String
-  character    BaseCharacter @relation(fields: [character_id], references: [id])
+  character    BaseCharacter @relation(fields: [character_id], references: [id], onDelete: Cascade)
 }
 
 model QuestState {
@@ -288,9 +299,9 @@ model QuestState {
   status       QuestStatus
 
   quest_id  String
-  quest     QuestDefinition @relation(fields: [quest_id], references: [id])
+  quest     QuestDefinition @relation(fields: [quest_id], references: [id], onDelete: Cascade)
   player_id String
-  player    PlayerCharacter @relation(fields: [player_id], references: [id])
+  player    PlayerCharacter @relation(fields: [player_id], references: [id], onDelete: Cascade)
 }
 
 model QuestObjective {
@@ -299,7 +310,7 @@ model QuestObjective {
   required    Int    @default(1)
 
   quest_def_id String
-  quest        QuestDefinition @relation(fields: [quest_def_id], references: [id])
+  quest        QuestDefinition @relation(fields: [quest_def_id], references: [id], onDelete: Cascade)
 }
 
 model QuestReward {
@@ -309,49 +320,33 @@ model QuestReward {
   item_ids String[]
 
   quest_def_id String
-  quest        QuestDefinition @relation(fields: [quest_def_id], references: [id])
+  quest        QuestDefinition @relation(fields: [quest_def_id], references: [id], onDelete: Cascade)
 }
 
 model QuestDefinition {
-  id                String   @id @default(cuid())
+  id                String           @id @default(cuid())
   name              String
   description       String
   level_requirement Int
   quest_type        String
-  repeatable        Boolean  @default(false)
+  repeatable        Boolean          @default(false)
   prerequisites     String[] // quest IDs
-
-  objectives QuestObjective[]
-  rewards    QuestReward[]
-  QuestState QuestState[]
+  objectives        QuestObjective[]
+  rewards           QuestReward[]
+  quest_state       QuestState[]
 }
 
 model SceneDiff {
-  id         String   @id @default(cuid())
-  zone       String
-  scene_id   String
-  changes    Json?
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  NpcCharacter NpcCharacter[]
+  id            String         @id @default(cuid())
+  zone          String
+  scene_id      String
+  changes       Json?
+  created_at    DateTime       @default(now())
+  updated_at    DateTime       @updatedAt
+  npc_character NpcCharacter[]
 
   game_session_id String
   game_session    GameSession @relation(fields: [game_session_id], references: [id], onDelete: Cascade)
-}
-
-model ChatMessage {
-  id         String      @id @default(cuid())
-  content    String
-  created_at DateTime    @default(now())
-  updated_at DateTime    @updatedAt
-  speaker    SpeakerType
-  action     ActionType
-
-  player_id       String?
-  player          PlayerCharacter? @relation(fields: [player_id], references: [id])
-  game_session_id String
-  game_session    GameSession      @relation(fields: [game_session_id], references: [id], onDelete: Cascade)
 }
 
 // ====================================================================================

@@ -4,15 +4,15 @@ from enum import Enum
 
 
 class GameStatus(str, Enum):
-    active = "active"
-    maintenance = "maintenance"
-    beta = "beta"
+    ACTIVE = "ACTIVE"
+    MAINTENANCE = "MAINTENANCE"
+    BETA = "BETA"
 
 
 class GameDifficulty(str, Enum):
-    beginner = "beginner"
-    intermediate = "intermediate"
-    advanced = "advanced"
+    BEGINNER = "BEGINNER"
+    INTERMEDIATE = "INTERMEDIATE"
+    ADVANCED = "ADVANCED"
 
 
 class HealthResponse(BaseModel):

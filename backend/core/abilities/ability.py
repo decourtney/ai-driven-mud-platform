@@ -4,9 +4,9 @@ from pydantic import BaseModel
 
 
 class AbilityType(str, Enum):
-    MELEE = "melee"
-    RANGED = "ranged"
-    SPECIAL = "special"
+    MELEE = "MELEE"
+    RANGED = "RANGED"
+    SPECIAL = "SPECIAL"
 
 
 class Ability(BaseModel):

@@ -5,22 +5,22 @@ from backend.core.characters.character_models import CharacterType
 
 
 class ActionType(str, Enum):
-    attack = "attack"
-    spell = "spell"
-    social = "social"
-    movement = "movement"
-    interact = "interact"
+    ATTACK = "ATTACK"
+    SPELL = "SPELL"
+    SOCIAL = "SOCIAL"
+    MOVEMENT = "MOVEMENT"
+    INTERACT = "INTERACT"
 
 
 class DamageType(str, Enum):
-    miss = "miss"
-    failure = "failure"
-    wound = "wound"
-    critical = "critical"
-    kill = "kill"
-    success = "success"
-    great_success = "great_success"
-    outstanding_success = "outstanding_success"
+    MISS = "MISS"
+    FAILURE = "FAILURE"
+    WOUND = "WOUND"
+    CRITICAL = "CRITICAL"
+    KILL = "KILL"
+    SUCCESS = "SUCCESS"
+    GREAT_SUCCESS = "GREAT_SUCCESS"
+    OUTSTANDING_SUCCESS = "OUTSTANDING_SUCCESS"
 
 
 class ParsedAction(BaseModel):

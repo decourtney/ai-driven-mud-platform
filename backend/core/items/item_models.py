@@ -5,20 +5,20 @@ from dataclasses import dataclass, field
 
 
 class ItemType(str, Enum):
-    WEAPON = "weapon"
-    ARMOR = "armor"
-    CONSUMABLE = "consumable"
-    TOOL = "tool"
+    WEAPON = "WEAPON"
+    ARMOR = "ARMOR"
+    CONSUMABLE = "CONSUMABLE"
+    TOOL = "TOOL"
 
 
 class Slot(str, Enum):
-    HELM = "helm"
-    CHEST = "chest"
-    LEGS = "legs"
-    HANDS = "hands"
-    FEET = "feet"
-    WEAPON = "weapon"
-    OFF_HAND = "off_hand"
+    HELM = "HELM"
+    CHEST = "CHEST"
+    LEGS = "LEGS"
+    HANDS = "HANDS"
+    FEET = "FEET"
+    WEAPON = "WEAPON"
+    OFF_HAND = "OFF_HAND"
 
 
 class Item(BaseModel):

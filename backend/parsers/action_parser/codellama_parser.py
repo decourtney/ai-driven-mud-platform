@@ -22,7 +22,6 @@ from backend.services.api.models.action_models import (
     ParseActionRequest,
 )
 from backend.core.scenes.scene_models import Exit
-from .fallback_parser import FallbackParser
 
 
 PROMPT_CONF_PATH = "backend/parsers/action_parser/prompts"
@@ -62,7 +61,7 @@ class CodeLlamaParser:
         )
 
         # Fallback parser for when CodeLlama fails
-        self.fallback_parser = FallbackParser()
+        self.fallback_parser = None
 
     def load_model(self) -> bool:
         """Load the CodeLlama model and tokenizer"""
@@ -187,15 +186,15 @@ class CodeLlamaParser:
             - actor: who/what is performing the action.
             - action: verb or short phrase describing what the actor is doing.
             - target: who/what is affected by the action.
-            - action_type: one of ["attack", "spell", "social", "interact", "movement"]:
-                - "attack": physical or weapon-based attack.
-                - "spell": casting magic.
-                - "social": persuading, negotiating, influencing, intimidating, or talking to characters.
-                - "interact": manipulating, opening, closing, or using any object, device, container, or entrance 
+            - action_type: one of ["ATTACK", "SPELL", "SOCIAL", "INTERACT", "MOVEMENT"]:
+                - "ATTACK": physical or weapon-based attack.
+                - "SPELL": casting magic.
+                - "SOCIAL": persuading, negotiating, influencing, intimidating, or talking to characters.
+                - "INTERACT": manipulating, opening, closing, or using any object, device, container, or entrance 
                 (including doors, gates, chests, levers, locks, switches). 
-                Always use "interact" for these actions, even if the object could be passed through.
-                - "movement": actively traveling from one location to another, including going through entrances.
-                Only use "movement" when the action is clearly about changing position or location, 
+                Always use "INTERACT" for these actions, even if the object could be passed through.
+                - "MOVEMENT": actively traveling from one location to another, including going through entrances.
+                Only use "MOVEMENT" when the action is clearly about changing position or location, 
                 not just opening something.
             - weapon: item used for attack or spellcasting.
             - subject: the specific topic, claim, or object of focus — this may be a full phrase or sentence.
@@ -209,7 +208,7 @@ class CodeLlamaParser:
             "actor": "player",
             "action": "pick the lock",
             "target": "chest",
-            "action_type": "interact,
+            "action_type": "INTERACT,
             "weapon": null,
             "subject": null,
             "details": null
@@ -220,11 +219,11 @@ class CodeLlamaParser:
             "actor": "player",
             "action": "swing my sword",
             "target": "goblin",
-            "action_type": "attack",
+            "action_type": "ATTACK",
             "weapon": "sword",
             "subject": null,
             "details": null
-            }===ENB===
+            }===END===
             """
 
         return f"""{system_prompt}
@@ -284,7 +283,7 @@ class CodeLlamaParser:
         # Clean up response
         response = response.strip()
         # Remove trailing text
-        stop_patterns = [r"\n\nInput:", r"\nInput:", r"\n\n", r"Output:", r"\nExample:"]
+        stop_patterns = [r"===END==="]
         for pattern in stop_patterns:
             match = re.search(pattern, response)
             if match:
@@ -318,7 +317,7 @@ class CodeLlamaParser:
                     "action": parsed_json.get("action", "unknown action"),
                     "target": parsed_json.get("target"),
                     "action_type": self._normalize_action_type(
-                        parsed_json.get("action_type", "interact")
+                        parsed_json.get("action_type", "INTERACT")
                     ),
                     "weapon": parsed_json.get("weapon"),
                     "subject": parsed_json.get("subject"),
@@ -341,25 +340,25 @@ class CodeLlamaParser:
     def _normalize_action_type(self, action_type: str) -> str:
         """Normalize action type to valid ActionType values"""
         if action_type is None:
-            return "interact"
+            return "INTERACT"
 
-        action_type = action_type.lower()
+        action_type = action_type.upper()
 
         if action_type in [e.value for e in ActionType]:
             return action_type
 
         # Map common variations
         type_mappings = {
-            "combat": "attack",
-            "magic": "spell",
-            "talk": "social",
-            "conversation": "social",
-            "move": "movement",
-            "use": "interact",
-            "object": "interact",
+            "combat": "ATTACK",
+            "magic": "SPELL",
+            "talk": "SOCIAL",
+            "conversation": "SOCIAL",
+            "move": "MOVEMENT",
+            "use": "INTERACT",
+            "object": "INTERACT",
         }
 
-        return type_mappings.get(action_type, "interact")
+        return type_mappings.get(action_type, "INTERACT")
 
     # -------------------------------------------------------------------------------------------
     # Scene exit determination methods

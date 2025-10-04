@@ -1,23 +1,15 @@
 from enum import Enum
 
+
 class GameCondition(Enum):
-    game_on = "game_on"
-    player_win = "player_win"
-    player_defeat = "player_defeat"
-    game_over = "game_over"
+    GAME_ON = "GAME_ON"
+    PLAYER_WIN = "PLAYER_WIN"
+    PLAYER_DEFEAT = "PLAYER_DEFEAT"
+    GAME_OVER = "GAME_OVER"
 
 
 class TurnPhase(Enum):
-    scene_narration = "scene_narration"
-    player_turn = "player_turn"
-    npc_turn = "npc_turn"
-    end_turn = "end_turn"
-
-
-
-
-
-
-
-
-
+    SCENE_NARRATION = "SCENE_NARRATION"
+    PLAYER_TURN = "PLAYER_TURN"
+    NPC_TURN = "NPC_TURN"
+    END_TURN = "END_TURN"

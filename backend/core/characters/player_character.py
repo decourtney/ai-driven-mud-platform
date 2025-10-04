@@ -1,5 +1,5 @@
 from backend.core.characters.base_character import BaseCharacter
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 from typing import Dict, List, Optional, Any
 from backend.core.items.item_models import Equipment, Slot, Item, Inventory
 from backend.core.spells.spell_slots import SpellSlots
@@ -14,15 +14,19 @@ from backend.core.characters.character_models import (
 
 
 class PlayerCharacter(BaseCharacter):
-    player_id: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+
+    id: Optional[str] = None
     base_id: Optional[str] = None
     experience: int = 0
-    equipment: Equipment = Equipment()
+    equipment: Equipment = Field(default_factory=Equipment)
     natural_heal: str = ""  # not sure this will be implemented
-    spell_slots: SpellSlots = Field(default_factory=SpellSlots)
+    spell_slots: SpellSlots = Field(
+        default_factory=SpellSlots
+    )  # spell_slots=SpellSlots(max_slots={1:3, 2:1}) - 3 level 1 slots, 1 level 2 slot
     active_quests: Dict[str, QuestState] = Field(default_factory=dict)
-    current_zone: Optional[str] = None
-    current_scene: Optional[str] = None
+    current_zone: Optional[str] = "start"
+    current_scene: Optional[str] = "start"
 
     @model_validator(mode="before")
     def set_initial_hp(cls, values):
@@ -87,10 +91,10 @@ class PlayerCharacter(BaseCharacter):
         return False
 
     @classmethod
-    def from_db(cls, record: dict):
+    def from_db(cls, record: Dict):
         base_data = record["base"]
         return cls(
-            player_id=record["id"],
+            id=record["id"],
             base_id=base_data["id"],
             name=base_data["name"],
             bio=base_data["bio"],
