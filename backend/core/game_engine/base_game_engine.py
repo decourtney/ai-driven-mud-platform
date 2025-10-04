@@ -152,8 +152,8 @@ class BaseGameEngine(ABC):
     def get_serialized_game_state(self) -> Tuple[Dict, Dict]:
         print("[DEBUG] RETURNING SERIALIZED GAME STATE")
         serialized_game_state = self.game_state.to_db()
-        serialized_player_state = self.player_character.to_db()
-        return serialized_game_state, serialized_player_state
+        # serialized_player_character = self.player_character # not seralizing player_character here
+        return serialized_game_state, self.player_character
 
     def update_game_state(self, results: List[ActionResult]):
         """Apply results of actions to game state"""

@@ -163,11 +163,6 @@ class GameSessionManager:
                 detail=f"Couldn't locate session {session_id}",
             )
 
-        # # Get states and update session as active
-        # gamesession_record, gamestate_record, playercharacter_record = (
-        #     await self.get_game_records_from_db(session_id=session_id, user_id=user_id)
-        # )
-
         # Make sure engine is loaded with game states
         await self.ensure_engine_exists(game_id, gamesession_record.id, user_id)
 
@@ -189,6 +184,21 @@ class GameSessionManager:
         )
         print("[DEBUG]Session deleted:", deleted)
 
+    async def save_session(
+        self, session_id: str, game_state: GameState, player_character: PlayerCharacter
+    ):
+        print("[DEBUG] SAVING SESSION")
+
+        await prisma.gamesession.update(
+            where={"id": session_id}, data={"is_active": False}
+        )
+
+        await prisma.gamestate.update(where={"id": game_state["id"]}, data=game_state)
+
+        await self.save_player(player_character)
+
+        return
+
     # async def get_session_id_using_game_state_id(
     #     self, game_state_id: str
     # ) -> Optional[str]:
@@ -203,21 +213,6 @@ class GameSessionManager:
     # ==========================================
     # GAME MANAGEMENT
     # ==========================================
-
-    async def save_session(
-        self, session_id: str, game_state: Dict[str, Any], player_character: Dict[str, Any]
-    ):
-        print("[DEBUG] SAVING SESSION")
-
-        await prisma.gamesession.update(
-            where={"id": session_id}, data={"is_active": False}
-        )
-
-        await prisma.gamestate.update(where={"id": game_state["id"]}, data=game_state)
-
-        await self.save_player(player_character)
-
-        return
 
     async def save_player(self, player_character: PlayerCharacter):
         print("[DEBUG] SAVE PLAYER PROCESS STARTED")
@@ -446,7 +441,7 @@ class GameSessionManager:
 
         # Fetch existing spell slot links from DB
         existing_slots = await prisma.spellslot.find_many(
-            where={"player_id": player_character.id}
+            where={"player_id": player_character.player_id}
         )
         existing_slots_map = {(slot.level, slot.id): slot for slot in existing_slots}
 
@@ -456,7 +451,7 @@ class GameSessionManager:
             if key not in existing_slots_map:
                 await prisma.spellslot.create(
                     data={
-                        "player_id": player_character.id,
+                        "player_id": player_character.player_id,
                         "level": slot.level,
                         "used": slot.used,
                     }
@@ -626,7 +621,7 @@ class GameSessionManager:
         session = await prisma.gamesession.find_first(
             where={"game_state": {"id": game_state["id"]}}
         )
-        print("initial state:",session)
+        print("initial state:", session)
         if not session:
             raise RuntimeError(f"No session found for GameState {game_state["id"]}")
 
@@ -649,7 +644,7 @@ class GameSessionManager:
 
     # NOTE: Should we save the state updates now?
     async def send_state_update_to_session(
-        self, game_state: Dict[str, Any], player_character: Dict[str, Any]
+        self, game_state: GameState, player_character: PlayerCharacter
     ):
         session = await prisma.gamesession.find_first(
             where={"game_state": {"id": game_state["id"]}}

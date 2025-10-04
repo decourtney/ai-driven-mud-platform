@@ -50,22 +50,22 @@ class GameEngineManager:
 
                     if now - entry["last_active"] > idle_threshold:
                         print("[DEBUG] PURGING STALE ENGINE INSTANCES")
-                        game_state, player_state = entry[
+                        game_state, player_character = entry[
                             "engine"
                         ].get_serialized_game_state()
                         to_delete.append(
-                            (session_id, game_id, game_state, player_state)
+                            (session_id, game_id, game_state, player_character)
                         )
 
             # Prepare async tasks
             tasks = []
-            for session_id, game_id, game_state, player_state in to_delete:
+            for session_id, game_id, game_state, player_character in to_delete:
                 if self.save_session:
                     tasks.append(
                         self.save_session(
                             session_id=session_id,
                             game_state=game_state,
-                            player_state=player_state,
+                            player_character=player_character,
                         )
                     )
                 # Remove engine from memory immediately

@@ -21,7 +21,9 @@ class PlayerCharacter(BaseCharacter):
     experience: int = 0
     equipment: Equipment = Field(default_factory=Equipment)
     natural_heal: str = ""  # not sure this will be implemented
-    spell_slots: SpellSlots = Field(default_factory=SpellSlots)
+    spell_slots: SpellSlots = Field(
+        default_factory=SpellSlots
+    )  # spell_slots=SpellSlots(max_slots={1:3, 2:1}) - 3 level 1 slots, 1 level 2 slot
     active_quests: Dict[str, QuestState] = Field(default_factory=dict)
     current_zone: Optional[str] = "start"
     current_scene: Optional[str] = "start"
