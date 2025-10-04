@@ -494,7 +494,7 @@ class BaseGameEngine(ABC):
                         action_type=parsed_action.action_type,
                         hit=False,
                         dice_roll=0,
-                        damage_type="failure",
+                        damage_type="FAILURE",
                         narration=result.narration,
                         difficulty=0,
                     )

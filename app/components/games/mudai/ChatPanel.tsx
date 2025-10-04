@@ -45,13 +45,13 @@ export default function ChatPanel({
 
   const getMessageStyle = (messageType: string) => {
     switch (messageType) {
-      case "player":
+      case "PLAYER":
         return "text-cyan-300 bg-cyan-400/5 border border-cyan-400/20";
-      case "narrator":
+      case "NARRATOR":
         return "text-purple-300 bg-purple-400/10 border-l-4 border-purple-400 pl-4";
-      case "system":
+      case "SYSTEM":
         return "text-green-400 bg-green-400/10 border-l-4 border-green-400 pl-4";
-      case "error":
+      case "ERROR":
         return "text-red-400 bg-red-400/10 border-l-4 border-red-400 pl-4";
       default:
         return "text-gray-300";

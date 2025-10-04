@@ -230,7 +230,7 @@ export const useGameWebSocket = ({
                 // Create new
                 const newMessage = {
                   id: messageId,
-                  speaker: message.data.speaker || "narrator",
+                  speaker: message.data.speaker || "NARRATOR",
                   content: message.data.narration.content,
                   timestamp: message.data.timestamp || new Date().toISOString(),
                   typing: message.data.narration.typing,

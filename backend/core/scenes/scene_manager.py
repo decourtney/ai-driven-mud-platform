@@ -142,6 +142,7 @@ class SceneManager:
         print(f"[SceneManager] Diff applied to {scene_id}: {diff}")
         await self.event_bus.emit("scene_changed", scene_id, diff)
 
+    # NOTE: currently untested
     def deep_merge(self, base: dict, diff: dict) -> dict:
         """
         Merge diff into base.

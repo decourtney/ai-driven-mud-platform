@@ -24,11 +24,11 @@ export default async function LobbyPage() {
 
   const getStatusBadge = (status: GameInfo["status"]) => {
     switch (status) {
-      case "active":
+      case "ACTIVE":
         return "bg-green-600 text-white";
-      case "beta":
+      case "BETA":
         return "bg-yellow-600 text-white";
-      case "maintenance":
+      case "MAINTENANCE":
         return "bg-red-600 text-white";
       default:
         return "bg-gray-600 text-white";
@@ -37,11 +37,11 @@ export default async function LobbyPage() {
 
   const getDifficultyColor = (difficulty: GameInfo["difficulty"]) => {
     switch (difficulty) {
-      case "beginner":
+      case "BEGINNER":
         return "text-green-400";
-      case "intermediate":
+      case "INTERMEDIATE":
         return "text-yellow-400";
-      case "advanced":
+      case "ADVANCED":
         return "text-red-400";
       default:
         return "text-gray-400";
