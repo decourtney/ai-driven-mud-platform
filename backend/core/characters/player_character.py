@@ -16,7 +16,7 @@ from backend.core.characters.character_models import (
 class PlayerCharacter(BaseCharacter):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
-    player_id: Optional[str] = None
+    id: Optional[str] = None
     base_id: Optional[str] = None
     experience: int = 0
     equipment: Equipment = Field(default_factory=Equipment)
@@ -94,7 +94,7 @@ class PlayerCharacter(BaseCharacter):
     def from_db(cls, record: Dict):
         base_data = record["base"]
         return cls(
-            player_id=record["id"],
+            id=record["id"],
             base_id=base_data["id"],
             name=base_data["name"],
             bio=base_data["bio"],

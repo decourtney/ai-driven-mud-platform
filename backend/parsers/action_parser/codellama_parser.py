@@ -223,7 +223,7 @@ class CodeLlamaParser:
             "weapon": "sword",
             "subject": null,
             "details": null
-            }===ENB===
+            }===END===
             """
 
         return f"""{system_prompt}
@@ -283,7 +283,7 @@ class CodeLlamaParser:
         # Clean up response
         response = response.strip()
         # Remove trailing text
-        stop_patterns = [r"\n\nInput:", r"\nInput:", r"\n\n", r"Output:", r"\nExample:"]
+        stop_patterns = [r"===END==="]
         for pattern in stop_patterns:
             match = re.search(pattern, response)
             if match:
@@ -342,7 +342,7 @@ class CodeLlamaParser:
         if action_type is None:
             return "INTERACT"
 
-        action_type = action_type.lower()
+        action_type = action_type.upper()
 
         if action_type in [e.value for e in ActionType]:
             return action_type

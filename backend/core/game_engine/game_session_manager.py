@@ -211,7 +211,7 @@ class GameSessionManager:
     #     return session.id if session else None
 
     # ==========================================
-    # GAME MANAGEMENT
+    # DB Saves
     # ==========================================
 
     async def save_player(self, player_character: PlayerCharacter):
@@ -224,7 +224,7 @@ class GameSessionManager:
         await self.save_spells(player_character)
         await self.save_spell_slots(player_character)
         await self.save_active_quests(player_character)
-
+        print("[DEBUG] SAVE PLAYER PROCESS COMPLETE")
         return
 
     async def save_npc(self, npc_character: NpcCharacter):
@@ -235,13 +235,14 @@ class GameSessionManager:
         await self.save_inventory(npc_character)
         await self.save_abilities(npc_character)
         await self.save_spells(npc_character)
+        print("[DEBUG] SAVE NPC PROCESS COMPLETE")
         return
 
     async def save_base_character(
         self, character: Union[PlayerCharacter, NpcCharacter]
     ):
-        print("[DEBUG] SAVING BASE CHARACTER")
-        print(character)
+        # print("[DEBUG] SAVING BASE CHARACTER")
+        # print(character)
         base_data = character.model_dump(
             include={
                 "name",
@@ -261,7 +262,7 @@ class GameSessionManager:
         return
 
     async def save_player_fields(self, player_character: PlayerCharacter):
-        print("[DEBUG] SAVING PLAYER CHARACTER")
+        # print("[DEBUG] SAVING PLAYER CHARACTER")
 
         player_data = player_character.model_dump(
             include={
@@ -289,14 +290,14 @@ class GameSessionManager:
         )
 
         await prisma.playercharacter.update(
-            where={"id": player_character.player_id},
+            where={"id": player_character.id},
             data=player_data,
         )
 
         return
 
     async def save_npc_fields(self, npc_character: NpcCharacter):
-        print("[DEBUG] SAVING NPC CHARACTER")
+        # print("[DEBUG] SAVING NPC CHARACTER")
 
         npc_data = npc_character.model_dump(
             include={
@@ -310,7 +311,7 @@ class GameSessionManager:
         )
 
         await prisma.npccharacter.update(
-            where={"id": npc_character.npc_id}, data=npc_data
+            where={"id": npc_character.id}, data=npc_data
         )
 
         return
@@ -318,7 +319,7 @@ class GameSessionManager:
     async def save_condition_effects(
         self, character: Union[PlayerCharacter, NpcCharacter]
     ):
-        print("[DEBUG] SAVING CHARACTER CONDITIONS")
+        # print("[DEBUG] SAVING CHARACTER CONDITIONS")
 
         # Delete all existing condition effects for this character
         await prisma.conditioneffectinstance.delete_many(
@@ -342,7 +343,7 @@ class GameSessionManager:
         return
 
     async def save_inventory(self, character: Union[PlayerCharacter, NpcCharacter]):
-        print("[DEBUG] SAVING CHARACTER INVENTORY")
+        # print("[DEBUG] SAVING CHARACTER INVENTORY")
 
         # Get a list of all current inventory items
         current_item_ids = {inv.item_id for inv in character.inventory}
@@ -373,7 +374,7 @@ class GameSessionManager:
         return
 
     async def save_abilities(self, character: Union[PlayerCharacter, NpcCharacter]):
-        print("[DEBUG] SAVING CHARACTER ABILITIES")
+        # print("[DEBUG] SAVING CHARACTER ABILITIES")
 
         # Get the IDs currently in the player's abilities
         current_ability_ids = {ab.ability_id for ab in character.known_abilities}
@@ -403,7 +404,7 @@ class GameSessionManager:
         return
 
     async def save_spells(self, character: PlayerCharacter):
-        print("[DEBUG] SAVING CHARACTER SPELLS")
+        # print("[DEBUG] SAVING CHARACTER SPELLS")
 
         # Get the IDs currently in the player's spells
         current_spell_ids = {sp.spell_id for sp in character.known_spells}
@@ -432,8 +433,10 @@ class GameSessionManager:
                 await prisma.spelloncharacter.delete(where={"id": sp.id})
 
     async def save_spell_slots(self, player_character: PlayerCharacter):
+        # print("[DEBUG] SAVING PLAYER SPELL SLOTS")
+
         # Blow away old slots
-        await prisma.spellslot.delete_many(where={"player_id": player_character.player_id})
+        await prisma.spellslot.delete_many(where={"player_id": player_character.id})
 
         # Recreate from aggregate counts
         for level, max_count in player_character.spell_slots.max_slots.items():
@@ -442,15 +445,13 @@ class GameSessionManager:
             used = max_count - available
             # Create rows for each slot
             for _ in range(available):
-                await prisma.spellslot.create(data={"player_id": player_character.player_id, "level": level, "used": False})
+                await prisma.spellslot.create(data={"player_id": player_character.id, "level": level, "used": False})
             for _ in range(used):
-                await prisma.spellslot.create(data={"player_id": player_character.player_id, "level": level, "used": True})
-
+                await prisma.spellslot.create(data={"player_id": player_character.id, "level": level, "used": True})
 
     async def save_active_quests(self, player_character: PlayerCharacter):
-        print("[DEBUG] SAVING PLAYER QUESTS")
+        # print("[DEBUG] SAVING PLAYER QUESTS")
 
-        # --- Active Quests ---
         current_quest_ids = {
             q.quest_id for q in player_character.active_quests.values()
         }
@@ -512,6 +513,10 @@ class GameSessionManager:
             where={"id": scene_state.id}, data=scene_state.model_dump()
         )
         return
+
+    # ==========================================
+    # GAME MANAGEMENT
+    # ==========================================
 
     async def lock_player_input(
         self,
@@ -674,26 +679,17 @@ class GameSessionManager:
     async def send_player_action_to_session(
         self,
         message: Dict[str, Any],
-        player_character: Dict[str, Any],
+        player_character: PlayerCharacter,
         session_id: Optional[str] = None,
-        game_state_id: Optional[str] = None,
     ):
-        session = None
-
-        if game_state_id:
-            session = await prisma.gamesession.find_first(
-                where={"game_state": {"id": game_state_id}}
-            )
-            if session:
-                session_id = session.id
-
+        print(player_character)
         if not session_id:
-            raise RuntimeError(f"No session found for GameState {game_state_id}")
+            raise RuntimeError(f"No session ID")
 
         chatmessage_record = await prisma.chatmessage.create(
             {
                 "game_session_id": session_id,
-                "player_id": player_character["id"],
+                "player_id": player_character.id,
                 **message,
             }
         )
@@ -706,7 +702,7 @@ class GameSessionManager:
                     speaker=chatmessage_record.speaker,
                     content=chatmessage_record.content,
                     timestamp=chatmessage_record.updated_at.isoformat(),
-                    player_character=player_character,
+                    player_character=player_character.model_dump_json(),
                 ),
             )
 
