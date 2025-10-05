@@ -17,9 +17,9 @@
     "Scene: {scene['label']}",
     "Description: {scene['description']}",
     "Structures: {'; '.join([s['name'] + ': ' + s['description'] for s in scene['structures']]) if scene['structures'] else 'None'}",
-    "NPCs: {'; '.join([n['name'] + ': ' + n['description'] + ' (disposition: ' + n['disposition'] + ')' for n in scene['npcs']]) if scene['npcs'] else 'None'}",
+    "NPCs: {'; '.join([n['label'] + ': ' + n['description'] + ' (disposition: ' + n['disposition'] + ')' for n in scene['npcs']]) if scene['npcs'] else 'None'}",
     "Items: {'; '.join([i['name'] + ': ' + i['description'] for i in scene['items']]) if scene['items'] else 'None'}",
-    "Discoveries: {'; '.join([d['observation'] + ' -> ' + d['implication'] for d in scene['discoveries']]) if scene['discoveries'] else 'None'}",
+    "Discoveries: {'; '.join([d['observation'] + ' -> ' + (d['implication'] if d['implication'] else 'None') for d in scene['discoveries']]) if scene['discoveries'] else 'None'}",
     "Exits: {'; '.join([e['label'] for e in scene['exits']]) if scene['exits'] else 'None'}",
     "[/INST]"
   ],

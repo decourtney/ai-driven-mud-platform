@@ -8,7 +8,7 @@ export default async function LandingPage() {
   const session = await auth();
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <main className="min-h-screen bg-black text-white">
       {/* Navigation Bar */}
       <Navbar variant="transparent" user={session?.user} />
 
@@ -65,6 +65,6 @@ export default async function LandingPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

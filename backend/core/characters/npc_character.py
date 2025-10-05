@@ -10,6 +10,8 @@ class NpcCharacter(BaseCharacter):
     id: Optional[str] = None
     base_id: Optional[str] = None
     damage: str
+    label: str
+    description: Optional[str] = None
     disposition: Disposition = Disposition.NEUTRAL
     loot_table: Optional[List[str]] = None  # list of item IDs for randomized loot
     available_quests: Optional[List[str]] = None  # quest definition ids

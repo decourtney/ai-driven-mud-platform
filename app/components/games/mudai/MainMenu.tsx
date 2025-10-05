@@ -1,4 +1,5 @@
 "use client";
+// TODO: Add delay of buttons display until after fetch
 
 import React, { useState, useEffect } from "react";
 import { Play, Plus, Settings, Book, Minus } from "lucide-react";
@@ -40,19 +41,6 @@ export default function MainMenu({ slug }: MainMenuProps) {
 
   const handleContinue = async () => {
     try {
-      // const res = await fetch(`/api/play/${slug}/${sessionId}`, {
-      //   method: "GET",
-      //   headers: { "Content-Type": "application/json" },
-      // });
-
-      // if (!res.ok) {
-      //   const errorText = await res.text();
-      //   throw new Error(errorText);
-      // }
-
-      // const data = await res.json();
-      // localStorage.setItem(`${slug}Session`, JSON.stringify(data));
-
       router.push(`${slug}/${sessionId}`);
     } catch (err: any) {
       toast.error(err.message || "Something went wrong");
@@ -88,20 +76,6 @@ export default function MainMenu({ slug }: MainMenuProps) {
 
   return (
     <div className="relative flex-1 text-white font-mono">
-      {/* Background Image */}
-      {/* <div className="absolute inset-0 w-full h-full">
-        <img
-          src="/images/mudai.jpeg"
-          alt="Fantasy adventure scene with mystical landscape"
-          className="w-full h-full object-cover"
-          style={{
-            filter: "contrast(1.1) brightness(0.5) sepia(0.5) saturate(0.7)",
-          }}
-        />
-
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent"></div>
-      </div> */}
-
       {/* Content */}
       <div className="relative max-w-7xl h-full mx-auto z-10">
         {/* Title Area */}

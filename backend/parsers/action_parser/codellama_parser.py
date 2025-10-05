@@ -178,53 +178,64 @@ class CodeLlamaParser:
 
     def create_action_parse_prompt(self, action: str) -> str:
         """Create a well-structured prompt for CodeLlama"""
-        system_prompt = """
-            You are a D&D text action parser.
-            Given user input, return a JSON object with these keys:
+        # Load config from JSON file
+        with open(f"{PROMPT_CONF_PATH}/action_parse_prompt.json", "r") as file:
+            system_prompt = json.load(file)
+        
+        print(system_prompt)    
+        # return system_prompt
 
-            - Fields: "actor", "action", "target", "action_type", "weapon", "subject", "details".
-            - actor: who/what is performing the action.
-            - action: verb or short phrase describing what the actor is doing.
-            - target: who/what is affected by the action.
-            - action_type: one of ["ATTACK", "SPELL", "SOCIAL", "INTERACT", "MOVEMENT"]:
-                - "ATTACK": physical or weapon-based attack.
-                - "SPELL": casting magic.
-                - "SOCIAL": persuading, negotiating, influencing, intimidating, or talking to characters.
-                - "INTERACT": manipulating, opening, closing, or using any object, device, container, or entrance 
-                (including doors, gates, chests, levers, locks, switches). 
-                Always use "INTERACT" for these actions, even if the object could be passed through.
-                - "MOVEMENT": actively traveling from one location to another, including going through entrances.
-                Only use "MOVEMENT" when the action is clearly about changing position or location, 
-                not just opening something.
-            - weapon: item used for attack or spellcasting.
-            - subject: the specific topic, claim, or object of focus — this may be a full phrase or sentence.
-            - details: include only clauses that add nuance not covered by other fields. Keep it one sentence max.
-            - Output ONLY valid JSON.
+        # system_prompt = """
+        #     You are a D&D text action parser.
+        #     Given user input, return a JSON object with these keys:
 
-            Examples:
+        #     - Fields: "actor", "action", "target", "action_type", "weapon", "subject", "details".
+        #     - actor: who/what is performing the action.
+        #     - action: verb or short phrase describing what the actor is doing.
+        #     - target: who/what is affected by the action.
+        #     - action_type: one of ["ATTACK", "SPELL", "SOCIAL", "INTERACT", "MOVEMENT"]:
+        #         - "ATTACK": physical or weapon-based attack.
+        #         - "SPELL": casting magic.
+        #         - "SOCIAL": persuading, negotiating, influencing, intimidating, or talking to characters.
+        #         - "INTERACT": manipulating, opening, closing, or using any object, device, container, or entrance 
+        #         (including doors, gates, chests, levers, locks, switches). 
+        #         Always use "INTERACT" for these actions, even if the object could be passed through.
+        #         - "MOVEMENT": actively traveling from one location to another, including going through entrances.
+        #         Only use "MOVEMENT" when the action is clearly about changing position or location, 
+        #         not just opening something.
+        #     - weapon: item used for attack or spellcasting.
+        #     - subject: the specific topic, claim, or object of focus — this may be a full phrase or sentence.
+        #     - details: include only clauses that add nuance not covered by other fields. Keep it one sentence max.
+        #     - Output ONLY valid JSON: { "key": "value" }.
 
-            Input: "I try to pick the lock on the chest"
-            Output: {
-            "actor": "player",
-            "action": "pick the lock",
-            "target": "chest",
-            "action_type": "INTERACT,
-            "weapon": null,
-            "subject": null,
-            "details": null
-            }===END===
+        #     Example 1:
 
-            Input: "I swing my sword at the goblin"
-            Output: {
-            "actor": "player",
-            "action": "swing my sword",
-            "target": "goblin",
-            "action_type": "ATTACK",
-            "weapon": "sword",
-            "subject": null,
-            "details": null
-            }===END===
-            """
+        #     Input: "I try to pick the lock on the chest"
+        #     Output: {
+        #     "actor": "player",
+        #     "action": "pick lock,
+        #     "target": "chest",
+        #     "action_type": "INTERACT,
+        #     "weapon": null,
+        #     "subject": null,
+        #     "details": null
+        #     }
+        #     ===END===
+            
+        #     Example 2:
+
+        #     Input: "I swing my sword at goblin 3"
+        #     Output: {
+        #     "actor": "player",
+        #     "action": "swing my sword",
+        #     "target": "goblin 3",
+        #     "action_type": "ATTACK",
+        #     "weapon": "sword",
+        #     "subject": null,
+        #     "details": null
+        #     }
+        #     ===END===
+        #     """
 
         return f"""{system_prompt}
 
@@ -377,10 +388,10 @@ class CodeLlamaParser:
         print("\033[91m[DEBUG]\033[0m Model chose exit ID:", chosen)
 
         # Verify against exits
-        exit_ids = {e.id: e for e in request.scene_exits}
-        print("\033[91m[DEBUG]\033[0m Available exit IDs:", list(exit_ids.keys()))
-        if chosen in exit_ids:
-            exit_label = exit_ids[chosen].label
+        exit_names = {e.name: e for e in request.scene_exits}
+        print("\033[91m[DEBUG]\033[0m Available exit IDs:", list(exit_names.keys()))
+        if chosen in exit_names:
+            exit_label = exit_names[chosen].label
 
             # Compute similarity
             sim = max(
@@ -428,7 +439,7 @@ class CodeLlamaParser:
         template = "\n".join(prompts["system_prompt"])
 
         # Build exits string
-        exits_str = "\n".join(f"ID = {e.id}: Label = {e.label}" for e in exits)
+        exits_str = "\n".join(f"ID = {e.name}: Label = {e.label}" for e in exits)
         # Fill template
         prompt = template.format(target=target, exits=exits_str)
         return prompt
