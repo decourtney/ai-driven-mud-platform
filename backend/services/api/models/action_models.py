@@ -46,6 +46,7 @@ class ActionResult(BaseModel):
 
 class ValidationResult(BaseModel):
     is_valid: bool
+    parsed_action: Optional[ParsedAction] = None
     reason: Optional[str] = None
     suggested_action: Optional[str] = None
 

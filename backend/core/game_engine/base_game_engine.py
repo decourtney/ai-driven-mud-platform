@@ -520,6 +520,9 @@ class BaseGameEngine(ABC):
                     self.is_processing = False
                     return
 
+                if validation_result.parsed_action:
+                    parsed_action = validation_result.parsed_action
+
                 # Execute valid action
                 action_result = await self.process_parsed_action(parsed_action)
 
@@ -635,11 +638,6 @@ class BaseGameEngine(ABC):
         if not self.game_state:
             return ValidationResult(False, "Game state not initialized")
 
-        # Get actor state
-        actor_state = self.get_actor_state(
-            actor_type=parsed_action.actor_type, actor_name=parsed_action.actor
-        )
-
         # # Testing purposes only: add stunned status effect
         # actor_state.add_status_effect(
         #     effect=StatusEffect.stunned, duration=2, intensity=1, source="fear"
@@ -647,7 +645,7 @@ class BaseGameEngine(ABC):
         # actor_state.remove_status_effect(StatusEffect.stunned)
 
         # Check if actor can move TODO: expand with status effects, conditions, etc.
-        if not actor_state.can_move():
+        if not actor.can_move():
             print("\033[91m[DEBUG]\033[0m Actor cannot move due to status effects")
             return ValidationResult(
                 is_valid=False,
@@ -670,18 +668,18 @@ class BaseGameEngine(ABC):
         # print("\033[91m[DEBUG]\033[0m Scene Exit Result:", scene_exit_result)
 
         valid_exit: Exit = self.action_validator.validate(
-            target=parsed_action.target, matches=self.game_state.loaded_scene.exits
+            query=parsed_action.target, candidates=self.game_state.loaded_scene.exits
         )
         print("\033[91m[DEBUG]\033[0m Validated exit:", valid_exit.name)
-
-        # TODO: check for blocked and locked states
 
         if not valid_exit:
             return ValidationResult(is_valid=False, reason="Location doesn't exist")
 
-        await self.load_scene(scene_name=valid_exit.name)
+        parsed_action = parsed_action.model_copy(update={"target": valid_exit.name})
 
-        return ValidationResult(is_valid=True)
+        # await self.load_scene(scene_name=valid_exit.name)
+
+        return ValidationResult(is_valid=True, parsed_action=parsed_action)
 
     async def validate_interact_constraints(
         self, parsed_action: ParsedAction, actor: BaseCharacter
@@ -693,27 +691,39 @@ class BaseGameEngine(ABC):
     ) -> ValidationResult:
         """Validate attack action"""
         attack_target = parsed_action.target
-        npcs = self.game_state.loaded_scene.npcs
+        if actor.character_type == CharacterType.PLAYER:
+            candidates = [self.player_character]
+        else:
+            candidates = self.game_state.loaded_scene.npcs
 
         if not self.game_state:
             return ValidationResult(False, "Game state not initialized")
 
-        valid_target: NpcCharacter = self.action_validator.validate(
-            target=attack_target, matches=npcs
+        valid_target: BaseCharacter = self.action_validator.validate(
+            query=attack_target, candidates=candidates
         )
         print("\033[94m[DEBUG]\033[0m Valid Attack Target:", valid_target)
 
+        # This works ok except with numbers
+        # if there are multiple candidates (wolf 1, wolf 2)
+        # the llm doesnt handle selection so great
         # valid_llm_target: NpcCharacter = await self.action_validator.llm_validate(
-        #     target=attack_target, npcs=npcs, model_client=self.model_client
+        #     query=attack_target, candidates=candidates, model_client=self.model_client
         # )
         # print("\033[94m[DEBUG]\033[0m Valid LLM Attack Target:", valid_llm_target)
 
         if not valid_target:
             return ValidationResult(
-                is_valid=False, reason=f"No {attack_target} to attack"
+                is_valid=False, reason=f"No {attack_target} to attack."
+            )
+        if not valid_target.check_is_alive():
+            return ValidationResult(
+                is_valid=False, reason=f"{attack_target} is already dead."
             )
 
-        return ValidationResult(is_valid=True)
+        parsed_action = parsed_action.model_copy(update={"target": valid_target.name})
+
+        return ValidationResult(is_valid=True, parsed_action=parsed_action)
 
     async def validate_spell_constraints(
         self, parsed_action: ParsedAction, actor: BaseCharacter

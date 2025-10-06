@@ -6,6 +6,7 @@ from backend.services.api.models.scene_models import SceneExitRequest
 from backend.services.api.models.action_models import TargetValidationRequest
 from backend.services.ai_models.model_client import AsyncModelServiceClient
 from backend.core.characters.npc_character import NpcCharacter
+from backend.core.characters.base_character import BaseCharacter
 
 
 class ActionValidator:
@@ -16,27 +17,27 @@ class ActionValidator:
     def __init__(self, similarity_threshold: float = 0.60):
         self.similarity_threshold = similarity_threshold
 
-    def validate(self, target: str, matches: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def validate(self, query: str, candidates: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Match a parsed target against available exits.
         Returns the exit ID string or 'none' if no match meets the threshold.
         """
-        if not target or not matches:
+        if not query or not candidates:
             return None
 
-        target = target.strip().lower()
+        query = query.strip().lower()
 
         # Direct ID match
-        for m in matches:
-            if target == m.name.lower():
+        for m in candidates:
+            if query == m.name.lower():
                 return m.name
 
         # Best fuzzy match across ID and label
         best_match: Optional[Dict[str, Any]] = None
         best_score = 0.0
 
-        for m in matches:
-            score = self.token_similarity(target, m.name.replace("_", " "))
+        for m in candidates:
+            score = self.token_similarity(query, m.name.replace("_", " "))
 
             # score = max(
             #     self.token_similarity(target, m.name.replace("_", " ")),
@@ -72,15 +73,17 @@ class ActionValidator:
 
     async def llm_validate(
         self,
-        target: str,
-        npcs: List[NpcCharacter],
+        query: str,
+        candidates: List[BaseCharacter],
         model_client: AsyncModelServiceClient,
     ) -> Dict[str, Any]:
-        matches: List[Dict[str, Any]] = [npc.model_dump(mode="json") for npc in npcs]
+        candidates: List[Dict[str, Any]] = [
+            c.model_dump(mode="json") for c in candidates
+        ]
 
         try:
             target_validation_request = TargetValidationRequest(
-                query=target, candidates=matches
+                query=query, candidates=candidates
             )
         except Exception as e:
             import traceback
@@ -93,11 +96,7 @@ class ActionValidator:
         #     "\033[91m[DEBUG]\033[0m Target Validation Request:",
         #     target_validation_request,
         # )
-        result = await model_client.determine_valid_target(
-            target_validation_request
-        )
-        print(
-            "\033[91m[DEBUG]\033[0m Target Validation Result:", result
-        )
+        result = await model_client.determine_valid_target(target_validation_request)
+        print("\033[91m[DEBUG]\033[0m Target Validation Result:", result)
 
         return result

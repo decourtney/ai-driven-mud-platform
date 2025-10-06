@@ -37,7 +37,7 @@
         "creature_type": "BEAST",
         "description": "It stalks with erratic movements, drool thick and red",
         "max_hp": 8,
-        "current_hp": 8,
+        "current_hp": 0,
         "damage": "",
         "strength": 10,
         "dexterity": 10,
