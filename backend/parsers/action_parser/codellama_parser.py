@@ -3,10 +3,8 @@ CodeLlama-based action parser implementing the ActionParser interface.
 This can now be easily swapped out or mocked for testing.
 """
 
-import torch
-import re
-import json
-import gc
+import torch, re, json, gc
+from typing import List, Any, Dict
 from difflib import SequenceMatcher
 from transformers import (
     AutoTokenizer,
@@ -20,8 +18,9 @@ from backend.services.api.models.action_models import (
     ParsedAction,
     ActionType,
     ParseActionRequest,
+    TargetValidationRequest,
+    TargetValidationResponse,
 )
-from backend.core.scenes.scene_models import Exit
 
 
 PROMPT_CONF_PATH = "backend/parsers/action_parser/prompts"
@@ -181,61 +180,6 @@ class CodeLlamaParser:
         # Load config from JSON file
         with open(f"{PROMPT_CONF_PATH}/action_parse_prompt.json", "r") as file:
             system_prompt = json.load(file)
-        
-        print(system_prompt)    
-        # return system_prompt
-
-        # system_prompt = """
-        #     You are a D&D text action parser.
-        #     Given user input, return a JSON object with these keys:
-
-        #     - Fields: "actor", "action", "target", "action_type", "weapon", "subject", "details".
-        #     - actor: who/what is performing the action.
-        #     - action: verb or short phrase describing what the actor is doing.
-        #     - target: who/what is affected by the action.
-        #     - action_type: one of ["ATTACK", "SPELL", "SOCIAL", "INTERACT", "MOVEMENT"]:
-        #         - "ATTACK": physical or weapon-based attack.
-        #         - "SPELL": casting magic.
-        #         - "SOCIAL": persuading, negotiating, influencing, intimidating, or talking to characters.
-        #         - "INTERACT": manipulating, opening, closing, or using any object, device, container, or entrance 
-        #         (including doors, gates, chests, levers, locks, switches). 
-        #         Always use "INTERACT" for these actions, even if the object could be passed through.
-        #         - "MOVEMENT": actively traveling from one location to another, including going through entrances.
-        #         Only use "MOVEMENT" when the action is clearly about changing position or location, 
-        #         not just opening something.
-        #     - weapon: item used for attack or spellcasting.
-        #     - subject: the specific topic, claim, or object of focus — this may be a full phrase or sentence.
-        #     - details: include only clauses that add nuance not covered by other fields. Keep it one sentence max.
-        #     - Output ONLY valid JSON: { "key": "value" }.
-
-        #     Example 1:
-
-        #     Input: "I try to pick the lock on the chest"
-        #     Output: {
-        #     "actor": "player",
-        #     "action": "pick lock,
-        #     "target": "chest",
-        #     "action_type": "INTERACT,
-        #     "weapon": null,
-        #     "subject": null,
-        #     "details": null
-        #     }
-        #     ===END===
-            
-        #     Example 2:
-
-        #     Input: "I swing my sword at goblin 3"
-        #     Output: {
-        #     "actor": "player",
-        #     "action": "swing my sword",
-        #     "target": "goblin 3",
-        #     "action_type": "ATTACK",
-        #     "weapon": "sword",
-        #     "subject": null,
-        #     "details": null
-        #     }
-        #     ===END===
-        #     """
 
         return f"""{system_prompt}
 
@@ -375,31 +319,43 @@ class CodeLlamaParser:
     # Scene exit determination methods
     # -------------------------------------------------------------------------------------------
 
-    def determine_scene_exit(self, request: SceneExitRequest) -> SceneExitResult:
+    def determine_valid_target(
+        self, request: TargetValidationRequest
+    ) -> TargetValidationResponse:
         if not self.is_loaded():
             raise RuntimeError("CodeLlama parser not loaded")
+        candidates = request.candidates
+        query = request.query.strip()
 
-        cleaned_input = request.target.strip()
-        prompt = self.create_scene_exit_prompt(cleaned_input, request.scene_exits)
+        prompt = self.create_scene_exit_prompt(query, candidates)
+        print("\033[91m[DEBUG]\033[0m LLM Validator Prompt:", prompt)
 
         response = self.generate_from_model(prompt).strip("`").strip()
 
-        chosen = response if response != "" else "none"
-        print("\033[91m[DEBUG]\033[0m Model chose exit ID:", chosen)
+        # best_match = response if response != "" else "none"
+        best_match = next(
+            (d for d in candidates if d["name"].replace("_", " ") == response), None
+        )
+        print("\033[91m[DEBUG]\033[0m Model chose target:", best_match)
 
-        # Verify against exits
-        exit_names = {e.name: e for e in request.scene_exits}
-        print("\033[91m[DEBUG]\033[0m Available exit IDs:", list(exit_names.keys()))
-        if chosen in exit_names:
-            exit_label = exit_names[chosen].label
+        if not best_match:
+            return TargetValidationResponse(target=best_match)
+
+        candidate_names = {e["name"]: e for e in candidates}
+        print("\033[91m[DEBUG]\033[0m Available targets:", list(candidate_names.keys()))
+
+        # Token/Sequence verification
+        if best_match["name"] in candidate_names:
 
             # Compute similarity
             sim = max(
-                self.token_similarity(cleaned_input, exit_label),
-                self.sequence_similarity(cleaned_input, exit_label),
+                # self.token_similarity(target, match_label),
+                self.token_similarity(query, best_match["name"].replace("_", " ")),
+                # self.sequence_similarity(target, match_label),
+                self.sequence_similarity(query, best_match["name"].replace("_", " ")),
             )
             print(
-                f"[DEBUG] Similarity between '{cleaned_input}' and '{exit_label}': {sim:.2f}"
+                f"[DEBUG] Similarity between '{query}' and '{best_match["name"].replace("_", " ")}': {sim:.2f}"
             )
 
             #########################################
@@ -407,14 +363,14 @@ class CodeLlamaParser:
             #      sim threshold can be tuned       #
             #                                       #
             #########################################
-            if sim < 0.35:
-                chosen = "none"
+            if sim < 0.50:
+                best_match = None
 
-        elif chosen.lower() != "none":
+        else:
             # If model gave something invalid, fallback to none
-            chosen = "none"
+            best_match = None
 
-        return SceneExitResult(target_scene=chosen)
+        return TargetValidationResponse(target=best_match)
 
     def normalize_string(self, text: str) -> list[str]:
         """Lowercase, remove punctuation, split into words, remove stopwords."""
@@ -426,20 +382,29 @@ class CodeLlamaParser:
     def token_similarity(self, a: str, b: str) -> float:
         set_a = set(self.normalize_string(a))
         set_b = set(self.normalize_string(b))
-        return len(set_a & set_b) / len(set_a | set_b) if set_a or set_b else 0.0
+        ts = len(set_a & set_b) / len(set_a | set_b) if set_a or set_b else 0.0
+        print("\033[94m[LLM Token:]\033[0m ", ts)
+        return ts
 
     def sequence_similarity(self, a: str, b: str) -> float:
         """Fallback: fuzzy string ratio."""
-        return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+        sm = SequenceMatcher(None, a.lower(), b.lower()).ratio()
+        print("\033[94m[LLM Sequence:]\033[0m ", sm)
+        return sm
 
-    def create_scene_exit_prompt(self, target: str, exits: list[Exit]) -> str:
+    def create_scene_exit_prompt(
+        self, query: str, candidates: List[Dict[str, Any]]
+    ) -> str:
         # Load prompt template from JSON
         with open(f"{PROMPT_CONF_PATH}/scene_exit_prompt.json", "r") as f:
             prompts = json.load(f)
         template = "\n".join(prompts["system_prompt"])
 
         # Build exits string
-        exits_str = "\n".join(f"ID = {e.name}: Label = {e.label}" for e in exits)
+        candidates_str = "\n".join(
+            f"Name = {e['name'].replace('_', ' ')}: Label = {e['label']}"
+            for e in candidates
+        )
         # Fill template
-        prompt = template.format(target=target, exits=exits_str)
+        prompt = template.format(query=query, candidates=candidates_str)
         return prompt

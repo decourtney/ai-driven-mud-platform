@@ -56,7 +56,7 @@ class BaseGameEngine(ABC):
             if scenemanager_root_path
             else None
         )
-        self.exit_validator = ActionValidator()
+        self.action_validator = ActionValidator()
 
         # Subscribe to scene manager events
         self.event_bus.subscribe("scene_changed", self.on_scene_diff_update)
@@ -669,7 +669,7 @@ class BaseGameEngine(ABC):
         # )
         # print("\033[91m[DEBUG]\033[0m Scene Exit Result:", scene_exit_result)
 
-        valid_exit: Exit = self.exit_validator.validate(
+        valid_exit: Exit = self.action_validator.validate(
             target=parsed_action.target, matches=self.game_state.loaded_scene.exits
         )
         print("\033[91m[DEBUG]\033[0m Validated exit:", valid_exit.name)
@@ -698,14 +698,20 @@ class BaseGameEngine(ABC):
         if not self.game_state:
             return ValidationResult(False, "Game state not initialized")
 
-        valid_target: NpcCharacter = self.exit_validator.validate(target=attack_target, matches=npcs)
+        valid_target: NpcCharacter = self.action_validator.validate(
+            target=attack_target, matches=npcs
+        )
+        print("\033[94m[DEBUG]\033[0m Valid Attack Target:", valid_target)
+
+        # valid_llm_target: NpcCharacter = await self.action_validator.llm_validate(
+        #     target=attack_target, npcs=npcs, model_client=self.model_client
+        # )
+        # print("\033[94m[DEBUG]\033[0m Valid LLM Attack Target:", valid_llm_target)
 
         if not valid_target:
             return ValidationResult(
                 is_valid=False, reason=f"No {attack_target} to attack"
             )
-
-        print("\033[94m[DEBUG]\033[0m Valid Attack Target:", valid_target)
 
         return ValidationResult(is_valid=True)
 

@@ -2,8 +2,6 @@ import torch
 from typing import Optional
 from backend.services.api.models.scene_models import (
     GenerateSceneRequest,
-    SceneExitRequest,
-    SceneExitResult,
 )
 from backend.services.api.models.action_models import (
     ParsedAction,
@@ -11,6 +9,8 @@ from backend.services.api.models.action_models import (
     GenerateActionRequest,
     ParsedAction,
     GenerateInvalidActionRequest,
+    TargetValidationRequest,
+    TargetValidationResponse,
 )
 from backend.parsers.action_parser.codellama_parser import CodeLlamaParser
 from backend.parsers.narrator_parser.mistral_narrator import GGUFMistralNarrator
@@ -83,12 +83,14 @@ class ModelManager:
                 raise RuntimeError("Failed to load models")
         return self.parser.parse_action(request)
 
-    def determine_scene_exit(self, request: SceneExitRequest) -> SceneExitResult:
-        """Determine scene exit based on action and available exits"""
+    def determine_valid_target(
+        self, request: TargetValidationRequest
+    ) -> TargetValidationResponse:
+        """Determine valid target based on action and available targets"""
         if not self.is_parser_ready():
             if not self.load_all_models():
                 raise RuntimeError("Failed to load models")
-        return self.parser.determine_scene_exit(request)
+        return self.parser.determine_valid_target(request)
 
     # change this signature to accept request: GenerateActionRequest then adjust model
     def generate_action_narration(self, request: GenerateActionRequest) -> str:
@@ -129,7 +131,9 @@ class ModelManager:
                 narration = self.narrator.generate_scene_narration(request)
                 yield {"narration": narration}
             except Exception as fallback_error:
-                print(f"\033[33m[MODEL_MANAGER]\033[0m Fallback also failed: {fallback_error}")
+                print(
+                    f"\033[33m[MODEL_MANAGER]\033[0m Fallback also failed: {fallback_error}"
+                )
                 yield {
                     "narration": f"You find yourself in {request.scene.get('label', 'an unknown location')}."
                 }

@@ -33,7 +33,7 @@ class GGUFMistralNarrator:
         model_path: str = "/home/donovan/ai_models/ministral-8B-instruct-2410-gguf/Ministral-8B-Instruct-2410-Q4_K_M.gguf",
         n_gpu_layers: int = 1,  # -1 = offload all layers to GPU
         n_ctx: int = 4096,  # Context window
-        verbose: bool = True,
+        verbose: bool = False,
     ):
         self.model_path = model_path
         self.n_gpu_layers = n_gpu_layers

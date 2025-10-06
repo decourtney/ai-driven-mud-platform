@@ -14,8 +14,6 @@ from backend.services.api.models.health_models import HealthResponse
 from backend.services.api.models.scene_models import (
     GeneratedNarration,
     GenerateSceneRequest,
-    SceneExitRequest,
-    SceneExitResult,
 )
 from backend.services.api.models.action_models import (
     ParsedAction,
@@ -23,6 +21,8 @@ from backend.services.api.models.action_models import (
     GenerateActionRequest,
     ParsedAction,
     GenerateInvalidActionRequest,
+    TargetValidationRequest,
+    TargetValidationResponse
 )
 
 
@@ -209,9 +209,9 @@ class ModelServer:
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Parse failed: {e}")
 
-        @app.post("/determine_scene_exit", response_model=SceneExitResult)
-        def determine_scene_exit(request: SceneExitRequest = Body(...)):
-            """Determine which scene exit the player intends to use"""
+        @app.post("/determine_valid_target", response_model=TargetValidationResponse)
+        def determine_valid_target(request: TargetValidationRequest = Body(...)):
+            """Determine what the actor is targeting"""
 
             if not self.model_manager.is_parser_ready():
                 # Try to auto-load
@@ -221,11 +221,11 @@ class ModelServer:
                         status_code=503, detail="Parser model not available"
                     )
             try:
-                return self.model_manager.determine_scene_exit(request)
+                return self.model_manager.determine_valid_target(request)
 
             except Exception as e:
                 raise HTTPException(
-                    status_code=400, detail=f"Determine scene exit failed: {e}"
+                    status_code=400, detail=f"Determine target failed: {e}"
                 )
 
         @app.post("/generate_action", response_model=GeneratedNarration)
