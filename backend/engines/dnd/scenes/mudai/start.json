@@ -31,13 +31,13 @@
         "disposition": "AGGRESIVE"
       },
       {
-        "name": "rabid_wolf_2",
+        "name": "rabid_wolf_3",
         "label": "Disease-maddened wolf",
         "character_type": "NPC",
         "creature_type": "BEAST",
         "description": "It stalks with erratic movements, drool thick and red",
         "max_hp": 8,
-        "current_hp": 0,
+        "current_hp": 1,
         "damage": "",
         "strength": 10,
         "dexterity": 10,
@@ -132,7 +132,7 @@
         "disposition": "AGGRESIVE"
       },
        {
-         "name": "rabid_wolf_02",
+         "name": "rabid_wolf_2",
          "label": "Disease-maddened wolf",
          "character_type": "NPC",
          "creature_type": "BEAST",

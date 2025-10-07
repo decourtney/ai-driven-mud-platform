@@ -52,8 +52,9 @@ class ValidationResult(BaseModel):
 
 
 class ParseActionRequest(BaseModel):
+    actor: str
+    actor_type: str
     action: str
-    actor_type: CharacterType
 
 
 class TargetValidationResponse(BaseModel):

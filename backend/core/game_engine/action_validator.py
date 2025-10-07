@@ -1,4 +1,5 @@
-import re
+import Levenshtein, re
+from collections import Counter
 from difflib import SequenceMatcher
 from typing import Optional, List, Dict, Any
 from backend.core.scenes.scene_models import Exit
@@ -26,6 +27,7 @@ class ActionValidator:
             return None
 
         query = query.strip().lower()
+        print("\n\033[95m[INPUT]\033[0m", query)
 
         # Direct ID match
         for m in candidates:
@@ -38,14 +40,14 @@ class ActionValidator:
 
         for m in candidates:
             score = self.token_similarity(query, m.name.replace("_", " "))
-
+            # print("\n\033[95m[TARGET]\033[0m", m.name.replace("_", " "))
             # score = max(
-            #     self.token_similarity(target, m.name.replace("_", " ")),
-            #     # self.token_similarity(target, m.label),
-            #     # self.sequence_similarity(target, m.name.replace("_", " ")),
-            #     # self.sequence_similarity(target, m.label),
+            #     self.token_similarity(query, m.name.replace("_", " ")),
+            #     self.sequence_similarity(query, m.name.replace("_", " ")),
+            #     self.levenshtein_similarity(query, m.name.replace("_", " ")),
             # )
-            print("\033[94m[VALIDATOR]\033[0m Score:", score, "Match:", m.name)
+            print("\033[92m[VALIDATOR]\033[0m Score:", score, "Match:", m.name, '\n')
+
             if score > best_score:
                 best_score, best_match = score, m
 
@@ -60,16 +62,30 @@ class ActionValidator:
         return [w for w in text.split() if w not in self.STOPWORDS]
 
     def token_similarity(self, a: str, b: str) -> float:
-        set_a = set(self.normalize_string(a))
-        set_b = set(self.normalize_string(b))
-        ts = len(set_a & set_b) / len(set_a | set_b) if set_a or set_b else 0.0
-        print(ts)
+        tokens_a = self.normalize_string(a)
+        tokens_b = self.normalize_string(b)
+        counter_a = Counter(tokens_a)
+        counter_b = Counter(tokens_b)
+        ts = (
+            sum(min(counter_a[t], counter_b[t]) for t in set(tokens_a) | set(tokens_b))
+            / sum(
+                max(counter_a[t], counter_b[t]) for t in set(tokens_a) | set(tokens_b)
+            )
+            if tokens_a or tokens_b
+            else 0.0
+        )
+        print("\033[94m[Jaccard]\033[0m:", round(ts, 2))
         return ts
 
     def sequence_similarity(self, a: str, b: str) -> float:
         sm = SequenceMatcher(None, a.lower(), b.lower()).ratio()
-        print(sm)
+        print("\033[94m[SequenceMatcher]\033[0m:", round(sm, 2))
         return sm
+
+    def levenshtein_similarity(self, a: str, b: str) -> float:
+        ls = Levenshtein.ratio(a.lower(), b.lower())
+        print("\033[94m[Levenshtein]\033[0m:", round(ls, 2))
+        return ls
 
     async def llm_validate(
         self,
@@ -97,6 +113,5 @@ class ActionValidator:
         #     target_validation_request,
         # )
         result = await model_client.determine_valid_target(target_validation_request)
-        print("\033[91m[DEBUG]\033[0m Target Validation Result:", result)
 
         return result

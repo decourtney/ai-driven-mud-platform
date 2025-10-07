@@ -198,7 +198,7 @@ class AsyncModelServiceClient:
         try:
             response = await self.client.post(
                 f"{self.base_url}/parse_action",
-                content=request.model_dump_json(),
+                json=request.model_dump(mode="json"),
                 headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
