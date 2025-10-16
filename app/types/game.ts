@@ -3,8 +3,8 @@ export interface GameInfo {
   title: string;
   description: string;
   player_count: number;
-  status: "active" | "maintenance" | "beta";
-  difficulty: "beginner" | "intermediate" | "advanced";
+  status: "ACTIVE" | "MAINTENANCE" | "BETA";
+  difficulty: "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
   estimated_time: string;
   features: string[];
   thumbnail: string;
@@ -89,7 +89,7 @@ export interface Item {
 export interface Quest {
   id: number;
   name: string;
-  status: "active" | "completed" | "failed";
+  status: "ACTIVE" | "COMPLETED" | "FAILED";
   progress: string;
   description?: string;
 }

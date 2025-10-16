@@ -9,14 +9,16 @@ interface LobbyLayoutProps {
 
 export default async function LobbyLayout({ children }: LobbyLayoutProps) {
   const session = await auth();
-
+/**
+ * Need to fix <main> structure here
+ */
   return (
-    <div className="min-h-screen bg-black text-white">
+    <main className="flex flex-col min-h-screen bg-black text-white">
       {/* Navigation Bar */}
       <Navbar variant="solid" user={session?.user} />
 
       {/* Main Content */}
-      <main className="relative">{children}</main>
+      <div className="relative flex flex-col flex-1">{children}</div>
 
       {/* Footer (Optional) */}
       <footer className="bg-gray-900 border-t border-green-500 mt-12">
@@ -48,6 +50,6 @@ export default async function LobbyLayout({ children }: LobbyLayoutProps) {
           </div>
         </div>
       </footer>
-    </div>
+    </main>
   );
 }

@@ -7,28 +7,43 @@ import { GameInfo } from "@/app/types/game";
 import { notFound } from "next/navigation";
 
 export default async function LobbyPage() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/lobby`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
+  let games: GameInfo[] = [];
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/lobby`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      // Optionally: prevent caching errors from persisting
+      cache: "no-store",
+    });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(errorText);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    games = await res.json();
+  } catch (err) {
+    // Log it to the server console
+    console.error("Failed to load lobby data:", err);
+    // Return an empty state or fallback
+    return (
+      <div className="flex flex-col flex-1 items-center justify-center text-center">
+        <h2 className="text-2xl font-semibold mb-2">Lobby Unavailable</h2>
+        <p className="text-gray-500">
+          We’re having trouble reaching the game server.
+        </p>
+        <p className="text-gray-400 text-sm mt-2">Please try again later.</p>
+      </div>
+    );
   }
 
-  const games: GameInfo[] = await res.json();
   const featuredGame =
     games.find((game) => game.tags?.includes("featured")) ?? games[0];
   const upcomingGames = games.filter((game) => game.tags?.includes("upcoming"));
 
   const getStatusBadge = (status: GameInfo["status"]) => {
     switch (status) {
-      case "active":
+      case "ACTIVE":
         return "bg-green-600 text-white";
-      case "beta":
+      case "BETA":
         return "bg-yellow-600 text-white";
-      case "maintenance":
+      case "MAINTENANCE":
         return "bg-red-600 text-white";
       default:
         return "bg-gray-600 text-white";
@@ -37,11 +52,11 @@ export default async function LobbyPage() {
 
   const getDifficultyColor = (difficulty: GameInfo["difficulty"]) => {
     switch (difficulty) {
-      case "beginner":
+      case "BEGINNER":
         return "text-green-400";
-      case "intermediate":
+      case "INTERMEDIATE":
         return "text-yellow-400";
-      case "advanced":
+      case "ADVANCED":
         return "text-red-400";
       default:
         return "text-gray-400";

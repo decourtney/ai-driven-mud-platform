@@ -47,15 +47,15 @@ class SceneManager:
             data = json.loads(contents)
 
         self.loaded_scenes = {}
-        for scene_id, scene_data in data.items():
+        for scene_name, scene_data in data.items():
             # Build Scene object
             scene = Scene(
-                id=scene_data["id"],
+                name=scene_data["name"],
                 label=scene_data["label"],
                 description=scene_data["description"],
                 exits=[
                     Exit(
-                        id=exit["id"],
+                        name=exit["name"],
                         label=exit["label"],
                         target_scene=exit["target_scene"],
                         blocked=BlockedState(**exit.get("blocked", {"active": False})),
@@ -76,15 +76,15 @@ class SceneManager:
                 ],
             )
 
-            # Store it keyed by scene_id
-            self.loaded_scenes[scene_id] = scene
+            # Store it keyed by scene_name
+            self.loaded_scenes[scene_name] = scene
         print("[DEBUG] SCENE MANAGER LOADED WITH ZONES AND SCENES")
         return
 
     def unload_current_zone(self):
         if self.loaded_zone and self.persist_callback:
             # Persist diffs before unloading
-            for scene_id, diff in self.scene_diffs.items():
+            for scene_name, diff in self.scene_diffs.items():
                 # save diff
                 pass
         self.loaded_scenes.clear()
@@ -94,54 +94,57 @@ class SceneManager:
     # Scene retrieval & navigation
     # -------------------------
 
-    async def get_scene(self, scene_id: str, zone: Optional[str] = None) -> Scene:
+    async def get_scene(self, scene_name: str, zone: Optional[str] = None) -> Scene:
         if zone and self.loaded_zone != zone:
             await self.load_zone(zone)
-        if scene_id not in self.loaded_scenes:
-            raise KeyError(f"Scene {scene_id} not found in zone {zone}")
+        if scene_name not in self.loaded_scenes:
+            raise KeyError(f"Scene {scene_name} not found in zone {zone}")
 
-        base_scene = self.loaded_scenes[scene_id]
+        base_scene = self.loaded_scenes[scene_name]
         scene_data = base_scene.model_dump()
 
         # Apply diffs if any
-        if scene_id in self.scene_diffs:
-            diff = self.scene_diffs[scene_id].changes
+        if scene_name in self.scene_diffs:
+            diff = self.scene_diffs[scene_name].changes
             scene_data = self.deep_merge(scene_data, diff)
 
         # Instantiate dynamic NPCs if none yet
-        if not scene_data.get("npcs"):
-            dynamic_npcs = []
-            for npc_id in ["rabid_wolf"]:  # could pull from spawn tables later
-                npc_template = NPC_LIBRARY[npc_id]
-                print("",npc_template)
-                dynamic_npcs.append(NpcCharacter(**npc_template))
-            scene_data["npcs"] = dynamic_npcs
+        # if not scene_data.get("npcs"):
+        #     dynamic_npcs = []
+        #     for npc_id in ["rabid_wolf"]:  # could pull from spawn tables later
+        #         npc_template = NPC_LIBRARY[npc_id]
+        #         print("",npc_template)
+        #         dynamic_npcs.append(NpcCharacter(**npc_template))
+        #     scene_data["npcs"] = dynamic_npcs
 
         return Scene(**scene_data)
 
-    def move_to_scene(self, current_scene: Scene, exit_id: str) -> Scene:
+    def move_to_scene(self, current_scene: Scene, exit_name: str) -> Scene:
         print("[DEBUG] Move to scene from", current_scene)
-        print("[DEBUG] Exit id", exit_id)
-        exit_ = next((e for e in current_scene.exits if e.id == exit_id), None)
+        print("[DEBUG] Exit id", exit_name)
+        exit_ = next((e for e in current_scene.exits if e.name == exit_name), None)
         if not exit_:
-            raise ValueError(f"Exit {exit_id} not found in scene {current_scene.id}")
+            raise ValueError(
+                f"Exit {exit_name} not found in scene {current_scene.name}"
+            )
         return self.get_scene(exit_.zone, exit_.target_scene)
 
     # -------------------------
     # Diff tracking
     # -------------------------
 
-    async def emit_diff_update(self, scene_id: str, diff: Dict[str, Any]):
-        if scene_id not in self.scene_diffs:
-            self.scene_diffs[scene_id] = SceneDiff(scene_id=scene_id, changes={})
+    async def emit_diff_update(self, scene_name: str, diff: Dict[str, Any]):
+        if scene_name not in self.scene_diffs:
+            self.scene_diffs[scene_name] = SceneDiff(scene_name=scene_name, changes={})
 
-        self.scene_diffs[scene_id].changes = self.deep_merge(
-            self.scene_diffs[scene_id].changes, diff
+        self.scene_diffs[scene_name].changes = self.deep_merge(
+            self.scene_diffs[scene_name].changes, diff
         )
 
-        print(f"[SceneManager] Diff applied to {scene_id}: {diff}")
-        await self.event_bus.emit("scene_changed", scene_id, diff)
+        print(f"[SceneManager] Diff applied to {scene_name}: {diff}")
+        await self.event_bus.emit("scene_changed", scene_name, diff)
 
+    # NOTE: currently untested
     def deep_merge(self, base: dict, diff: dict) -> dict:
         """
         Merge diff into base.

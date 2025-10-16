@@ -310,9 +310,7 @@ class GameSessionManager:
             mode="json",
         )
 
-        await prisma.npccharacter.update(
-            where={"id": npc_character.id}, data=npc_data
-        )
+        await prisma.npccharacter.update(where={"id": npc_character.id}, data=npc_data)
 
         return
 
@@ -445,9 +443,21 @@ class GameSessionManager:
             used = max_count - available
             # Create rows for each slot
             for _ in range(available):
-                await prisma.spellslot.create(data={"player_id": player_character.id, "level": level, "used": False})
+                await prisma.spellslot.create(
+                    data={
+                        "player_id": player_character.id,
+                        "level": level,
+                        "used": False,
+                    }
+                )
             for _ in range(used):
-                await prisma.spellslot.create(data={"player_id": player_character.id, "level": level, "used": True})
+                await prisma.spellslot.create(
+                    data={
+                        "player_id": player_character.id,
+                        "level": level,
+                        "used": True,
+                    }
+                )
 
     async def save_active_quests(self, player_character: PlayerCharacter):
         # print("[DEBUG] SAVING PLAYER QUESTS")
@@ -595,14 +605,14 @@ class GameSessionManager:
             return {"success": False, "error": str(e)}
 
     async def send_initial_state_to_session(
-        self, game_state: Dict[str, Any], player_character: Dict[str, Any]
+        self, game_state: GameState, player_character: PlayerCharacter
     ):
         session = await prisma.gamesession.find_first(
-            where={"game_state": {"id": game_state["id"]}}
+            where={"game_state": {"id": game_state.id}}
         )
         print("initial state:", session)
         if not session:
-            raise RuntimeError(f"No session found for GameState {game_state["id"]}")
+            raise RuntimeError(f"No session found for GameState {game_state.id}")
 
         # Get chat history
         chatmessage_records = await prisma.chatmessage.find_many(
@@ -615,8 +625,8 @@ class GameSessionManager:
             await self.connection_manager.send_to_session(
                 session.id,
                 WebSocketMessage.initial_state(
-                    game_state=game_state,
-                    player_character=player_character,
+                    game_state=game_state.to_dict(),
+                    player_character=player_character.model_dump(mode="json"),
                     chat_history=chat_history,
                 ),
             )
@@ -682,7 +692,6 @@ class GameSessionManager:
         player_character: PlayerCharacter,
         session_id: Optional[str] = None,
     ):
-        print(player_character)
         if not session_id:
             raise RuntimeError(f"No session ID")
 

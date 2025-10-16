@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from enum import Enum
 from backend.core.characters.character_models import CharacterType
 
@@ -46,13 +46,19 @@ class ActionResult(BaseModel):
 
 class ValidationResult(BaseModel):
     is_valid: bool
+    parsed_action: Optional[ParsedAction] = None
     reason: Optional[str] = None
     suggested_action: Optional[str] = None
 
 
 class ParseActionRequest(BaseModel):
+    actor: str
+    actor_type: str
     action: str
-    actor_type: CharacterType
+
+
+class TargetValidationResponse(BaseModel):
+    target: Dict[str, Any] | None
 
 
 class GenerateActionRequest(BaseModel):
@@ -64,3 +70,8 @@ class GenerateActionRequest(BaseModel):
 class GenerateInvalidActionRequest(BaseModel):
     validation_result: ValidationResult
     parsed_action: ParsedAction
+
+
+class TargetValidationRequest(BaseModel):
+    query: str
+    candidates: List[Dict[str, Any]]

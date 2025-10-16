@@ -189,6 +189,8 @@ model NpcCharacter {
   charisma         Int
   gold             Int
   damage           String
+  label            String
+  description      String
   available_quests String[]
   disposition      Disposition @default(NEUTRAL)
   loot_table       LootEntry[]
@@ -339,7 +341,7 @@ model QuestDefinition {
 model SceneDiff {
   id            String         @id @default(cuid())
   zone          String
-  scene_id      String
+  scene_name    String
   changes       Json?
   created_at    DateTime       @default(now())
   updated_at    DateTime       @updatedAt

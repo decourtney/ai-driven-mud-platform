@@ -5,13 +5,13 @@ from backend.core.characters.npc_character import NpcCharacter
 
 
 class SceneDiff(BaseModel):
-    scene_id: str
+    scene_name: str
     changes: Dict[str, Any] = {}
 
 
 class Structure(BaseModel):
-    id: str
     name: str
+    label: str
     description: str
 
 
@@ -34,7 +34,7 @@ class LockedState(BaseModel):
 
 
 class Exit(BaseModel):
-    id: str
+    name: str
     label: str
     target_scene: str
     blocked: Optional[BlockedState] = None
@@ -42,16 +42,16 @@ class Exit(BaseModel):
 
 
 class SceneItem(BaseModel):
-    id: str
     name: str
+    label: str
     description: str
     is_interactable: bool = False
     is_loot: bool = False
 
 
 class Discovery(BaseModel):
-    id: str
-    type: str
+    name: str
+    label: str
     observation: str
     perception_dc: int
     implication: Optional[str] = None
@@ -66,7 +66,7 @@ class Discovery(BaseModel):
 
 
 class Scene(BaseModel):
-    id: str
+    name: str
     label: str
     description: str
     exits: List[Exit] = []

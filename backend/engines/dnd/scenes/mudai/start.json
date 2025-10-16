@@ -1,47 +1,83 @@
 {
   "start": {
-    "id": "start",
+    "name": "start",
     "label": "Waking Up",
     "description": "You awaken on a bed of leaves, the cool morning air brushing against your face. The scent of damp earth and pine surrounds you. The sun peeks through the canopy above, casting soft light over your small campsite.",
     "exits": [
       {
-        "id": "village_arrival",
+        "name": "village_arrival",
         "label": "path to village",
         "target_scene": "village_arrival",
         "blocked": { "active": false },
         "locked": { "active": false }
       }
+    ],
+    "npcs": [
+      {
+        "name": "rabid_wolf_1",
+        "label": "Disease-maddened wolf",
+        "character_type": "NPC",
+        "creature_type": "BEAST",
+        "description": "Its eyes burn with feverish rage and hunger",
+        "max_hp": 8,
+        "current_hp": 8,
+        "damage": "",
+        "strength": 10,
+        "dexterity": 10,
+        "constitution": 10,
+        "intelligence": 10,
+        "wisdom": 10,
+        "charisma": 10,
+        "disposition": "AGGRESIVE"
+      },
+      {
+        "name": "rabid_wolf_3",
+        "label": "Disease-maddened wolf",
+        "character_type": "NPC",
+        "creature_type": "BEAST",
+        "description": "It stalks with erratic movements, drool thick and red",
+        "max_hp": 8,
+        "current_hp": 1,
+        "damage": "",
+        "strength": 10,
+        "dexterity": 10,
+        "constitution": 10,
+        "intelligence": 10,
+        "wisdom": 10,
+        "charisma": 10,
+        "disposition": "AGGRESIVE"
+      }
     ]
   },
   "village_arrival": {
-    "id": "village_arrival",
+    "name": "village_arrival",
     "label": "The Forgotten Village",
     "description": "A shabby village square, eerily quiet.",
 
     "exits": [
       {
-        "id": "start",
+        "name": "start",
         "label": "path up hill",
         "target_scene": "hill_path",
         "blocked": { "active": false },
         "locked": { "active": false }
       },
       {
-        "id": "village_road",
+        "name": "village_road",
         "label": "road to village",
         "target_scene": "village_road",
         "blocked": { "active": false },
         "locked": { "active": false }
       },
       {
-        "id": "inn_entrance",
+        "name": "inn_entrance",
         "label": "entrance to Spork Inn",
         "target_scene": "inn",
         "blocked": { "active": false },
         "locked": { "active": false }
       },
       {
-        "id": "blacksmith_shop_entrance",
+        "name": "blacksmith_shop_entrance",
         "label": "entrance to Rusty Nail blacksmith shop",
         "target_scene": "blacksmith_shop",
         "blocked": {
@@ -65,24 +101,59 @@
 
     "structures": [
       {
-        "id": "inn",
-        "name": "Spork Inn",
+        "name": "inn",
+        "label": "Spork Inn",
         "description": "Ugly shack with a faded sign — could be a fork, could be a spoon."
       },
       {
-        "id": "blacksmith_shop",
-        "name": "Rusty Nail",
+        "name": "blacksmith_shop",
+        "label": "Rusty Nail",
         "description": "Run down building with a cold hearth."
       }
     ],
 
     "notable_npcs": [],
-    "npcs": [],
+    "npcs": [
+      {
+        "name": "rabid_wolf",
+        "label": "Disease-maddened wolf",
+        "character_type": "NPC",
+        "creature_type": "BEAST",
+        "description": "Its eyes burn with feverish rage and hunger",
+        "max_hp": 8,
+        "current_hp": 8,
+        "damage": "",
+        "strength": 10,
+        "dexterity": 10,
+        "constitution": 10,
+        "intelligence": 10,
+        "wisdom": 10,
+        "charisma": 10,
+        "disposition": "AGGRESIVE"
+      },
+       {
+         "name": "rabid_wolf_2",
+         "label": "Disease-maddened wolf",
+         "character_type": "NPC",
+         "creature_type": "BEAST",
+         "description": "It stalks with erratic movements, drool thick and red",
+         "max_hp": 8,
+         "current_hp": 8,
+         "damage": "",
+         "strength": 10,
+         "dexterity": 10,
+         "constitution": 10,
+         "intelligence": 10,
+         "wisdom": 10,
+         "charisma": 10,
+         "disposition": "AGGRESIVE"
+       }
+    ],
 
     "scene_items": [
       {
-        "id": "busted_statue",
-        "name": "The Great ...",
+        "name": "busted_statue",
+        "label": "The Great ...",
         "description": "Toppled marble statue of a robed man. Broken and defaced — the plaque only reads 'The Great'.",
         "is_interactable": true,
         "is_loot": false
@@ -91,16 +162,16 @@
 
     "discoveries": [
       {
-        "id": "no_footprints",
-        "type": "environment",
+        "name": "no_footprints",
+        "label": "environment",
         "observation": "No recent footprints in the dust on doorsteps",
         "implication": "The village has been empty for some time",
         "is_discovered": false,
         "perception_dc": 12
       },
       {
-        "id": "quest_hint_bandits",
-        "type": "quest_hook",
+        "name": "quest_hint_bandits",
+        "label": "quest_hook",
         "observation": "Scraps of cloth with a bandit insignia caught on a broken fence.",
         "quest": "bandit_hideout",
         "is_discovered": false,

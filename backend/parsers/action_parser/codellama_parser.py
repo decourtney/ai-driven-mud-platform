@@ -3,10 +3,8 @@ CodeLlama-based action parser implementing the ActionParser interface.
 This can now be easily swapped out or mocked for testing.
 """
 
-import torch
-import re
-import json
-import gc
+import torch, re, json, gc
+from typing import List, Any, Dict
 from difflib import SequenceMatcher
 from transformers import (
     AutoTokenizer,
@@ -20,8 +18,9 @@ from backend.services.api.models.action_models import (
     ParsedAction,
     ActionType,
     ParseActionRequest,
+    TargetValidationRequest,
+    TargetValidationResponse,
 )
-from backend.core.scenes.scene_models import Exit
 
 
 PROMPT_CONF_PATH = "backend/parsers/action_parser/prompts"
@@ -140,22 +139,21 @@ class CodeLlamaParser:
             print("[DEBUG] CodeLlama is loaded, proceeding with parsing")
 
             # Prepare input
-            cleaned_input = request.action.strip()
-            cleaned_input = re.sub(r"\bInput:\s*", "", cleaned_input)
-            prompt = self.create_action_parse_prompt(cleaned_input)
-            print(f"[DEBUG] Cleaned input: '{cleaned_input}'")
+            actor = request.actor
+            actor_type = request.actor_type
+            action = request.action.strip()
+            prompt = self.create_action_parse_prompt(actor, actor_type, action)
+            print(f"[DEBUG] Raw action: '{request}'")
 
             response = self.generate_from_model(prompt)
             print(f"[DEBUG] Model response: '{response}'")
 
             # Parse the response
-            print("[DEBUG] About to call parse_llama_response")
-            parsed_result = self.parse_llama_response(response, cleaned_input)
+            parsed_result = self.parse_llama_response(response, action)
             print("[DEBUG] Parse result:", parsed_result)
-            print("[DEBUG] Type of parse result:", type(parsed_result))
 
             # Add actor_type
-            parsed_result["actor_type"] = request.actor_type
+            parsed_result["actor_type"] = actor_type
             print("[DEBUG] Result dict with actor_type:", parsed_result)
 
             # Create and return ParsedAction
@@ -176,58 +174,17 @@ class CodeLlamaParser:
                 result_dict["actor_type"] = request.actor_type
                 return ParsedAction(**result_dict)
 
-    def create_action_parse_prompt(self, action: str) -> str:
+    def create_action_parse_prompt(
+        self, actor: str, actor_type: str, action: str
+    ) -> str:
         """Create a well-structured prompt for CodeLlama"""
-        system_prompt = """
-            You are a D&D text action parser.
-            Given user input, return a JSON object with these keys:
-
-            - Fields: "actor", "action", "target", "action_type", "weapon", "subject", "details".
-            - actor: who/what is performing the action.
-            - action: verb or short phrase describing what the actor is doing.
-            - target: who/what is affected by the action.
-            - action_type: one of ["ATTACK", "SPELL", "SOCIAL", "INTERACT", "MOVEMENT"]:
-                - "ATTACK": physical or weapon-based attack.
-                - "SPELL": casting magic.
-                - "SOCIAL": persuading, negotiating, influencing, intimidating, or talking to characters.
-                - "INTERACT": manipulating, opening, closing, or using any object, device, container, or entrance 
-                (including doors, gates, chests, levers, locks, switches). 
-                Always use "INTERACT" for these actions, even if the object could be passed through.
-                - "MOVEMENT": actively traveling from one location to another, including going through entrances.
-                Only use "MOVEMENT" when the action is clearly about changing position or location, 
-                not just opening something.
-            - weapon: item used for attack or spellcasting.
-            - subject: the specific topic, claim, or object of focus — this may be a full phrase or sentence.
-            - details: include only clauses that add nuance not covered by other fields. Keep it one sentence max.
-            - Output ONLY valid JSON.
-
-            Examples:
-
-            Input: "I try to pick the lock on the chest"
-            Output: {
-            "actor": "player",
-            "action": "pick the lock",
-            "target": "chest",
-            "action_type": "INTERACT,
-            "weapon": null,
-            "subject": null,
-            "details": null
-            }===END===
-
-            Input: "I swing my sword at the goblin"
-            Output: {
-            "actor": "player",
-            "action": "swing my sword",
-            "target": "goblin",
-            "action_type": "ATTACK",
-            "weapon": "sword",
-            "subject": null,
-            "details": null
-            }===END===
-            """
+        # Load config from JSON file
+        with open(f"{PROMPT_CONF_PATH}/action_parse_prompt.json", "r") as file:
+            system_prompt = json.load(file)
 
         return f"""{system_prompt}
-
+        Actor: "{actor}"
+        Actor Type: "{actor_type}"
         Input: "{action}"
         Output: """
 
@@ -276,66 +233,118 @@ class CodeLlamaParser:
     def make_stop_criteria(self, stop_strings, tokenizer):
         return StoppingCriteriaList([StopOnStrings(stop_strings, tokenizer)])
 
-    def parse_llama_response(
-        self, response: str, original_input: str
-    ) -> dict:  # Return dict, not ParsedAction
-        """Parse the CodeLlama model's JSON response"""
-        # Clean up response
+    def parse_llama_response(self, response: str, original_input: str) -> dict:
+        """Parse the CodeLlama model's JSON response into a dict structure."""
+
         response = response.strip()
-        # Remove trailing text
-        stop_patterns = [r"===END==="]
-        for pattern in stop_patterns:
-            match = re.search(pattern, response)
-            if match:
-                response = response[: match.start()]
-                break
 
-        # Extract JSON
-        json_patterns = [
-            r'\{[^{}]*"actor"[^{}]*\}',
-            r'\{[^{}]*"action"[^{}]*\}',
-            r"\{.*?\}",
-        ]
+        # Truncate at known stop markers
+        stop_marker = "===END==="
+        if stop_marker in response:
+            response = response.split(stop_marker, 1)[0].strip()
 
-        json_str = None
-        for pattern in json_patterns:
-            json_match = re.search(pattern, response, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
-                break
+        # Extract first JSON object from response
+        json_match = re.search(r"\{.*?\}", response, re.DOTALL)
+        if not json_match:
+            print("[-] No JSON object found in model output.")
+            return self._fallback_to_dict(original_input)
 
-        if json_str:
-            try:
-                # Fix common JSON issues
-                # json_str = json_str.replace("'", '"')
-                json_str = re.sub(r",\s*}", "}", json_str)
-                parsed_json = json.loads(json_str)
+        json_str = json_match.group(0)
 
-                # Return dict instead of ParsedAction
-                return {
-                    "actor": parsed_json.get("actor", "player"),
-                    "action": parsed_json.get("action", "unknown action"),
-                    "target": parsed_json.get("target"),
-                    "action_type": self._normalize_action_type(
-                        parsed_json.get("action_type", "INTERACT")
-                    ),
-                    "weapon": parsed_json.get("weapon"),
-                    "subject": parsed_json.get("subject"),
-                    "details": parsed_json.get("details"),
-                    # Don't include actor_type here - it will be added in parse_action
-                }
-            except (json.JSONDecodeError, ValueError) as e:
-                print(f"[-] JSON parsing failed: {e}")
+        # Clean common issues before parsing
+        json_str = re.sub(r",\s*}", "}", json_str)  # remove trailing commas
+        json_str = re.sub(r",\s*]", "]", json_str)
+        json_str = json_str.replace("“", '"').replace("”", '"').replace("’", "'")
 
-        # Fall back to fallback parser result
+        try:
+            parsed_json = json.loads(json_str)
+        except json.JSONDecodeError as e:
+            print(f"[-] JSON parsing failed: {e}")
+            return self._fallback_to_dict(original_input)
+
+        # Normalize & fill defaults
+        return {
+            "actor": parsed_json.get("actor", "player"),
+            "action": parsed_json.get("action", "unknown action"),
+            "target": parsed_json.get("target"),
+            "action_type": self._normalize_action_type(
+                parsed_json.get("action_type", "INTERACT")
+            ),
+            "weapon": parsed_json.get("weapon"),
+            "subject": parsed_json.get("subject"),
+            "details": parsed_json.get("details"),
+        }
+
+    def _fallback_to_dict(self, original_input: str) -> dict:
+        """Use fallback parser and ensure consistent dict output."""
         print(f"[-] CodeLlama response invalid, using fallback for: '{original_input}'")
         fallback_result = self.fallback_parser.parse_action(original_input)
+        return (
+            fallback_result
+            if isinstance(fallback_result, dict)
+            else fallback_result.model_dump()
+        )
 
-        # Convert fallback result to dict
-        if isinstance(fallback_result, dict):
-            return fallback_result
-        else:
-            return fallback_result.model_dump()
+    # def parse_llama_response(
+    #     self, response: str, original_input: str
+    # ) -> dict:  # Return dict, not ParsedAction
+    #     """Parse the CodeLlama model's JSON response"""
+    #     # Clean up response
+    #     response = response.strip()
+    #     # Remove trailing text
+    #     stop_patterns = [r"===END==="]
+    #     for pattern in stop_patterns:
+    #         match = re.search(pattern, response)
+    #         if match:
+    #             response = response[: match.start()]
+    #             break
+
+    #     # Extract JSON
+    #     json_patterns = [
+    #         r'\{[^{}]*"actor"[^{}]*\}',
+    #         r'\{[^{}]*"action"[^{}]*\}',
+    #         r"\{.*?\}",
+    #     ]
+
+    #     json_str = None
+    #     for pattern in json_patterns:
+    #         json_match = re.search(pattern, response, re.DOTALL)
+    #         if json_match:
+    #             json_str = json_match.group(0)
+    #             break
+
+    #     if json_str:
+    #         try:
+    #             # Fix common JSON issues
+    #             # json_str = json_str.replace("'", '"')
+    #             json_str = re.sub(r",\s*}", "}", json_str)
+    #             parsed_json = json.loads(json_str)
+
+    #             # Return dict instead of ParsedAction
+    #             return {
+    #                 "actor": parsed_json.get("actor", "player"),
+    #                 "action": parsed_json.get("action", "unknown action"),
+    #                 "target": parsed_json.get("target"),
+    #                 "action_type": self._normalize_action_type(
+    #                     parsed_json.get("action_type", "INTERACT")
+    #                 ),
+    #                 "weapon": parsed_json.get("weapon"),
+    #                 "subject": parsed_json.get("subject"),
+    #                 "details": parsed_json.get("details"),
+    #                 # Don't include actor_type here - it will be added in parse_action
+    #             }
+    #         except (json.JSONDecodeError, ValueError) as e:
+    #             print(f"[-] JSON parsing failed: {e}")
+
+    #     # Fall back to fallback parser result
+    #     print(f"[-] CodeLlama response invalid, using fallback for: '{original_input}'")
+    #     fallback_result = self.fallback_parser.parse_action(original_input)
+
+    #     # Convert fallback result to dict
+    #     if isinstance(fallback_result, dict):
+    #         return fallback_result
+    #     else:
+    #         return fallback_result.model_dump()
 
     def _normalize_action_type(self, action_type: str) -> str:
         """Normalize action type to valid ActionType values"""
@@ -364,31 +373,52 @@ class CodeLlamaParser:
     # Scene exit determination methods
     # -------------------------------------------------------------------------------------------
 
-    def determine_scene_exit(self, request: SceneExitRequest) -> SceneExitResult:
+    def determine_valid_target(
+        self, request: TargetValidationRequest
+    ) -> TargetValidationResponse:
         if not self.is_loaded():
             raise RuntimeError("CodeLlama parser not loaded")
+        candidates = request.candidates
+        query = request.query.strip()
 
-        cleaned_input = request.target.strip()
-        prompt = self.create_scene_exit_prompt(cleaned_input, request.scene_exits)
+        prompt = self.create_scene_exit_prompt(query, candidates)
+        # print("\033[91m[DEBUG]\033[0m LLM Validator Prompt:", prompt)
 
         response = self.generate_from_model(prompt).strip("`").strip()
 
-        chosen = response if response != "" else "none"
-        print("\033[91m[DEBUG]\033[0m Model chose exit ID:", chosen)
+        # best_match = response if response != "" else "none"
+        best_match = next(
+            (d for d in candidates if d["name"].replace("_", " ") == response), None
+        )
 
-        # Verify against exits
-        exit_ids = {e.id: e for e in request.scene_exits}
-        print("\033[91m[DEBUG]\033[0m Available exit IDs:", list(exit_ids.keys()))
-        if chosen in exit_ids:
-            exit_label = exit_ids[chosen].label
+        if not best_match:
+            print(
+                "\n\033[96m[LLM MATCH]\033[0m: None",
+                "\n",
+            )
+            return TargetValidationResponse(target=best_match)
+
+        print(
+            "\n\033[96m[LLM MATCH]\033[0m:",
+            best_match["name"].replace("_", " "),
+            "\n",
+        )
+
+        candidate_names = {e["name"]: e for e in candidates}
+        print("\033[91m[DEBUG]\033[0m Available targets:", list(candidate_names.keys()))
+
+        # Token/Sequence verification
+        if best_match["name"] in candidate_names:
 
             # Compute similarity
             sim = max(
-                self.token_similarity(cleaned_input, exit_label),
-                self.sequence_similarity(cleaned_input, exit_label),
+                # self.token_similarity(target, match_label),
+                self.token_similarity(query, best_match["name"].replace("_", " ")),
+                # self.sequence_similarity(target, match_label),
+                self.sequence_similarity(query, best_match["name"].replace("_", " ")),
             )
             print(
-                f"[DEBUG] Similarity between '{cleaned_input}' and '{exit_label}': {sim:.2f}"
+                f"[DEBUG] Similarity between '{query}' and '{best_match["name"].replace("_", " ")}': {sim:.2f}"
             )
 
             #########################################
@@ -396,14 +426,14 @@ class CodeLlamaParser:
             #      sim threshold can be tuned       #
             #                                       #
             #########################################
-            if sim < 0.35:
-                chosen = "none"
+            if sim < 0.50:
+                best_match = None
 
-        elif chosen.lower() != "none":
+        else:
             # If model gave something invalid, fallback to none
-            chosen = "none"
+            best_match = None
 
-        return SceneExitResult(target_scene=chosen)
+        return TargetValidationResponse(target=best_match)
 
     def normalize_string(self, text: str) -> list[str]:
         """Lowercase, remove punctuation, split into words, remove stopwords."""
@@ -415,20 +445,29 @@ class CodeLlamaParser:
     def token_similarity(self, a: str, b: str) -> float:
         set_a = set(self.normalize_string(a))
         set_b = set(self.normalize_string(b))
-        return len(set_a & set_b) / len(set_a | set_b) if set_a or set_b else 0.0
+        ts = len(set_a & set_b) / len(set_a | set_b) if set_a or set_b else 0.0
+        print("\033[94m[LLM Token:]\033[0m ", ts)
+        return ts
 
     def sequence_similarity(self, a: str, b: str) -> float:
         """Fallback: fuzzy string ratio."""
-        return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+        sm = SequenceMatcher(None, a.lower(), b.lower()).ratio()
+        print("\033[94m[LLM Sequence:]\033[0m ", sm)
+        return sm
 
-    def create_scene_exit_prompt(self, target: str, exits: list[Exit]) -> str:
+    def create_scene_exit_prompt(
+        self, query: str, candidates: List[Dict[str, Any]]
+    ) -> str:
         # Load prompt template from JSON
         with open(f"{PROMPT_CONF_PATH}/scene_exit_prompt.json", "r") as f:
             prompts = json.load(f)
         template = "\n".join(prompts["system_prompt"])
 
         # Build exits string
-        exits_str = "\n".join(f"ID = {e.id}: Label = {e.label}" for e in exits)
+        candidates_str = "\n".join(
+            f"Name = {e['name'].replace('_', ' ')}: Label = {e['label']}"
+            for e in candidates
+        )
         # Fill template
-        prompt = template.format(target=target, exits=exits_str)
+        prompt = template.format(query=query, candidates=candidates_str)
         return prompt

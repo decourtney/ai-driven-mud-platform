@@ -98,7 +98,7 @@ class BaseCharacter(BaseModel):
         )
 
     def can_act(self) -> bool:
-        """Check if character can take actions (attack, interact, cast, etc.)"""
+        """Check if character can make actions (attack, interact, cast, etc.)"""
         blocking_effects = {
             ConditionEffect.INCAPACITATED,
             ConditionEffect.PARALYZED,
